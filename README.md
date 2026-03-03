@@ -1,4 +1,6 @@
-# Bibliotheks-Pods: datensouveräne personalisierte Empfehlungen in Bibliotheken
+# Bibliotheks-Pods
+
+datensouveräne personalisierte Empfehlungen in Bibliotheken
 
 ## Architektur
 
@@ -50,5 +52,3 @@ Distributed under the MIT License. See [LICENSE](LICENSE) file for more informat
 ## Contact
 
 it@M - opensource@muenchen.de
-[made-with-love-shield]: https://img.shields.io/badge/made%20with%20%E2%9D%A4%20by-it%40M-yellow?style=for-the-badge
-[itm-opensource]: https://opensource.muenchen.de/
