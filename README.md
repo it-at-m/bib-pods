@@ -1,44 +1,7 @@
-## Customize this file after creating the new REPO and remove this lines.
-What to adjust:  
-* Add the your project or repo name direct under the logo.
-* Add a short and long desciption.
-* Add links for your final repo to report a bug or request a feature.
-* Add list of used technologies.
-* If you have, add a roadmap or remove this section.
-* Fill up the section for set up and documentation.
- * Start in this file only with documentation and link to the docs folder.
-* Add more project shields. Use [shields.io](https://shields.io/) with style `for-the-badge`.
+# Bibliotheks-Pods: datensouveräne personalisierte Empfehlungen in Bibliotheken
 
-## ------- end to remove -------
-<!-- add Project Logo, if existing -->
+## Architektur
 
-# repo or project name
-
-[![Made with love by it@M][made-with-love-shield]][itm-opensource]
-<!-- feel free to add more shields, style 'for-the-badge' -> see https://shields.io/badges -->
-
-*Add a description from your project here.*
-
-
-### Built With
-
-The documentation project is built with technologies we use in our projects:
-
-* *write here the list of used technologies*
-
-## Roadmap
-
-*if you have a ROADMAP for your project add this here*
-
-
-See the [open issues](#) for a full list of proposed features (and known issues).
-
-
-## Set up
-*how can i start and fly this project*
-
-## Documentation
-*what insights do you have to tell*
 
 ```mermaid
 graph TD;
@@ -48,7 +11,6 @@ graph TD;
     C-->D;
 ```
 
-use [diagrams](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams).
 
 ## Contributing
 
@@ -75,7 +37,5 @@ Distributed under the MIT License. See [LICENSE](LICENSE) file for more informat
 ## Contact
 
 it@M - opensource@muenchen.de
-
-<!-- project shields / links -->
 [made-with-love-shield]: https://img.shields.io/badge/made%20with%20%E2%9D%A4%20by-it%40M-yellow?style=for-the-badge
 [itm-opensource]: https://opensource.muenchen.de/
