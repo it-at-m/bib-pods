@@ -3,8 +3,8 @@
 Bibliotheksnutzer*innen soll es ermöglicht werden persönliche Daten wie ihre Präferenzen und Ausleihhistorie in einem [Solid Pod](https://positionspapier-solid-in-der-verwaltung-29ff8c.usercontent.opencode.de/) zu verwalten.
 Diese persönlichen Daten können für personalisierte Angebote und Empfehlungen genutzt werden, ohne dass die Bibliothek diese Daten selbst speichern muss. 
 
-Die [Webseite der Münchner Stadtbibliothek](https://www.muenchner-stadtbibliothek.de/) basiert auf [typo3](https://opensource.muenchen.de/de/software/typo3.html) und kann mit einem Plug-ins erweitert werden.
-Nachnutzung durch andere Bibliotheken wird von Anfang an angestrebt
+Die [Webseite der Münchner Stadtbibliothek](https://www.muenchner-stadtbibliothek.de/) basiert auf [typo3](https://opensource.muenchen.de/de/software/typo3.html) und kann mit einem Plug-in erweitert werden.
+Nachnutzung durch andere Bibliotheken wird von Anfang an angestrebt.
 
 Das Projekt wird unterstützt durch die Abteilung [Daten und Algorithmen in der Münchner Stadtbibliothek](https://www.muenchner-stadtbibliothek.de/daten-algorithmen) und dem [OSPO](https://opensource.muenchen.de/de/ospo.html).
 
