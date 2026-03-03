@@ -4,11 +4,24 @@
 
 
 ```mermaid
-graph TD;
-    A-->B;
-    A-->C;
-    B-->D;
-    C-->D;
+architecture-beta
+    group bib(database)[Bib Daten]
+        service stoc(database)[Books Stock] in bib
+        service event(database)[Events] in bib
+        service other(database)[Other] in bib
+        service index(database)[Index] in bib
+    group web(internet)[Website]
+        service podwidget(internet)[Widget] in web
+    group pod(cloud)[Pod]
+        service frontend(internet)[Frontend] in pod
+        service backend(disk)[Backend] in pod
+
+    stoc:L -- B:index
+    event:L -- B:index
+    other:L -- B:index
+    index:L -- L:podwidget
+    frontend:R -- L:podwidget
+    frontend:L -- R:backend
 ```
 
 
