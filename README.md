@@ -10,6 +10,7 @@ Das Projekt wird unterstützt durch die Abteilung [Daten und Algorithmen in der 
 
 ## Architektur
 
+''vorläufig''
 
 ```mermaid
 architecture-beta
