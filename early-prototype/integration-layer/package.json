@@ -1,0 +1,16 @@
+{
+  "name": "library-pods-integration-layer",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@comunica/query-sparql-solid": "^5.0.1",
+    "@foerderfunke/sem-ops-utils": "^0.3.8",
+    "@inrupt/solid-client": "^1.23.1",
+    "@inrupt/solid-client-authn-browser": "^3.1.1",
+    "vite": "^7.3.1"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "library-pods-solid-server",
+  "type": "module",
+  "scripts": {
+    "start": "npx @solid/community-server -c @css:config/file.json -f data/ --seedConfig seedConfig.json"
+  },
+  "dependencies": {
+    "@solid/community-server": "^7.1.8"
+  }
+}
