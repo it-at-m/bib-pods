@@ -12,27 +12,66 @@ Auch das Positionspapier [Digitale Souveränität mit Solid, für interoperable 
 
 ## Architektur
 
-''vorläufig''
+*vorläufig*
 
 ```mermaid
-architecture-beta
-    group bib(database)[Bib Daten]
-        service stoc(database)[Books Stock] in bib
-        service event(database)[Events] in bib
-        service other(database)[Other] in bib
-        service index(database)[Index] in bib
-    group web(internet)[Website]
-        service podwidget(internet)[Widget] in web
-    group pod(cloud)[Pod]
-        service frontend(internet)[Frontend] in pod
-        service backend(disk)[Backend] in pod
+flowchart TD
+    classDef nonArch fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef planned stroke:#9ca3af,color:#6b7280,stroke-dasharray: 5 5
 
-    stoc:L -- B:index
-    event:L -- B:index
-    other:L -- B:index
-    index:L -- L:podwidget
-    frontend:R -- L:podwidget
-    frontend:L -- R:backend
+    subgraph msb["<h2>MSB</h2>"]
+        data["<b>Datenquellen</b>
+            #bull; Katalogdaten (OAI)
+            #bull; Mediensuche (SRU)
+            #bull; Veranstaltungen (VADB)
+            #bull; Weitere (z.B. Blogposts)
+        "]
+        site["<b>Webseite</b>"]
+        typo3["<b>Typo3 Plugin</b>
+            #bull; Interessensverwaltung
+            #bull; Empfehlungsmodul
+            #bull; One-Klick-Modul
+        "]
+        index["<b>Index</b>"]
+        typo3 -->|übergibt persönliche Daten aus Pod als Suchparameter| index
+        index -->|indiziert| data
+        site -->|integriert| typo3
+    end
+
+    subgraph cori["<h2>CORI</h2>"]
+        cockpit["<b>Cockpit</b>
+            <small><i>serverless</i></small>
+            #bull; Profile verwalten
+            #bull; Import/Export
+            #bull; Zugriffshistorie
+        "]
+        pod["<b>Pod</b>
+            <small><i>BYO Profile Storage</i></small>
+            #bull;&nbsp;Managed&nbsp;Solid&nbsp;Pod
+            #bull; Eigener Solid Pod
+            <span color=gray>(#bull; EUDI Wallet?)</span>
+            (#bull; Local Storage)
+            (#bull; In-Memory)
+        "]
+        admin["<b>Admin</b><br>#bull;&nbsp;Gesamtvokabular&nbsp;verwalten<br>#bull;&nbsp;Änderungen&nbsp;kommunizieren<br>#bull;&nbsp;Liste&nbsp;teilnehmender&nbsp;Apps"]
+        exec["<b>Execution Engine</b>"]:::planned
+        integrate["<b>Integration SDK</b>"]
+        cockpit -->|nutzt| integrate
+        integrate <-->|read/write| pod
+        integrate -.-> exec
+        exec -.->|führt Verarbeitungslogik aus| pod
+    end
+
+    bibComm["<b>Bibliotheksübergreifende&nbsp;Zusammenarbeit</b>
+        #bull;&nbsp;Gemeinsame&nbsp;Vokabularentwicklung
+        #bull;&nbsp;Gemeinsame&nbsp;Feature-Entwicklung
+    "]:::nonArch
+    
+    cori ~~~ msb
+    msb ~~~ spacer[" "] ~~~ cori
+    style spacer fill:none,stroke:none
+    typo3 -->|nutzt| integrate
+    msb -->|koordiniert| bibComm
 ```
 
 
