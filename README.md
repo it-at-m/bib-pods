@@ -33,7 +33,7 @@ flowchart TD
             #bull; One-Klick-Modul
         "]
         index["<b>Index</b>"]
-        typo3 -->|speist persönliche Daten in Suche ein| index
+        typo3 -->|übergibt persönliche Daten aus Pod als Suchparameter| index
         index -->|indiziert| data
         site -->|integriert| typo3
     end
