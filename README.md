@@ -17,6 +17,7 @@ Auch das Positionspapier [Digitale Souveränität mit Solid, für interoperable 
 ```mermaid
 flowchart TD
     classDef nonArch fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef nonArchDashed fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-dasharray: 5 5
     classDef planned stroke:#9ca3af,color:#6b7280,stroke-dasharray: 5 5
     classDef ghost fill:none,stroke:none,color:#374151
     style moreUseCases stroke:#9ca3af,color:#6b7280,stroke-dasharray: 5 5
@@ -48,7 +49,7 @@ textNode["<div align='left'>
 #bull; Restaurants in Kiel
 #bull; Berliner Volkshochschulen
 #bull; Angebote für Erstsemester-Studierende einer Uni
-→ Letztlich alle Apps und Services, die Angebote personalisieren möchten, ohne Nutzerdaten selbst zu speichern
+→ Letztlich alle Apps und Services, die Angebote personalisieren möchten, ohne Nutzerdaten selbst zu speichern: <i>privacy-preserving personalization-as-a-service</i>
 <span style='opacity:0'>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>
 </div>"]:::ghost
     end
@@ -83,6 +84,11 @@ textNode["<div align='left'>
         #bull; In-Memory
     "]:::planned
 
+    communityInput["<b>Weitere Kuratierungs- und Empfehlungsquellen</b>
+#bull;&nbsp;Von&nbsp;anderen&nbsp;Nutzer*innen&nbsp;hinterlegte&nbsp;Muster&nbsp;wie manuell&nbsp;kuratierte&nbsp;Empfehlungen&nbsp;oder&nbsp;lokale&nbsp;Events
+#bull;&nbsp;Weitere&nbsp;Empfehlungsalgorithmen&nbsp;via&nbsp;Plugins
+    "]:::nonArchDashed
+
     psi --> pod1
     psi --> pod2
     psi --> pod3
@@ -93,6 +99,7 @@ textNode["<div align='left'>
     typo3 -->|nutzt| integrate
     connectBtn -->|nutzt| integrate
     msb -->|koordiniert| bibComm
+    communityInput -->|könnten einfließen| typo3
 ```
 
 
