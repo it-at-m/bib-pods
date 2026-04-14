@@ -1,7 +1,11 @@
 .DS_Store
 .idea/
+
+_local/
+
 node_modules/
 package-lock.json
-_local/
+
 interim-index/oai/data/
 typo3/site/
+typo3/bib-pods-ext/Resources/Public/JavaScript/bundle.js

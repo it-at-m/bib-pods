@@ -8,5 +8,6 @@ page {
         templateRootPaths.10 = EXT:bib_pods_ext/Resources/Private/Templates/Page/
     }
 
-    includeJSFooter.solid_pod = EXT:bib_pods_ext/Resources/Public/JavaScript/solid-pod.js
+    includeJSFooter.solid_pod = EXT:bib_pods_ext/Resources/Public/JavaScript/bundle.js
+    includeJSFooter.solid_pod.type = module
 }

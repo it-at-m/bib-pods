@@ -1,0 +1,12 @@
+{
+  "name": "bib-pods-typo3-ext",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@foerderfunke/sem-ops-utils": "^0.3.9",
+    "vite": "^7.3.1"
+  }
+}
