@@ -1,0 +1,12 @@
+page = PAGE
+page {
+    typeNum = 0
+
+    10 = FLUIDTEMPLATE
+    10 {
+        templateName = Default
+        templateRootPaths.10 = EXT:bib_pods_ext/Resources/Private/Templates/Page/
+    }
+
+    includeJSFooter.solid_pod = EXT:bib_pods_ext/Resources/Public/JavaScript/solid-pod.js
+}

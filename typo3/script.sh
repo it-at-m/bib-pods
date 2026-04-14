@@ -4,7 +4,8 @@
 
 set -euo pipefail
 
-SITE_DIR="$(cd "$(dirname "$0")" && pwd)/site"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SITE_DIR="$SCRIPT_DIR/site"
 
 case "${1:-}" in
   setup)
@@ -29,6 +30,15 @@ case "${1:-}" in
     echo "==> Installing TYPO3 via Composer..."
     ddev composer create-project typo3/cms-base-distribution
 
+    echo "==> Mounting bib-pods-ext into DDEV container..."
+    cat > "$SITE_DIR/.ddev/docker-compose.bib-pods-ext.yaml" <<DDEV
+services:
+  web:
+    volumes:
+      - $SCRIPT_DIR/bib-pods-ext:/var/www/html/bib-pods-ext:rw
+DDEV
+    ddev restart
+
     echo "==> Resetting database..."
     echo "DROP DATABASE IF EXISTS \`db\`; CREATE DATABASE \`db\`;" | ddev mysql
 
@@ -46,6 +56,36 @@ case "${1:-}" in
       --project-name=typo3-local \
       --create-site="$SITE_URL" \
       --no-interaction
+
+    echo "==> Installing bib-pods-ext..."
+    ddev composer config repositories.bib-pods-ext path bib-pods-ext
+    ddev composer require bib-pods/typo3-ext:@dev
+
+    echo "==> Activating bib-pods-ext set..."
+    cat > "$SITE_DIR/config/sites/main/config.yaml" <<YAML
+base: '$SITE_URL'
+dependencies:
+  - bib-pods/typo3-ext
+errorHandling: {  }
+languages:
+  -
+    title: English
+    enabled: true
+    languageId: 0
+    base: /
+    locale: en_US.UTF-8
+    navigationTitle: English
+    flag: us
+rootPageId: 1
+routes: {  }
+YAML
+
+    echo "==> Removing default TypoScript overrides..."
+    echo "DELETE FROM sys_template;" | ddev mysql
+    rm -f "$SITE_DIR/config/sites/main/setup.typoscript"
+
+    echo "==> Flushing TYPO3 caches..."
+    ddev typo3 cache:flush
 
     echo "==> Done. Opening TYPO3 frontend and backend..."
     ddev launch
