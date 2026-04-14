@@ -8,6 +8,11 @@ export default defineConfig({
             entry: "src/main.js",
             formats: ["es"],
             fileName: () => "bundle.js"
+        },
+        rollupOptions: {
+            output: {
+                inlineDynamicImports: true
+            }
         }
     }
 })

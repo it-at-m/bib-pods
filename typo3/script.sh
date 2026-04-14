@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 # Manage the local TYPO3 DDEV instance
 # Usage: ./script.sh {setup|start|stop}
+#
+# If the Solid server was restarted and you get a stale client
+# error, clear the browser storage for the DDEV site:
+# chrome://settings/content/all?searchSubpage=ddev&search=view+per
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SITE_DIR="$SCRIPT_DIR/site"
+
+site_url() {
+    echo "https://$(ddev exec printenv DDEV_HOSTNAME):$(ddev exec printenv DDEV_ROUTER_HTTPS_PORT)"
+}
 
 case "${1:-}" in
   setup)
@@ -24,7 +32,7 @@ case "${1:-}" in
 
     echo "==> Starting DDEV..."
     ddev start
-    SITE_URL=$(ddev exec printenv DDEV_PRIMARY_URL)
+    SITE_URL=$(site_url)
     rm -f .gitignore  # ddev start creates this, but composer create-project requires a clean directory
 
     echo "==> Installing TYPO3 via Composer..."
@@ -88,16 +96,17 @@ YAML
     ddev typo3 cache:flush
 
     echo "==> Done. Opening TYPO3 frontend and backend..."
-    ddev launch
-    ddev launch /typo3/
+    ddev launch "$SITE_URL"
+    ddev launch "$SITE_URL/typo3/"
     ;;
 
   start)
     cd "$SITE_DIR"
     ddev start
     echo "==> TYPO3 is running."
-    ddev launch
-    ddev launch /typo3/
+    SITE_URL=$(site_url)
+    ddev launch "$SITE_URL"
+    ddev launch "$SITE_URL/typo3/"
     ;;
 
   stop)

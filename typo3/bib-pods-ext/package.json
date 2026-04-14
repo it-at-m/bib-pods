@@ -7,6 +7,8 @@
   },
   "devDependencies": {
     "@foerderfunke/sem-ops-utils": "^0.3.9",
+    "@inrupt/solid-client": "^1.23.1",
+    "@inrupt/solid-client-authn-browser": "^3.1.1",
     "vite": "^7.3.1"
   }
 }
