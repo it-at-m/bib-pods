@@ -1,14 +1,17 @@
-<header>
-    <button id="solid-pod-connect" type="button">Connect your Pod</button>
-    <span id="solid-pod-status"></span>
-</header>
-
-<section id="pod-actions" style="display:none; margin-top: 1rem;">
-    <button id="write-to-pod" type="button">Write to Pod</button>
-    <button id="get-recommendations" type="button">Get Recommendations</button>
-    <pre id="pod-actions-output"></pre>
-</section>
-
 <main>
     <f:cObject typoscriptObjectPath="styles.content.get" />
 </main>
+
+<div style="border: 2px solid orange; border-radius: 10px; padding: 1rem; margin-top: 1rem;">
+    <div style="color: orange; font-weight: bold; margin-bottom: 0.75rem;">bib-pods site package</div>
+    <header>
+        <button id="solid-pod-connect" type="button">Connect your Pod</button>
+        <span id="solid-pod-status"></span>
+    </header>
+
+    <section id="pod-actions" style="display:none; margin-top: 1rem;">
+        <button id="write-to-pod" type="button">Write to Pod</button>
+        <button id="get-recommendations" type="button">Get Recommendations</button>
+        <pre id="pod-actions-output"></pre>
+    </section>
+</div>

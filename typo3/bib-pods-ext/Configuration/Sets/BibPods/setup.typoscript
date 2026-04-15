@@ -2,6 +2,10 @@ page = PAGE
 page {
     typeNum = 0
 
+    config.noPageTitle = 2
+    headerData.10 = TEXT
+    headerData.10.value = <title>TYPO3 site</title>
+
     10 = FLUIDTEMPLATE
     10 {
         templateName = Default
