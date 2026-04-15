@@ -4,7 +4,7 @@
 #
 # If the Solid server was restarted and you get a stale client
 # error, clear the browser storage for the DDEV site:
-# chrome://settings/content/all?searchSubpage=ddev&search=view+per
+# chrome://settings/content/all?searchSubpage=ddev
 #
 # ddev typo3 cache:flush
 
