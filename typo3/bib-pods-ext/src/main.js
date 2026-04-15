@@ -1,9 +1,11 @@
-import { getSolidDataset, saveSolidDatasetAt, solidDatasetAsTurtle, createThing, setThing, buildThing, getThingAll, getStringNoLocale } from "@inrupt/solid-client"
+import { getResourceInfo, createContainerAt, getSolidDataset, saveSolidDatasetAt, createSolidDataset, solidDatasetAsTurtle, createThing, setThing, buildThing, getThingAll, getStringNoLocale, toRdfJsDataset } from "@inrupt/solid-client"
 import { Session } from "@inrupt/solid-client-authn-browser"
+import { datasetToTurtle } from "@foerderfunke/sem-ops-utils"
 
 const SOLID_SERVER = "http://localhost:3000"
 const POD = "citizen-pod"
-const PROFILE_URL = `${SOLID_SERVER}/${POD}/profile/card`
+const APP_CONTAINER = `${SOLID_SERVER}/${POD}/bib-pods-project/`
+const APP_PROFILE_URL = `${APP_CONTAINER}profile.ttl`
 const SOLR_URL = "http://localhost:8983/solr/interim-index"
 
 // localStorage-backed storage so OIDC state survives the redirect
@@ -11,6 +13,37 @@ const storage = {
     async get(key) { return localStorage.getItem(key) || undefined },
     async set(key, value) { localStorage.setItem(key, value) },
     async delete(key) { localStorage.removeItem(key) },
+}
+
+async function ensureContainer(url) {
+    try {
+        await getResourceInfo(url, { fetch: session.fetch })
+    } catch (e) {
+        if (e?.statusCode === 404) {
+            await createContainerAt(url, { fetch: session.fetch })
+            return
+        }
+        if (e?.statusCode === 409) return
+        throw e
+    }
+}
+
+async function ensureDataset(url) {
+    try {
+        return await getSolidDataset(url, { fetch: session.fetch })
+    } catch (e) {
+        if (e?.statusCode === 404) {
+            const empty = createSolidDataset()
+            await saveSolidDatasetAt(url, empty, { fetch: session.fetch })
+            return empty
+        }
+        throw e
+    }
+}
+
+async function ensureAppProfileSpace() {
+    await ensureContainer(APP_CONTAINER)
+    await ensureDataset(APP_PROFILE_URL)
 }
 
 function clearSolidStorage() {
@@ -33,12 +66,10 @@ async function updateOutput(text) {
 }
 
 async function onLoggedIn() {
-    await updateStatus(`Logged in as ${session.info.webId}`)
     document.getElementById("pod-actions").style.display = "block"
     try {
-        const dataset = await getSolidDataset(PROFILE_URL, { fetch: session.fetch })
-        const turtle = await solidDatasetAsTurtle(dataset)
-        await updateStatus(`Logged in as ${session.info.webId}\n\nProfile (${PROFILE_URL}):\n${turtle}`)
+        await ensureAppProfileSpace()
+        await updateStatus(`Logged in as ${session.info.webId}`)
     } catch (e) {
         await updateStatus(`Logged in as ${session.info.webId}\n\nRead error: ${e.message}`)
     }
@@ -47,17 +78,20 @@ async function onLoggedIn() {
 async function writeToPod() {
     await updateOutput("Writing to pod...")
     try {
-        let dataset = await getSolidDataset(PROFILE_URL, { fetch: session.fetch })
+        await ensureAppProfileSpace()
+        let dataset = await getSolidDataset(APP_PROFILE_URL, { fetch: session.fetch })
 
-        const pref = buildThing(createThing({ name: "author-preference" }))
+        const pref = buildThing(createThing({ url: "http://example.org/user" }))
             .addStringNoLocale("http://schema.org/author", "Sapkowski")
             .build()
 
         dataset = setThing(dataset, pref)
-        await saveSolidDatasetAt(PROFILE_URL, dataset, { fetch: session.fetch })
+        await saveSolidDatasetAt(APP_PROFILE_URL, dataset, { fetch: session.fetch })
 
-        const turtle = await solidDatasetAsTurtle(dataset)
-        await updateOutput(`Wrote to ${PROFILE_URL}:\n${turtle}`)
+        const ds = toRdfJsDataset(dataset)
+        let turtle = await datasetToTurtle(ds, { ex: "http://example.org/" })
+        // const turtle = await solidDatasetAsTurtle(dataset)
+        await updateOutput(`Wrote to ${APP_PROFILE_URL}:\n\n${turtle}`)
     } catch (e) {
         await updateOutput(`Write error: ${e.message}`)
     }
@@ -66,7 +100,7 @@ async function writeToPod() {
 async function getRecommendations() {
     await updateOutput("Reading preferences from pod...")
     try {
-        const dataset = await getSolidDataset(PROFILE_URL, { fetch: session.fetch })
+        const dataset = await getSolidDataset(APP_PROFILE_URL, { fetch: session.fetch })
         const things = getThingAll(dataset)
         const authors = things
             .map(t => getStringNoLocale(t, "http://schema.org/author"))
