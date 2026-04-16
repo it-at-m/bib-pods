@@ -24,7 +24,7 @@ flowchart TD
 
     subgraph msb["<h2>Münchner Stadtbibliothek</h2>"]
         data["<b>Datenquellen</b>
-            #bull; Katalogdaten (OAI)
+            #bull; Katalogdaten (OAI) data-bib.muenchen.de
             #bull; Mediensuche (SRU)
             #bull; Veranstaltungen (VADB)
             #bull; Weitere (z.B. Blogposts)
@@ -35,7 +35,7 @@ flowchart TD
             #bull; Empfehlungsmodul
             #bull; One-Klick-Modul
         "]
-        index["<b>Index</b>"]
+        index["<b>Index</b> ElasticSearch"]
         typo3 -->|speist persönliche Daten in Suche ein| index
         index -->|indiziert| data
         site -->|integriert| typo3
