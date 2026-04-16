@@ -24,8 +24,8 @@ flowchart TD
 
     subgraph msb["<h2>Münchner Stadtbibliothek</h2>"]
         data["<b>Datenquellen</b>
-            #bull; Katalogdaten (OAI) data-bib.muenchen.de
-            #bull; Mediensuche (SRU)
+            #bull;&nbsp;Katalogdaten (OAI)
+                <i>data-bib.muenchen.de</i>
             #bull; Veranstaltungen (VADB)
             #bull; Weitere (z.B. Blogposts)
         "]
@@ -35,7 +35,7 @@ flowchart TD
             #bull; Empfehlungsmodul
             #bull; One-Klick-Modul
         "]
-        index["<b>Index</b> ElasticSearch"]
+        index["<b>Index</b>: ElasticSearch"]
         typo3 -->|speist persönliche Daten in Suche ein| index
         index -->|indiziert| data
         site -->|integriert| typo3
@@ -49,7 +49,7 @@ textNode["<div align='left'>
 #bull; Restaurants in Kiel
 #bull; Berliner Volkshochschulen
 #bull; Angebote für Erstsemester-Studierende einer Uni
-→ Letztlich alle Apps und Services, die Angebote personalisieren möchten, ohne Nutzerdaten selbst zu speichern: <i>privacy-preserving personalization-as-a-service</i>
+→ Letztlich alle Apps und Services, die Angebote personalisieren möchten, ohne Nutzer*innendaten selbst zu speichern: <i>Privacy-preserving Personalization-as-a-Service</i>
 <span style='opacity:0'>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>
 </div>"]:::ghost
     end
@@ -99,7 +99,7 @@ textNode["<div align='left'>
     typo3 -->|nutzt| integrate
     connectBtn -->|nutzt| integrate
     msb -->|koordiniert| bibComm
-    communityInput -->|könnten einfließen| typo3
+    communityInput -->|fließen ein| typo3
 ```
 
 
