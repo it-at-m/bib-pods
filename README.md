@@ -14,27 +14,94 @@ Auch das Positionspapier [Digitale Souveränität mit Solid, für interoperable 
 
 ## Architektur
 
-''vorläufig''
+*vorläufig*
 
 ```mermaid
-architecture-beta
-    group bib(database)[Bib Daten]
-        service stoc(database)[Books Stock] in bib
-        service event(database)[Events] in bib
-        service other(database)[Other] in bib
-        service index(database)[Index] in bib
-    group web(internet)[Website]
-        service podwidget(internet)[Widget] in web
-    group pod(cloud)[Pod]
-        service frontend(internet)[Frontend] in pod
-        service backend(disk)[Backend] in pod
+flowchart TD
+    classDef nonArch fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef nonArchDashed fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-dasharray: 5 5
+    classDef planned stroke:#9ca3af,color:#6b7280,stroke-dasharray: 5 5
+    classDef ghost fill:none,stroke:none,color:#374151
+    style moreUseCases stroke:#9ca3af,color:#6b7280,stroke-dasharray: 5 5
 
-    stoc:L -- B:index
-    event:L -- B:index
-    other:L -- B:index
-    index:L -- L:podwidget
-    frontend:R -- L:podwidget
-    frontend:L -- R:backend
+    subgraph msb["<h2>Münchner Stadtbibliothek</h2>"]
+        data["<b>Datenquellen</b>
+            #bull;&nbsp;Katalogdaten (OAI)
+                <i>data-bib.muenchen.de</i>
+            #bull; Veranstaltungen (VADB)
+            #bull; Weitere (z.B. Blogposts)
+        "]
+        site["<b>Webseite</b>"]
+        typo3["<b>Typo3 Plugin</b>
+            #bull; Interessensverwaltung
+            #bull; Empfehlungsmodul
+            #bull; One-Klick-Modul
+        "]
+        index["<b>Index</b>: ElasticSearch"]
+        typo3 -->|speist persönliche Daten in Suche ein| index
+        index -->|indiziert| data
+        site -->|integriert| typo3
+    end
+
+    subgraph moreUseCases["<h2>Weitere Anwendungen</h2>"]
+        connectBtn["Integration eines<br><b>Connect your Pod</b><br>Buttons"]
+textNode["<div align='left'>
+<b>Das könnten beispielsweise sein:</b>
+#bull; Weitere Bibliotheken
+#bull; Restaurants in Kiel
+#bull; Berliner Volkshochschulen
+#bull; Angebote für Erstsemester-Studierende einer Uni
+→ Letztlich alle Apps und Services, die Angebote personalisieren möchten, ohne Nutzer*innendaten selbst zu speichern: <i>Privacy-preserving Personalization-as-a-Service</i>
+<span style='opacity:0'>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>
+</div>"]:::ghost
+    end
+
+    subgraph cori["<h2>CORI</h2>Contextual Relational Infrastructure"]
+        cockpit["<b>Cockpit</b>
+            <small><i>serverless</i></small>
+            #bull; Profile verwalten
+            #bull; Import/Export
+            #bull; Zugriffshistorie
+        "]
+        psi["<b>Profile Storage Interface</b>"]
+        admin["<b>Admin</b><br>#bull;&nbsp;Gesamtvokabular&nbsp;verwalten<br>#bull;&nbsp;Änderungen&nbsp;kommunizieren<br>#bull;&nbsp;Liste&nbsp;teilnehmender&nbsp;Apps"]
+        exec["<b>Execution Engine</b>"]:::planned
+        integrate["<b>Integration SDK</b>"]
+        cockpit -->|nutzt| integrate
+        integrate <-->|read/write| psi
+        integrate -.-> exec
+        exec -.->|führt Verarbeitungslogik aus| psi
+    end
+
+    bibComm["<b>Bibliotheksübergreifende&nbsp;Zusammenarbeit</b>
+        #bull;&nbsp;Gemeinsame&nbsp;Vokabularentwicklung
+        #bull;&nbsp;Gemeinsame&nbsp;Feature-Entwicklung
+    "]:::nonArch
+
+    pod1["<b>Managed Solid Pod</b>"]
+    pod2["<b>Eigener Solid Pod</b>"]
+    pod3["<b>Weitere</b>
+        #bull; EUDI Wallet?
+        #bull; Local Storage
+        #bull; In-Memory
+    "]:::planned
+
+    communityInput["<b>Weitere Kuratierungs- und Empfehlungsquellen</b>
+#bull;&nbsp;Von&nbsp;anderen&nbsp;Nutzer*innen&nbsp;hinterlegte&nbsp;Muster&nbsp;wie manuell&nbsp;kuratierte&nbsp;Empfehlungen&nbsp;oder&nbsp;lokale&nbsp;Events
+#bull;&nbsp;Weitere&nbsp;Empfehlungsalgorithmen&nbsp;via&nbsp;Plugins
+    "]:::nonArchDashed
+
+    psi --> pod1
+    psi --> pod2
+    psi --> pod3
+
+    cori ~~~ msb
+    msb ~~~ spacer[" "] ~~~ cori
+    style spacer fill:none,stroke:none
+    typo3 -->|nutzt| integrate
+    connectBtn -->|nutzt| integrate
+    msb -->|koordiniert| bibComm
+    communityInput -->|fließen ein| typo3
 ```
 
 
