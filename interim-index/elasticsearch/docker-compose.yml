@@ -1,0 +1,20 @@
+# docker compose up -d
+# docker compose down
+# see all content: http://localhost:9200/interim-index/_search?pretty
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    ports:
+      - "9200:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      http.cors.enabled: "true"
+      http.cors.allow-origin: '"*"'
+      http.cors.allow-methods: "GET,POST,PUT,DELETE,OPTIONS,HEAD"
+      http.cors.allow-headers: "origin,content-type,accept,authorization"
+    volumes:
+      - data:/usr/share/elasticsearch/data
+
+volumes:
+  data:

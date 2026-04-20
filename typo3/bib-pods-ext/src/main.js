@@ -1,4 +1,4 @@
-import { getResourceInfo, createContainerAt, getSolidDataset, saveSolidDatasetAt, createSolidDataset, solidDatasetAsTurtle, createThing, setThing, buildThing, getThingAll, getStringNoLocale, toRdfJsDataset } from "@inrupt/solid-client"
+import { getResourceInfo, createContainerAt, getSolidDataset, saveSolidDatasetAt, createSolidDataset, createThing, setThing, buildThing, getThingAll, getStringNoLocale, toRdfJsDataset } from "@inrupt/solid-client"
 import { Session } from "@inrupt/solid-client-authn-browser"
 import { datasetToTurtle } from "@foerderfunke/sem-ops-utils"
 
@@ -6,7 +6,36 @@ const SOLID_SERVER = "http://localhost:3000"
 const POD = "citizen-pod"
 const APP_CONTAINER = `${SOLID_SERVER}/${POD}/bib-pods-project/`
 const APP_PROFILE_URL = `${APP_CONTAINER}profile.ttl`
+const INDEX_BACKEND = "solr" // solr / elasticsearch
 const SOLR_URL = "http://localhost:8983/solr/interim-index"
+const ES_URL = "http://localhost:9200/interim-index"
+
+async function queryIndexByAuthors(authors) {
+    if (INDEX_BACKEND === "elasticsearch") {
+        const res = await fetch(`${ES_URL}/_search`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                query: { bool: { should: authors.map(a => ({ match: { authors: a } })) } },
+                _source: ["title", "authors", "year"]
+            })
+        })
+        const json = await res.json()
+        if (json.error) throw new Error(json.error.reason ?? JSON.stringify(json.error))
+        return {
+            numFound: json.hits.total.value,
+            docs: json.hits.hits.map(h => ({ id: h._id, ...h._source }))
+        }
+    }
+    const params = new URLSearchParams({
+        q: authors.map(a => `authors:${a}`).join(" OR "),
+        fl: "id,title,authors,year"
+    })
+    const res = await fetch(`${SOLR_URL}/select?${params}`)
+    const json = await res.json()
+    if (json.error) throw new Error(json.error.msg)
+    return json.response
+}
 
 // localStorage-backed storage so OIDC state survives the redirect
 const storage = {
@@ -111,26 +140,13 @@ async function getRecommendations() {
             return
         }
 
-        await updateOutput(`Found authors: ${authors.join(", ")}\nQuerying Solr...`)
+        await updateOutput(`Found authors: ${authors.join(", ")}\nQuerying ${INDEX_BACKEND}...`)
 
-        const authorQuery = authors.map(a => `authors:${a}`).join(" OR ")
-        const params = new URLSearchParams({
-            q: authorQuery,
-            fl: "id,title,authors,year"
-        })
-        const res = await fetch(`${SOLR_URL}/select?${params}`)
-        const json = await res.json()
-
-        if (json.error) {
-            await updateOutput(`Solr error: ${json.error.msg}`)
-            return
-        }
-
-        const { numFound, docs } = json.response
+        const { numFound, docs } = await queryIndexByAuthors(authors)
         let output = `Recommendations based on: ${authors.join(", ")}\n`
         output += `Found ${numFound} result(s):\n\n`
         for (const doc of docs) {
-            output += `  ${doc.title} (${doc.year ?? "n/a"}) — ${(doc.authors ?? []).join(", ")}\n`
+            output += `  ${doc.title} (${doc.year ?? "n/a"}) — ${(doc.authors ?? []).join(", ")}\n` // doc.title: string in ES, single-element array in Solr (coerces via .toString())
         }
         await updateOutput(output)
     } catch (e) {
