@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 # Manage the local TYPO3 DDEV instance
-# Usage: ./script.sh {setup|start|stop}
+# Usage: ./script.sh {setup|start|stop|flush}
 #
 # If the Solid server was restarted and you get a stale client
 # error, clear the browser storage for the DDEV site:
 # chrome://settings/content/all?searchSubpage=ddev
-#
-# ddev typo3 cache:flush
 
 set -euo pipefail
 
@@ -117,8 +115,13 @@ YAML
     echo "==> TYPO3 has been stopped."
     ;;
 
+  flush)
+    cd "$SITE_DIR"
+    ddev typo3 cache:flush
+    ;;
+
   *)
-    echo "Usage: $0 {setup|start|stop}" >&2
+    echo "Usage: $0 {setup|start|stop|flush}" >&2
     exit 1
     ;;
 esac
