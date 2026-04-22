@@ -96,11 +96,22 @@ async function updateOutput(text) {
 
 async function onLoggedIn() {
     document.getElementById("pod-actions").style.display = "block"
+    document.getElementById("solid-pod-connect").style.display = "none"
+    document.getElementById("solid-pod-logout").style.display = ""
     try {
         await ensureAppProfileSpace()
         await updateStatus(`Logged in as ${session.info.webId}`)
     } catch (e) {
         await updateStatus(`Logged in as ${session.info.webId}\n\nRead error: ${e.message}`)
+    }
+}
+
+async function logout() {
+    try {
+        await session.logout()
+    } finally {
+        clearSolidStorage()
+        window.location.replace(window.location.origin + window.location.pathname)
     }
 }
 
@@ -164,6 +175,7 @@ async function init() {
 
     document.getElementById("write-to-pod").addEventListener("click", writeToPod)
     document.getElementById("get-recommendations").addEventListener("click", getRecommendations)
+    document.getElementById("solid-pod-logout").addEventListener("click", logout)
 
     if (session.info.isLoggedIn) {
         await onLoggedIn()
