@@ -1,0 +1,20 @@
+@prefix bp:      <https://www.muenchner-stadtbibliothek.de/bib-pods#> .
+@prefix bf:      <http://id.loc.gov/ontologies/bibframe/> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+
+bp:favoriteWork a rdf:Property ;
+    rdfs:label "favorite work" ;
+    rdfs:range bf:Work .
+
+bp:favoriteAuthor a rdf:Property ;
+    rdfs:label "favorite author" ;
+    rdfs:range bf:Person .
+
+bp:favoriteGenre a rdf:Property ;
+    rdfs:label "favorite genre" ;
+    rdfs:range bf:GenreForm .
+
+bp:interestedIn a rdf:Property ;
+    rdfs:label "interested in" ;
+    rdfs:range bf:Topic .

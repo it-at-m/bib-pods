@@ -122,14 +122,17 @@ async function writeToPod() {
         let dataset = await getSolidDataset(APP_PROFILE_URL, { fetch: session.fetch })
 
         const pref = buildThing(createThing({ url: "http://example.org/user" }))
-            .addStringNoLocale("http://schema.org/author", "Sapkowski")
+            .addStringNoLocale("https://www.muenchner-stadtbibliothek.de/bib-pods#favoriteAuthor", "Sapkowski")
             .build()
 
         dataset = setThing(dataset, pref)
         await saveSolidDatasetAt(APP_PROFILE_URL, dataset, { fetch: session.fetch })
 
         const ds = toRdfJsDataset(dataset)
-        let turtle = await datasetToTurtle(ds, { ex: "http://example.org/" })
+        let turtle = await datasetToTurtle(ds, {
+            bp:  "https://www.muenchner-stadtbibliothek.de/bib-pods#",
+            ex: "http://example.org/"
+        })
         // const turtle = await solidDatasetAsTurtle(dataset)
         await updateOutput(`Wrote to ${APP_PROFILE_URL}:\n\n${turtle}`)
     } catch (e) {
@@ -143,7 +146,7 @@ async function getRecommendations() {
         const dataset = await getSolidDataset(APP_PROFILE_URL, { fetch: session.fetch })
         const things = getThingAll(dataset)
         const authors = things
-            .map(t => getStringNoLocale(t, "http://schema.org/author"))
+            .map(t => getStringNoLocale(t, "https://www.muenchner-stadtbibliothek.de/bib-pods#favoriteAuthor"))
             .filter(Boolean)
 
         if (authors.length === 0) {
