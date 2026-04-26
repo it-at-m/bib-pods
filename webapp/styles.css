@@ -1,0 +1,39 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    color: #222;
+    background: #fafafa;
+}
+
+.top-menu {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    background: #fff;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.top-menu a {
+    color: #222;
+    text-decoration: none;
+    margin-right: 1.5rem;
+    font-weight: 500;
+}
+
+.top-menu a:hover {
+    text-decoration: underline;
+}
+
+.top-menu .brand {
+    font-weight: 700;
+}
+
+.top-menu .spacer {
+    flex: 1;
+}
+
+main {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
