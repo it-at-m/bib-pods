@@ -37,3 +37,76 @@ main {
     margin: 2rem auto;
     padding: 0 1.5rem;
 }
+
+input[type="text"],
+input[type="url"],
+select,
+textarea {
+    font: inherit;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    color: inherit;
+}
+
+input[type="text"]:focus,
+input[type="url"]:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: #888;
+}
+
+textarea {
+    resize: vertical;
+}
+
+button {
+    font: inherit;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid #222;
+    border-radius: 4px;
+    background: #222;
+    color: #fff;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #444;
+    border-color: #444;
+}
+
+.field-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.field-row {
+    align-items: flex-start;
+}
+
+.field-row > input,
+.field-row > select,
+.field-row > textarea {
+    flex: 1;
+    min-width: 0;
+}
+
+.field-row.actions {
+    justify-content: center;
+}
+
+.field-row.actions button {
+    min-width: 16rem;
+    padding: 0.6rem 1.5rem;
+    font-size: 1.05rem;
+}
+
+input.code-input,
+textarea.code-input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 1rem;
+    padding: 0.6rem 0.8rem;
+}

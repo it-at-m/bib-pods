@@ -4,6 +4,7 @@
         <meta charset="UTF-8">
         <title>query — bib-pods</title>
         <link rel="stylesheet" href="../styles.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-okaidia.min.css">
     </head>
     <body>
         <nav class="top-menu">
@@ -14,7 +15,72 @@
             <a href="https://github.com/it-at-m/bib-pods">GitHub</a>
         </nav>
         <main>
-            <p>TODO</p>
+            <form id="q-form">
+                <div class="field-row">
+                    <input id="endpoint" type="url" placeholder="Solr endpoint (will be saved in localStorage)">
+                    <select id="saved">
+                        <option value="">— saved queries —</option>
+                        <option value="q=*:*">all documents</option>
+                        <option value="q=authors:Sapkowski&amp;fl=id,title,authors,year,subjects">by author</option>
+                        <option value="q=genre:Musikdruck AND authors:Weill AND title:Kurt&amp;rows=10&amp;start=0&amp;fl=id,title,authors,year,genre">genre + author + keyword</option>
+                    </select>
+                </div>
+                <div class="field-row">
+                    <textarea id="q" class="code-input" rows="3" placeholder="q=*:*" autofocus>q=*:*</textarea>
+                </div>
+                <div class="field-row actions">
+                    <button type="submit">search</button>
+                </div>
+            </form>
+            <pre><code id="result" class="language-json">Enter a Solr query above.</code></pre>
         </main>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+        <script>
+            const ENDPOINT_KEY = "bib-pods.solr-endpoint"
+
+            const form = document.getElementById("q-form")
+            const endpointInput = document.getElementById("endpoint")
+            const savedSelect = document.getElementById("saved")
+            const input = document.getElementById("q")
+            const result = document.getElementById("result")
+
+            endpointInput.value = localStorage.getItem(ENDPOINT_KEY) || ""
+            endpointInput.addEventListener("input", () => {
+                localStorage.setItem(ENDPOINT_KEY, endpointInput.value)
+            })
+
+            savedSelect.addEventListener("change", () => {
+                if (savedSelect.value) {
+                    input.value = savedSelect.value
+                    savedSelect.value = ""
+                    input.focus()
+                }
+            })
+
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault()
+                const endpoint = endpointInput.value.trim()
+                if (!endpoint) {
+                    result.textContent = "Set a Solr endpoint first."
+                    return
+                }
+                const qs = input.value.replace(/\s+/g, " ").trim() || "q=*:*"
+                const url = `${endpoint}?${qs}&wt=json`
+                result.textContent = "Loading…"
+                try {
+                    const r = await fetch(url)
+                    const text = await r.text()
+                    try {
+                        result.textContent = JSON.stringify(JSON.parse(text), null, 2)
+                        Prism.highlightElement(result)
+                    } catch {
+                        result.textContent = text
+                    }
+                } catch (err) {
+                    result.textContent = "Request failed: " + err.message
+                }
+            })
+        </script>
     </body>
 </html>
