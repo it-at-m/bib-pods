@@ -104,6 +104,85 @@ button:hover {
     font-size: 1.05rem;
 }
 
+.tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid #ddd;
+    margin-top: 1.5rem;
+}
+
+.tab {
+    background: none;
+    color: #666;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 0.5rem 1rem;
+    margin-bottom: -1px;
+    cursor: pointer;
+}
+
+.tab:hover {
+    background: none;
+    color: #222;
+    border-color: transparent;
+}
+
+.tab.active {
+    color: #222;
+    border-bottom-color: #222;
+    font-weight: 600;
+}
+
+.output {
+    margin-top: 0.5rem;
+}
+
+.output.hidden {
+    display: none;
+}
+
+.results-meta {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.results-table th,
+.results-table td {
+    text-align: left;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid #eee;
+}
+
+.results-table th {
+    background: #f4f4f4;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.pagination button {
+    min-width: auto;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.9rem;
+}
+
+.pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 input.code-input,
 textarea.code-input {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

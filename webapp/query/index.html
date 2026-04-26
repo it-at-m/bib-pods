@@ -32,7 +32,25 @@
                     <button type="submit">search</button>
                 </div>
             </form>
-            <pre><code id="result" class="language-json">Enter a Solr query above.</code></pre>
+            <div class="tabs">
+                <button type="button" class="tab active" data-mode="raw">raw</button>
+                <button type="button" class="tab" data-mode="table">table</button>
+            </div>
+            <div class="output" data-mode="raw">
+                <pre><code id="result" class="language-json">Enter a Solr query above.</code></pre>
+            </div>
+            <div class="output hidden" data-mode="table">
+                <p class="results-meta" id="table-meta">Run a query first.</p>
+                <table class="results-table">
+                    <thead id="table-head"></thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination" hidden>
+                <button type="button" id="prev-page">← prev</button>
+                <span id="page-info"></span>
+                <button type="button" id="next-page">next →</button>
+            </div>
         </main>
         <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
@@ -44,6 +62,16 @@
             const savedSelect = document.getElementById("saved")
             const input = document.getElementById("q")
             const result = document.getElementById("result")
+            const tableMeta = document.getElementById("table-meta")
+            const tableHead = document.getElementById("table-head")
+            const tableBody = document.getElementById("table-body")
+            const pagination = document.getElementById("pagination")
+            const pageInfo = document.getElementById("page-info")
+            const prevBtn = document.getElementById("prev-page")
+            const nextBtn = document.getElementById("next-page")
+
+            const DEFAULT_ROWS = 10
+            let currentParams = null
 
             endpointInput.value = localStorage.getItem(ENDPOINT_KEY) || ""
             endpointInput.addEventListener("input", () => {
@@ -58,28 +86,132 @@
                 }
             })
 
-            form.addEventListener("submit", async (e) => {
-                e.preventDefault()
+            document.querySelectorAll(".tab").forEach(t => {
+                t.addEventListener("click", () => {
+                    const mode = t.dataset.mode
+                    document.querySelectorAll(".tab").forEach(x => {
+                        x.classList.toggle("active", x.dataset.mode === mode)
+                    })
+                    document.querySelectorAll(".output").forEach(o => {
+                        o.classList.toggle("hidden", o.dataset.mode !== mode)
+                    })
+                })
+            })
+
+            function renderTable(data) {
+                const docs = data && data.response && data.response.docs ? data.response.docs : []
+                const numFound = data && data.response ? data.response.numFound : 0
+                tableHead.innerHTML = ""
+                tableBody.innerHTML = ""
+                if (!docs.length) {
+                    tableMeta.textContent = `No documents in response (${numFound} results). Try the raw view.`
+                    return
+                }
+                const HIDDEN = new Set(["_version_", "_root_"])
+                const keys = []
+                for (const d of docs) for (const k of Object.keys(d)) if (!HIDDEN.has(k) && !keys.includes(k)) keys.push(k)
+                tableMeta.textContent = `${numFound} results · showing ${docs.length}`
+                const headRow = document.createElement("tr")
+                for (const k of keys) {
+                    const th = document.createElement("th")
+                    th.textContent = k
+                    headRow.appendChild(th)
+                }
+                tableHead.appendChild(headRow)
+                for (const d of docs) {
+                    const tr = document.createElement("tr")
+                    for (const k of keys) {
+                        const td = document.createElement("td")
+                        const full = formatCell(d[k])
+                        if (full.length > 200) {
+                            td.textContent = full.slice(0, 200) + "…"
+                            td.title = full
+                        } else {
+                            td.textContent = full
+                        }
+                        tr.appendChild(td)
+                    }
+                    tableBody.appendChild(tr)
+                }
+            }
+
+            function formatCell(v) {
+                if (v == null) return ""
+                if (Array.isArray(v)) return v.join(", ")
+                if (typeof v === "object") return JSON.stringify(v)
+                return String(v)
+            }
+
+            function updatePagination(data) {
+                const numFound = data && data.response ? data.response.numFound : 0
+                const start = parseInt(currentParams.get("start") || "0", 10)
+                const rows = parseInt(currentParams.get("rows") || DEFAULT_ROWS, 10)
+                if (numFound <= rows) {
+                    pagination.hidden = true
+                    return
+                }
+                const from = start + 1
+                const to = Math.min(start + rows, numFound)
+                pageInfo.textContent = `${from}–${to} of ${numFound} results`
+                prevBtn.disabled = start === 0
+                nextBtn.disabled = to >= numFound
+                pagination.hidden = false
+            }
+
+            async function runQuery() {
                 const endpoint = endpointInput.value.trim()
                 if (!endpoint) {
                     result.textContent = "Set a Solr endpoint first."
                     return
                 }
-                const qs = input.value.replace(/\s+/g, " ").trim() || "q=*:*"
-                const url = `${endpoint}?${qs}&wt=json`
+                const url = `${endpoint}?${currentParams.toString()}&wt=json`
                 result.textContent = "Loading…"
+                tableMeta.textContent = "Loading…"
+                tableHead.innerHTML = ""
+                tableBody.innerHTML = ""
+                pagination.hidden = true
                 try {
                     const r = await fetch(url)
                     const text = await r.text()
+                    let parsed = null
                     try {
-                        result.textContent = JSON.stringify(JSON.parse(text), null, 2)
+                        parsed = JSON.parse(text)
+                        result.textContent = JSON.stringify(parsed, null, 2)
                         Prism.highlightElement(result)
                     } catch {
                         result.textContent = text
                     }
+                    if (parsed) {
+                        renderTable(parsed)
+                        updatePagination(parsed)
+                    } else {
+                        tableMeta.textContent = "Response is not JSON. Try the raw view."
+                    }
                 } catch (err) {
                     result.textContent = "Request failed: " + err.message
+                    tableMeta.textContent = "Request failed."
                 }
+            }
+
+            prevBtn.addEventListener("click", () => {
+                const start = parseInt(currentParams.get("start") || "0", 10)
+                const rows = parseInt(currentParams.get("rows") || DEFAULT_ROWS, 10)
+                currentParams.set("start", Math.max(0, start - rows))
+                runQuery()
+            })
+
+            nextBtn.addEventListener("click", () => {
+                const start = parseInt(currentParams.get("start") || "0", 10)
+                const rows = parseInt(currentParams.get("rows") || DEFAULT_ROWS, 10)
+                currentParams.set("start", start + rows)
+                runQuery()
+            })
+
+            form.addEventListener("submit", (e) => {
+                e.preventDefault()
+                const qs = input.value.replace(/\s+/g, " ").trim() || "q=*:*"
+                currentParams = new URLSearchParams(qs)
+                runQuery()
             })
         </script>
     </body>
