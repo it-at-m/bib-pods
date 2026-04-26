@@ -4,6 +4,7 @@
         <meta charset="UTF-8">
         <title>vocabulary — bib-pods</title>
         <link rel="stylesheet" href="../styles.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-okaidia.min.css">
     </head>
     <body>
         <nav class="top-menu">
@@ -14,7 +15,28 @@
             <a href="https://github.com/it-at-m/bib-pods">GitHub</a>
         </nav>
         <main>
-            <p>TODO</p>
+            <p>Source: <a href="https://github.com/it-at-m/bib-pods/blob/main/definitions/vocabulary.ttl">vocabulary.ttl</a></p>
+            <pre><code id="ttl" class="language-turtle">Loading...</code></pre>
         </main>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-turtle.min.js"></script>
+        <script>
+            async function loadTurtle() {
+                const candidates = ["../definitions/vocabulary.ttl", "../../definitions/vocabulary.ttl"]
+                for (const url of candidates) {
+                    const r = await fetch(url)
+                    if (r.ok) return r.text()
+                }
+                throw new Error("vocabulary.ttl not found at any known path")
+            }
+
+            loadTurtle()
+                .then(text => {
+                    const el = document.getElementById("ttl")
+                    el.textContent = text
+                    Prism.highlightElement(el)
+                })
+                .catch(err => document.getElementById("ttl").textContent = "Failed to load: " + err.message)
+        </script>
     </body>
 </html>
