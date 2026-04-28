@@ -40,6 +40,31 @@ let page = 0
 let token = null
 let totalSize = null
 
+const startedAt = Date.now()
+
+function formatDuration(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return "unknown"
+
+    const totalSeconds = Math.round(ms / 1000)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+
+    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
+    if (minutes > 0) return `${minutes}m ${seconds}s`
+    return `${seconds}s`
+}
+
+function formatProgress(done, total, elapsedMs) {
+    if (!total || total <= 0) return `page ${page}, elapsed ${formatDuration(elapsedMs)}, ETA unknown`
+
+    const percentage = Math.min(100, (done / total) * 100)
+    const estimatedTotalMs = done > 0 ? elapsedMs / done * total : Infinity
+    const remainingMs = estimatedTotalMs - elapsedMs
+
+    return `${done}/${total} records (${percentage.toFixed(1)}%), elapsed ${formatDuration(elapsedMs)}, ETA ${formatDuration(remainingMs)}`
+}
+
 console.log(`Downloading OAI-PMH catalog: set=${SET}, format=${METADATA_PREFIX}`)
 
 do {
@@ -62,8 +87,10 @@ do {
     token = extractResumptionToken(xml)
     page ++
 
-    const progress = totalSize ? `${cursor + 50 > totalSize ? totalSize : cursor + 50}/${totalSize}` : `page ${page}`
-    console.log(`  Saved ${outFile} (${progress} records)`)
+    const elapsedMs = Date.now() - startedAt
+    const recordsDone = totalSize ? Math.min(cursor + 50, totalSize) : null
+    const progress = formatProgress(recordsDone, totalSize, elapsedMs)
+    console.log(`  Saved ${outFile} (${progress})`)
 } while (token && page < MAX_PAGES)
 
-console.log(`Done. ${page} pages written to ${OUT_DIR}`)
+console.log(`Done. ${page} pages written to ${OUT_DIR} in ${formatDuration(Date.now() - startedAt)}`)
