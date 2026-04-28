@@ -36,9 +36,21 @@ function extractCompleteListSize(xml) {
     return m ? parseInt(m[1], 10) : null
 }
 
+function extractOaiError(xml) {
+    const match = xml.match(/<error[^>]*code="([^"]+)"[^>]*>([^<]*)<\/error>/)
+    if (!match) return null
+
+    return {
+        code: match[1],
+        message: match[2]?.trim() || "unknown error"
+    }
+}
+
 let page = 0
 let token = null
 let totalSize = null
+let totalBytesDownloaded = 0
+let estimatedTotalBytes = null
 
 const startedAt = Date.now()
 
@@ -53,6 +65,21 @@ function formatDuration(ms) {
     if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
     if (minutes > 0) return `${minutes}m ${seconds}s`
     return `${seconds}s`
+}
+
+function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return "unknown"
+
+    const units = ["B", "KB", "MB", "GB"]
+    let i = 0
+    let value = bytes
+
+    while (value >= 1024 && i < units.length - 1) {
+        value /= 1024
+        i++
+    }
+
+    return `${value.toFixed(1)} ${units[i]}`
 }
 
 function formatProgress(done, total, elapsedMs) {
@@ -72,14 +99,29 @@ do {
         ? `${BASE_URL}?verb=ListRecords&resumptionToken=${encodeURIComponent(token)}`
         : `${BASE_URL}?verb=ListRecords&metadataPrefix=${METADATA_PREFIX}&set=${SET}`
     const xml = await fetchPage(url)
+    const bytes = Buffer.byteLength(xml, "utf8")
+    totalBytesDownloaded += bytes
 
-    if (xml.includes("<error")) {
-        const err = xml.match(/<error[^>]*>([^<]+)/)?.[1] ?? "unknown error"
-        throw new Error(`OAI error: ${err}`)
+    const oaiError = extractOaiError(xml)
+    if (oaiError) {
+        if (oaiError.code === "badResumptionToken") {
+            console.warn(`Stopping: resumption token expired or became invalid after ${page} pages. Last error: ${oaiError.message}`)
+            break
+        }
+
+        throw new Error(`OAI error ${oaiError.code}: ${oaiError.message}`)
     }
 
     if (totalSize === null) totalSize = extractCompleteListSize(xml)
+
     const cursor = extractCursor(xml) ?? page * 50
+    const recordsDoneForEstimate = totalSize ? Math.min(cursor + 50, totalSize) : null
+
+    // continuously update estimated total bytes based on the average record size so far
+    if (recordsDoneForEstimate && totalSize) {
+        const avgBytesPerRecord = totalBytesDownloaded / recordsDoneForEstimate
+        estimatedTotalBytes = avgBytesPerRecord * totalSize
+    }
 
     const outFile = path.join(OUT_DIR, `page-${String(page).padStart(6, "0")}.xml`)
     fs.writeFileSync(outFile, xml)
@@ -88,9 +130,13 @@ do {
     page ++
 
     const elapsedMs = Date.now() - startedAt
-    const recordsDone = totalSize ? Math.min(cursor + 50, totalSize) : null
+    const recordsDone = recordsDoneForEstimate
     const progress = formatProgress(recordsDone, totalSize, elapsedMs)
-    console.log(`  Saved ${outFile} (${progress})`)
+    const sizeInfo = estimatedTotalBytes
+        ? `${formatBytes(totalBytesDownloaded)} / ~${formatBytes(estimatedTotalBytes)}`
+        : `${formatBytes(totalBytesDownloaded)} downloaded`
+
+    console.log(`  Saved ${outFile} (${progress}, ${sizeInfo})`)
 } while (token && page < MAX_PAGES)
 
 console.log(`Done. ${page} pages written to ${OUT_DIR} in ${formatDuration(Date.now() - startedAt)}`)
