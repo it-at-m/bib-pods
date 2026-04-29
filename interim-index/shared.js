@@ -11,6 +11,11 @@ const parser = new XMLParser({
     isArray: (name) => ["record", "controlfield", "datafield", "subfield", "setSpec"].includes(name)
 })
 
+// Field names and source mappings follow standard VuFind MARC mappings:
+// https://github.com/vufind-org/vufind/blob/dev/import/marc.properties
+
+const ALPHA_CODE = /^[a-z]$/
+
 function controlField(marc, tag) {
     return marc.controlfield?.find(f => f["@_tag"] === tag)?.["#text"] ?? null
 }
@@ -22,36 +27,129 @@ function subfields(marc, tag, code) {
         .filter(Boolean)
 }
 
+// VuFind getAllAlphaSubfields: per datafield with one of `tags`, join the text of
+// every alphabetic-coded subfield with `sep`. Returns one string per datafield.
+function allAlphaSubfields(marc, tags, sep = " ") {
+    const want = new Set(tags)
+    return (marc.datafield ?? [])
+        .filter(f => want.has(f["@_tag"]))
+        .map(f => (f.subfield ?? [])
+            .filter(s => ALPHA_CODE.test(s["@_code"]))
+            .map(s => String(s["#text"] ?? "").trim())
+            .filter(Boolean)
+            .join(sep))
+        .filter(Boolean)
+}
+
+// Per datafield with the given tag, take only the listed subfield codes and join.
+function fieldSubfields(marc, tag, codes, sep = " ") {
+    const want = new Set(codes.split(""))
+    return (marc.datafield ?? [])
+        .filter(f => f["@_tag"] === tag)
+        .map(f => (f.subfield ?? [])
+            .filter(s => want.has(s["@_code"]))
+            .map(s => String(s["#text"] ?? "").trim())
+            .filter(Boolean)
+            .join(sep))
+        .filter(Boolean)
+}
+
 function first(arr) {
     return arr[0] ?? null
+}
+
+// Strip trailing ISBD punctuation (" /", " :", " ;") that MARC libraries append.
+function trimEndPunct(s) {
+    return s?.replace(/\s*[/:;,]\s*$/, "").trim() || null
+}
+
+// VuFind language: 008[35-37] + 041 a/d/h/j
+function languageCodes(marc) {
+    const codes = new Set()
+    const f008 = controlField(marc, "008") ?? ""
+    const lang008 = f008.slice(35, 38).trim()
+    if (lang008.length === 3) codes.add(lang008)
+    for (const code of ["a", "d", "h", "j"]) {
+        for (const v of subfields(marc, "041", code)) codes.add(v.trim())
+    }
+    return [...codes].filter(Boolean)
+}
+
+// VuFind getDates: 4-digit years from 264c, 260c, then 008[7-10].
+function getDates(marc) {
+    const years = []
+    const seen = new Set()
+    const add = (y) => { if (/^\d{4}$/.test(y) && !seen.has(y)) { seen.add(y); years.push(y) } }
+    for (const v of subfields(marc, "264", "c")) { const m = v.match(/\d{4}/); if (m) add(m[0]) }
+    for (const v of subfields(marc, "260", "c")) { const m = v.match(/\d{4}/); if (m) add(m[0]) }
+    const f008 = controlField(marc, "008") ?? ""
+    add(f008.slice(7, 11).trim())
+    return years
 }
 
 // https://www.loc.gov/marc/bibliographic
 function mapRecord(oaiRecord) {
     const marc = oaiRecord.metadata.record[0]
-    const field008 = controlField(marc, "008") ?? ""
+
+    const title_short = trimEndPunct(first(subfields(marc, "245", "a")))
+    const title_sub   = trimEndPunct(first(subfields(marc, "245", "b")))
+    const title       = [title_short, title_sub].filter(Boolean).join(" : ") || null
+
+    const dates = getDates(marc)
 
     return {
-        id:             controlField(marc, "001"),
-        title:          first(subfields(marc, "245", "a"))?.replace(/ [/:]$/, "").trim(),
-        title_variant:  subfields(marc, "246", "a"),
-        subtitle:       first(subfields(marc, "245", "b"))?.replace(/ [/:]$/, "").trim(),
-        authors:        [...subfields(marc, "100", "a"), ...subfields(marc, "700", "a")],
-        year:           (first(subfields(marc, "264", "c")) ?? first(subfields(marc, "260", "c")) ?? (field008.slice(7, 11).trim() || null))?.replace(/\D/g, "") || null,
-        edition:        first(subfields(marc, "250", "a")),
-        publisher:      first(subfields(marc, "264", "b")) ?? first(subfields(marc, "260", "b")),
-        place:          first(subfields(marc, "264", "a")) ?? first(subfields(marc, "260", "a")),
-        isbn:           subfields(marc, "020", "a"),
-        languages:      subfields(marc, "041", "a"),
-        subjects:       [...subfields(marc, "650", "a"), ...subfields(marc, "689", "a")],
-        subjects_geo:   subfields(marc, "651", "a"),
-        subjects_person: subfields(marc, "600", "a"),
-        genre:          subfields(marc, "655", "a"),
-        audience:       first(subfields(marc, "521", "a")),
-        summary:        first(subfields(marc, "520", "a")),
-        series:         [...subfields(marc, "490", "a"), ...subfields(marc, "830", "a")],
-        extent:         first(subfields(marc, "300", "a")),
-        libraries:      oaiRecord.header.setSpec ?? [],
+        id:               controlField(marc, "001"),
+
+        // Title (VuFind: title=245ab, title_short=245a, title_sub=245b, title_alt=…)
+        title,
+        title_short,
+        title_sub,
+        title_alt:        [
+            ...allAlphaSubfields(marc, ["246"]),
+            ...subfields(marc, "240", "a"),
+            ...subfields(marc, "730", "a"),
+        ],
+
+        // Authors (VuFind: author=100abcqd, author2=700abcqd, author_corporate=110/111/710/711)
+        author:           fieldSubfields(marc, "100", "abcqd"),
+        author2:          fieldSubfields(marc, "700", "abcqd"),
+        author_corporate: allAlphaSubfields(marc, ["110", "111", "710", "711"]),
+
+        // Publication (VuFind: publisher, publishDate, publishDateSort, edition)
+        publisher:        [
+            ...subfields(marc, "264", "b"),
+            ...subfields(marc, "260", "b"),
+        ],
+        publishDate:      dates,
+        publishDateSort:  dates[0] ?? null,
+        edition:          first(subfields(marc, "250", "a")),
+
+        // Physical (VuFind: physical=300abcefg)
+        physical:         fieldSubfields(marc, "300", "abcefg"),
+
+        // Identifiers (VuFind: isbn=020a:773z, issn=022a)
+        isbn:             [...subfields(marc, "020", "a"), ...subfields(marc, "773", "z")],
+        issn:             subfields(marc, "022", "a"),
+
+        // Language (VuFind: language=008[35-37]:041a:041d:041h:041j)
+        language:         languageCodes(marc),
+
+        // Subjects (VuFind: topic, genre, geographic, era as alpha-subfields)
+        topic:            allAlphaSubfields(marc, ["600", "610", "611", "630", "650", "653", "656"]),
+        genre:            allAlphaSubfields(marc, ["655"]),
+        geographic:       allAlphaSubfields(marc, ["651"]),
+        era:              allAlphaSubfields(marc, ["648"]),
+
+        // Series (VuFind: series=800abcdfpqt:830ap, series2=490a)
+        series:           allAlphaSubfields(marc, ["800", "830"]),
+        series2:          subfields(marc, "490", "a"),
+
+        // Misc (VuFind: contents=505a:505t, url=856u:555u)
+        contents:         [...subfields(marc, "505", "a"), ...subfields(marc, "505", "t")],
+        url:              [...subfields(marc, "856", "u"), ...subfields(marc, "555", "u")],
+
+        // Non-VuFind: OAI setSpec → mapped to institution per VuFind convention
+        institution:      oaiRecord.header.setSpec ?? [],
     }
 }
 

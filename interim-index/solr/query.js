@@ -1,15 +1,15 @@
 const SOLR_URL = "http://localhost:8983/solr/interim-index"
 
 const params1 = {
-    q:      "authors:Sapkowski",
-    fl:     "id,title,authors,year,subjects"
+    q:      "author:Sapkowski",
+    fl:     "id,title,author,publishDate,topic"
 }
 
 const params2 = {
-    q:      "genre:Musikdruck AND authors:Weill AND title:Kurt",
+    q:      "genre:Musikdruck AND author:Weill AND title:Kurt",
     rows:   10,
     start:  0,
-    fl:     "id,title,authors,year,genre"
+    fl:     "id,title,author,publishDate,genre"
 }
 
 async function query(params) {
