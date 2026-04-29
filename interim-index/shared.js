@@ -3,6 +3,7 @@ import path from "path"
 import fs from "fs"
 
 const DATA_DIR = path.join(import.meta.dirname, "oai", "data")
+const CURSOR_FILE = path.join(import.meta.dirname, ".import-cursor.json")
 
 const parser = new XMLParser({
     ignoreAttributes: false,
@@ -54,19 +55,79 @@ function mapRecord(oaiRecord) {
     }
 }
 
-export async function runImport({ targetUrl, batchSize = 500, postBatch, finalize }) {
-    const files = fs.readdirSync(DATA_DIR)
+async function postWithRetry(postBatch, docs, attempts = 5) {
+    let delay = 1000
+    for (let i = 0; i < attempts; i++) {
+        try { return await postBatch(docs) }
+        catch (err) {
+            if (i === attempts - 1) throw err
+            console.warn(`  POST failed (attempt ${i + 1}/${attempts}): ${err.message}. Retrying in ${delay}ms`)
+            await new Promise(r => setTimeout(r, delay))
+            delay *= 2
+        }
+    }
+}
+
+function readCursorMap() {
+    if (!fs.existsSync(CURSOR_FILE)) return {}
+    try { return JSON.parse(fs.readFileSync(CURSOR_FILE, "utf8")) }
+    catch { return {} }
+}
+
+function saveCursor(targetUrl, lastFile) {
+    const data = readCursorMap()
+    data[targetUrl] = lastFile
+    fs.writeFileSync(CURSOR_FILE, JSON.stringify(data))
+}
+
+function clearCursor(targetUrl) {
+    const data = readCursorMap()
+    delete data[targetUrl]
+    if (Object.keys(data).length === 0 && fs.existsSync(CURSOR_FILE)) fs.unlinkSync(CURSOR_FILE)
+    else fs.writeFileSync(CURSOR_FILE, JSON.stringify(data))
+}
+
+export async function runImport({ targetUrl, batchSize = 2000, postBatch, finalize }) {
+    const allFiles = fs.readdirSync(DATA_DIR)
         .filter(f => f.endsWith(".xml"))
         .sort()
         .map(f => path.join(DATA_DIR, f))
 
+    const cursor = readCursorMap()[targetUrl]
+    const cursorIdx = cursor ? allFiles.indexOf(cursor) : -1
+    const startIdx = cursorIdx >= 0 ? cursorIdx + 1 : 0
+    const files = allFiles.slice(startIdx)
+
+    if (cursor && cursorIdx < 0) console.warn(`Cursor refers to unknown file ${cursor}, starting from beginning`)
+    if (cursor && cursorIdx >= 0) console.log(`Resuming after ${path.basename(cursor)} (${files.length} of ${allFiles.length} files remaining)`)
     console.log(`Indexing ${files.length} file(s) into ${targetUrl}...`)
 
     let total = 0
     let batch = []
+    let lastFullyParsedFileIdx = -1   // absolute index into allFiles
+    let inFlight = Promise.resolve()
+    let inFlightTag = -1               // file idx fully covered by batch currently in flight
 
-    for (const file of files) {
-        const xml = fs.readFileSync(file, "utf8")
+    // Pipelined flush: while one batch is being POSTed, the main loop continues parsing
+    // the next batch. Cursor is advanced only after a batch's POST acks, so on crash we
+    // resume from a file whose records are all durable in the index.
+    async function flush() {
+        if (batch.length === 0) return
+        const toSend = batch
+        batch = []
+        const tag = lastFullyParsedFileIdx
+        await inFlight
+        if (inFlightTag >= 0) saveCursor(targetUrl, allFiles[inFlightTag])
+        inFlightTag = tag
+        const sendCount = toSend.length
+        inFlight = postWithRetry(postBatch, toSend).then(() => {
+            total += sendCount
+            console.log(`  Indexed ${total} records`)
+        })
+    }
+
+    for (let i = 0; i < files.length; i++) {
+        const xml = await fs.promises.readFile(files[i], "utf8")
         const parsed = parser.parse(xml)
         const oaiRecords = parsed["OAI-PMH"]?.ListRecords?.record ?? []
 
@@ -74,21 +135,17 @@ export async function runImport({ targetUrl, batchSize = 500, postBatch, finaliz
             const doc = mapRecord(oaiRecord)
             if (!doc.id) continue
             batch.push(doc)
-
-            if (batch.length >= batchSize) {
-                await postBatch(batch)
-                total += batch.length
-                console.log(`  Indexed ${total} records`)
-                batch = []
-            }
+            if (batch.length >= batchSize) await flush()
         }
+
+        lastFullyParsedFileIdx = startIdx + i
     }
 
-    if (batch.length > 0) {
-        await postBatch(batch)
-        total += batch.length
-    }
+    await flush()
+    await inFlight
+    if (inFlightTag >= 0) saveCursor(targetUrl, allFiles[inFlightTag])
 
     await finalize()
+    clearCursor(targetUrl)
     console.log(`Done. ${total} records indexed.`)
 }
