@@ -1,6 +1,7 @@
 import { runImport } from "../shared.js"
 
 const SOLR_URL = "http://localhost:8983/solr/interim-index"
+const LIMIT = 10
 
 async function postBatch(docs) {
     const res = await fetch(`${SOLR_URL}/update`, {
@@ -20,4 +21,4 @@ async function finalize() {
     if (!res.ok) throw new Error(`Solr commit error ${res.status}`)
 }
 
-await runImport({ targetUrl: SOLR_URL, postBatch, finalize })
+await runImport({ targetUrl: SOLR_URL, limit: LIMIT, postBatch, finalize })

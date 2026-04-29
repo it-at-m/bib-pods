@@ -185,26 +185,46 @@ function clearCursor(targetUrl) {
     else fs.writeFileSync(CURSOR_FILE, JSON.stringify(data))
 }
 
-export async function runImport({ targetUrl, batchSize = 2000, postBatch, finalize }) {
+function formatDuration(sec) {
+    if (!isFinite(sec) || sec < 0) return "?"
+    if (sec < 60) return `${Math.round(sec)}s`
+    if (sec < 3600) return `${Math.floor(sec / 60)}m${String(Math.round(sec % 60)).padStart(2, "0")}s`
+    return `${Math.floor(sec / 3600)}h${String(Math.floor((sec % 3600) / 60)).padStart(2, "0")}m`
+}
+
+export async function runImport({ targetUrl, batchSize = 2000, limit = null, postBatch, finalize }) {
+    const testMode = limit != null
+
     const allFiles = fs.readdirSync(DATA_DIR)
         .filter(f => f.endsWith(".xml"))
         .sort()
         .map(f => path.join(DATA_DIR, f))
 
-    const cursor = readCursorMap()[targetUrl]
+    const cursor = testMode ? null : readCursorMap()[targetUrl]
     const cursorIdx = cursor ? allFiles.indexOf(cursor) : -1
     const startIdx = cursorIdx >= 0 ? cursorIdx + 1 : 0
-    const files = allFiles.slice(startIdx)
+    let files = allFiles.slice(startIdx)
+    if (testMode) files = files.slice(0, limit)
 
     if (cursor && cursorIdx < 0) console.warn(`Cursor refers to unknown file ${cursor}, starting from beginning`)
     if (cursor && cursorIdx >= 0) console.log(`Resuming after ${path.basename(cursor)} (${files.length} of ${allFiles.length} files remaining)`)
-    console.log(`Indexing ${files.length} file(s) into ${targetUrl}...`)
+    if (testMode) console.log(`TEST MODE: limited to first ${files.length} file(s); cursor is not read or written`)
+    console.log(`Indexing ${files.length} file(s) (of ${allFiles.length} total) into ${targetUrl}, batch size ${batchSize}...`)
 
+    const startTime = Date.now()
     let total = 0
     let batch = []
     let lastFullyParsedFileIdx = -1   // absolute index into allFiles
     let inFlight = Promise.resolve()
     let inFlightTag = -1               // file idx fully covered by batch currently in flight
+
+    function logProgress(filesDoneAbs) {
+        const filesDone = Math.max(0, filesDoneAbs - startIdx + 1)
+        const elapsed = (Date.now() - startTime) / 1000
+        const rate = elapsed > 0 ? total / elapsed : 0
+        const eta = filesDone > 0 ? elapsed * (files.length - filesDone) / filesDone : Infinity
+        console.log(`  [file ${filesDone}/${files.length}] ${total.toLocaleString()} records · ${Math.round(rate).toLocaleString()}/s · elapsed ${formatDuration(elapsed)} · ETA ${formatDuration(eta)}`)
+    }
 
     // Pipelined flush: while one batch is being POSTed, the main loop continues parsing
     // the next batch. Cursor is advanced only after a batch's POST acks, so on crash we
@@ -215,12 +235,13 @@ export async function runImport({ targetUrl, batchSize = 2000, postBatch, finali
         batch = []
         const tag = lastFullyParsedFileIdx
         await inFlight
-        if (inFlightTag >= 0) saveCursor(targetUrl, allFiles[inFlightTag])
+        if (!testMode && inFlightTag >= 0) saveCursor(targetUrl, allFiles[inFlightTag])
         inFlightTag = tag
         const sendCount = toSend.length
+        const myTag = tag
         inFlight = postWithRetry(postBatch, toSend).then(() => {
             total += sendCount
-            console.log(`  Indexed ${total} records`)
+            logProgress(myTag)
         })
     }
 
@@ -241,9 +262,13 @@ export async function runImport({ targetUrl, batchSize = 2000, postBatch, finali
 
     await flush()
     await inFlight
-    if (inFlightTag >= 0) saveCursor(targetUrl, allFiles[inFlightTag])
+    if (!testMode && inFlightTag >= 0) saveCursor(targetUrl, allFiles[inFlightTag])
 
+    console.log("Finalizing...")
     await finalize()
-    clearCursor(targetUrl)
-    console.log(`Done. ${total} records indexed.`)
+    if (!testMode) clearCursor(targetUrl)
+
+    const elapsed = (Date.now() - startTime) / 1000
+    const rate = elapsed > 0 ? total / elapsed : 0
+    console.log(`Done. ${total.toLocaleString()} records indexed in ${formatDuration(elapsed)} (${Math.round(rate).toLocaleString()}/s).`)
 }

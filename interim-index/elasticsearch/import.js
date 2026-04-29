@@ -1,6 +1,7 @@
 import { runImport } from "../shared.js"
 
 const ES_URL = "http://localhost:9200/interim-index"
+const LIMIT = null
 
 async function postBatch(docs) {
     const body = docs.flatMap(d => {
@@ -22,4 +23,4 @@ async function finalize() {
     if (!res.ok) throw new Error(`ES refresh error ${res.status}`)
 }
 
-await runImport({ targetUrl: ES_URL, postBatch, finalize })
+await runImport({ targetUrl: ES_URL, limit: LIMIT, postBatch, finalize })
