@@ -16,8 +16,8 @@ async function queryIndexByAuthors(authors) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                query: { bool: { should: authors.map(a => ({ match: { authors: a } })) } },
-                _source: ["title", "authors", "year"]
+                query: { bool: { should: authors.map(a => ({ match: { author: a } })) } },
+                _source: ["title", "author", "publishDate"]
             })
         })
         const json = await res.json()
@@ -28,8 +28,8 @@ async function queryIndexByAuthors(authors) {
         }
     }
     const params = new URLSearchParams({
-        q: authors.map(a => `authors:${a}`).join(" OR "),
-        fl: "id,title,authors,year"
+        q: authors.map(a => `author:${a}`).join(" OR "),
+        fl: "id,title,author,publishDate"
     })
     const res = await fetch(`${SOLR_URL}/select?${params}`)
     const json = await res.json()
@@ -160,7 +160,8 @@ async function getRecommendations() {
         let output = `Recommendations based on: ${authors.join(", ")}\n`
         output += `Found ${numFound} result(s):\n\n`
         for (const doc of docs) {
-            output += `  ${doc.title} (${doc.year ?? "n/a"}) — ${(doc.authors ?? []).join(", ")}\n` // doc.title: string in ES, single-element array in Solr (coerces via .toString())
+            const year = Array.isArray(doc.publishDate) ? doc.publishDate[0] : doc.publishDate
+            output += `  ${doc.title} (${year ?? "n/a"}) — ${[].concat(doc.author ?? []).join(", ")}\n` // doc.title: string in ES, single-element array in Solr (coerces via .toString())
         }
         await updateOutput(output)
     } catch (e) {
