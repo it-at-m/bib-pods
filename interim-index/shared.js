@@ -25,6 +25,7 @@ function first(arr) {
     return arr[0] ?? null
 }
 
+// https://www.loc.gov/marc/bibliographic
 function mapRecord(oaiRecord) {
     const marc = oaiRecord.metadata.record[0]
     const field008 = controlField(marc, "008") ?? ""
