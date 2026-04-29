@@ -12,13 +12,16 @@ const ES_URL = "http://localhost:9200/interim-index"
 
 async function queryIndexByAuthors(authors) {
     if (INDEX_BACKEND === "elasticsearch") {
-        const res = await fetch(`${ES_URL}/_search`, {
+        const body = {
+            query: { bool: { should: authors.map(a => ({ match: { author: a } })) } },
+            _source: ["title", "author", "publishDate"]
+        }
+        const url = `${ES_URL}/_search`
+        console.log(`POST ${url}`, body)
+        const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                query: { bool: { should: authors.map(a => ({ match: { author: a } })) } },
-                _source: ["title", "author", "publishDate"]
-            })
+            body: JSON.stringify(body)
         })
         const json = await res.json()
         if (json.error) throw new Error(json.error.reason ?? JSON.stringify(json.error))
@@ -27,11 +30,13 @@ async function queryIndexByAuthors(authors) {
             docs: json.hits.hits.map(h => ({ id: h._id, ...h._source }))
         }
     }
-    const params = new URLSearchParams({
+    const params = {
         q: authors.map(a => `author:${a}`).join(" OR "),
         fl: "id,title,author,publishDate"
-    })
-    const res = await fetch(`${SOLR_URL}/select?${params}`)
+    }
+    const url = `${SOLR_URL}/select?${new URLSearchParams(params)}`
+    console.log(`GET ${url}`, params)
+    const res = await fetch(url)
     const json = await res.json()
     if (json.error) throw new Error(json.error.msg)
     return json.response
