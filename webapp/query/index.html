@@ -31,6 +31,12 @@
             #endpoint {
                 color: #888;
             }
+            .saved-help {
+                font-size: 0.85rem;
+                color: #888;
+                margin: -0.4rem 0 0.75rem 0;
+                min-height: 1.2em;
+            }
         </style>
     </head>
     <body>
@@ -50,11 +56,21 @@
                 <div class="field-row">
                     <select id="saved">
                         <option value="">— saved queries —</option>
-                        <option value="q=*:*">all documents</option>
-                        <option value="q=author:Sapkowski&amp;fl=id,title,author,publishDate,topic">by author</option>
-                        <option value="q=genre:Musikdruck AND author:Weill AND title:Kurt&amp;rows=10&amp;start=0&amp;fl=id,title,author,publishDate,genre">genre + author + keyword</option>
+                        <option value="q=*:*" data-description="Match every document in the index.">all documents</option>
+                        <option value="q=author:Sapkowski&amp;fl=id,title,author,publishDate,topic" data-description="Restrict to documents where the author field contains 'Sapkowski'. The fl param picks which fields come back.">by author</option>
+                        <option value="q=genre:Musikdruck AND author:Weill AND title:Kurt&amp;rows=10&amp;start=0&amp;fl=id,title,author,publishDate,genre" data-description="Combine three field constraints with AND — all three must match.">genre + author + keyword</option>
+                        <option value="q=title:&quot;Der Herr der Ringe&quot;" data-description="Quoted terms become a phrase: words must appear in order, adjacent.">phrase query</option>
+                        <option value="q=title:Witch*" data-description="`*` matches any sequence of characters; `?` matches a single character.">wildcard match</option>
+                        <option value="q=author:Sapkowski~1" data-description="`~N` after a term allows up to N character edits (insert/delete/substitute/transpose). Tolerates typos.">fuzzy search (~1 edit)</option>
+                        <option value="q=title:&quot;Kurt Weill&quot;~5" data-description="`~N` after a quoted phrase allows the words to be up to N positions apart instead of strictly adjacent.">proximity (within 5 words)</option>
+                        <option value="q=publishDate:[2000 TO 2010]" data-description="`[a TO b]` is an inclusive range; `{a TO b}` is exclusive. `*` works as an open bound.">date range (inclusive)</option>
+                        <option value="q=title:witcher^3 OR title:wizard" data-description="`^N` boosts the score of matches on that term — useful for ranking when combining alternatives with OR.">boosted terms</option>
+                        <option value="q=topic:(magic OR dragons OR elves)" data-description="`field:(a OR b)` is shorthand for `(field:a OR field:b)` — applies the field to each term in the group.">field grouping</option>
+                        <option value="q=(author:Sapkowski OR author:Weill) AND NOT genre:Musikdruck" data-description="Parentheses group sub-expressions; `AND NOT` excludes documents matching the right side.">grouped + negated</option>
+                        <option value="q=%2Bauthor:Sapkowski -genre:Comic" data-description="`+` requires a clause to match; `-` requires it not to match. Alternative to AND/NOT.">required + prohibited</option>
                     </select>
                 </div>
+                <p id="saved-help" class="saved-help"></p>
                 <div class="field-row q-row">
                     <textarea id="q" rows="3" placeholder="*:*">*:*</textarea>
                 </div>
@@ -100,6 +116,7 @@
             const form = document.getElementById("q-form")
             const endpointInput = document.getElementById("endpoint")
             const savedSelect = document.getElementById("saved")
+            const savedHelp = document.getElementById("saved-help")
             const qTextarea = document.getElementById("q")
             const flInput = document.getElementById("fl")
             const rowsInput = document.getElementById("rows")
@@ -129,11 +146,12 @@
 
             savedSelect.addEventListener("change", () => {
                 if (!savedSelect.value) return
+                const opt = savedSelect.selectedOptions[0]
+                savedHelp.textContent = opt.dataset.description || ""
                 const params = new URLSearchParams(savedSelect.value)
                 editor.setValue(params.get("q") || "")
                 flInput.value = params.get("fl") || ""
                 rowsInput.value = params.get("rows") || DEFAULT_ROWS
-                savedSelect.value = ""
                 editor.focus()
             })
 
