@@ -5,6 +5,30 @@
         <title>query — bib-pods</title>
         <link rel="stylesheet" href="../styles.css">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-okaidia.min.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
+        <style>
+            .CodeMirror {
+                flex: 1;
+                min-width: 0;
+                height: auto;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: 1rem;
+                padding: 0.4rem 0.4rem;
+            }
+            .CodeMirror-focused { border-color: #888; }
+            .cm-s-default .cm-field { color: #07a; }
+            .cm-s-default .cm-string { color: inherit; }
+            .param-label {
+                flex: 0 0 6rem;
+                line-height: 2.2;
+                color: #555;
+            }
+            .field-row > input.rows-input {
+                flex: 0 0 6rem;
+            }
+        </style>
     </head>
     <body>
         <nav class="top-menu">
@@ -26,7 +50,15 @@
                     </select>
                 </div>
                 <div class="field-row">
-                    <textarea id="q" class="code-input" rows="3" placeholder="q=*:*" autofocus>q=*:*</textarea>
+                    <textarea id="q" rows="3" placeholder="*:*">*:*</textarea>
+                </div>
+                <div class="field-row">
+                    <label class="param-label" for="fl">fields (fl)</label>
+                    <input id="fl" type="text" placeholder="id,title,author,...">
+                </div>
+                <div class="field-row">
+                    <label class="param-label" for="rows">rows</label>
+                    <input id="rows" type="number" min="1" value="10" class="rows-input">
                 </div>
                 <div class="field-row actions">
                     <button type="submit">search</button>
@@ -54,13 +86,17 @@
         </main>
         <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/solr/solr.min.js"></script>
         <script>
             const ENDPOINT_KEY = "bib-pods.solr-endpoint"
 
             const form = document.getElementById("q-form")
             const endpointInput = document.getElementById("endpoint")
             const savedSelect = document.getElementById("saved")
-            const input = document.getElementById("q")
+            const qTextarea = document.getElementById("q")
+            const flInput = document.getElementById("fl")
+            const rowsInput = document.getElementById("rows")
             const result = document.getElementById("result")
             const tableMeta = document.getElementById("table-meta")
             const tableHead = document.getElementById("table-head")
@@ -71,7 +107,14 @@
             const nextBtn = document.getElementById("next-page")
 
             const DEFAULT_ROWS = 10
-            let currentParams = null
+            let currentStart = 0
+            let currentRows = DEFAULT_ROWS
+
+            const editor = CodeMirror.fromTextArea(qTextarea, {
+                mode: "solr",
+                lineWrapping: true,
+            })
+            editor.focus()
 
             endpointInput.value = localStorage.getItem(ENDPOINT_KEY) || ""
             endpointInput.addEventListener("input", () => {
@@ -79,11 +122,13 @@
             })
 
             savedSelect.addEventListener("change", () => {
-                if (savedSelect.value) {
-                    input.value = savedSelect.value
-                    savedSelect.value = ""
-                    input.focus()
-                }
+                if (!savedSelect.value) return
+                const params = new URLSearchParams(savedSelect.value)
+                editor.setValue(params.get("q") || "")
+                flInput.value = params.get("fl") || ""
+                rowsInput.value = params.get("rows") || DEFAULT_ROWS
+                savedSelect.value = ""
+                editor.focus()
             })
 
             document.querySelectorAll(".tab").forEach(t => {
@@ -144,16 +189,14 @@
 
             function updatePagination(data) {
                 const numFound = data && data.response ? data.response.numFound : 0
-                const start = parseInt(currentParams.get("start") || "0", 10)
-                const rows = parseInt(currentParams.get("rows") || DEFAULT_ROWS, 10)
-                if (numFound <= rows) {
+                if (numFound <= currentRows) {
                     pagination.hidden = true
                     return
                 }
-                const from = start + 1
-                const to = Math.min(start + rows, numFound)
+                const from = currentStart + 1
+                const to = Math.min(currentStart + currentRows, numFound)
                 pageInfo.textContent = `${from}–${to} of ${numFound} results`
-                prevBtn.disabled = start === 0
+                prevBtn.disabled = currentStart === 0
                 nextBtn.disabled = to >= numFound
                 pagination.hidden = false
             }
@@ -164,7 +207,15 @@
                     result.textContent = "Set a Solr endpoint first."
                     return
                 }
-                const url = `${endpoint}?${currentParams.toString()}&wt=json`
+                currentRows = parseInt(rowsInput.value, 10) || DEFAULT_ROWS
+                const params = new URLSearchParams()
+                params.set("q", editor.getValue().trim() || "*:*")
+                const fl = flInput.value.trim()
+                if (fl) params.set("fl", fl)
+                params.set("rows", currentRows)
+                params.set("start", currentStart)
+                params.set("wt", "json")
+                const url = `${endpoint}?${params.toString()}`
                 result.textContent = "Loading…"
                 tableMeta.textContent = "Loading…"
                 tableHead.innerHTML = ""
@@ -194,23 +245,18 @@
             }
 
             prevBtn.addEventListener("click", () => {
-                const start = parseInt(currentParams.get("start") || "0", 10)
-                const rows = parseInt(currentParams.get("rows") || DEFAULT_ROWS, 10)
-                currentParams.set("start", Math.max(0, start - rows))
+                currentStart = Math.max(0, currentStart - currentRows)
                 runQuery()
             })
 
             nextBtn.addEventListener("click", () => {
-                const start = parseInt(currentParams.get("start") || "0", 10)
-                const rows = parseInt(currentParams.get("rows") || DEFAULT_ROWS, 10)
-                currentParams.set("start", start + rows)
+                currentStart = currentStart + currentRows
                 runQuery()
             })
 
             form.addEventListener("submit", (e) => {
                 e.preventDefault()
-                const qs = input.value.replace(/\s+/g, " ").trim() || "q=*:*"
-                currentParams = new URLSearchParams(qs)
+                currentStart = 0
                 runQuery()
             })
         </script>
