@@ -25,8 +25,11 @@
                 line-height: 2.2;
                 color: #555;
             }
-            .field-row > input.rows-input {
-                flex: 0 0 6rem;
+            .q-row {
+                margin-top: 2rem;
+            }
+            #endpoint {
+                color: #888;
             }
         </style>
     </head>
@@ -41,7 +44,10 @@
         <main>
             <form id="q-form">
                 <div class="field-row">
+                    <label class="param-label" for="endpoint">endpoint</label>
                     <input id="endpoint" type="url" placeholder="Solr endpoint (will be saved in localStorage)">
+                </div>
+                <div class="field-row">
                     <select id="saved">
                         <option value="">— saved queries —</option>
                         <option value="q=*:*">all documents</option>
@@ -49,16 +55,16 @@
                         <option value="q=genre:Musikdruck AND author:Weill AND title:Kurt&amp;rows=10&amp;start=0&amp;fl=id,title,author,publishDate,genre">genre + author + keyword</option>
                     </select>
                 </div>
-                <div class="field-row">
+                <div class="field-row q-row">
                     <textarea id="q" rows="3" placeholder="*:*">*:*</textarea>
                 </div>
                 <div class="field-row">
-                    <label class="param-label" for="fl">fields (fl)</label>
+                    <label class="param-label" for="fl">fields</label>
                     <input id="fl" type="text" placeholder="id,title,author,...">
                 </div>
                 <div class="field-row">
                     <label class="param-label" for="rows">rows</label>
-                    <input id="rows" type="number" min="1" value="10" class="rows-input">
+                    <input id="rows" type="text" value="10">
                 </div>
                 <div class="field-row actions">
                     <button type="submit">search</button>
