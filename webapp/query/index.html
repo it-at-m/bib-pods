@@ -21,7 +21,7 @@
             .cm-s-default .cm-field { color: #07a; }
             .cm-s-default .cm-string { color: inherit; }
             .param-label {
-                flex: 0 0 6rem;
+                flex: 0 0 8rem;
                 line-height: 2.2;
                 color: #555;
             }
@@ -34,7 +34,7 @@
             .saved-help {
                 font-size: 0.85rem;
                 color: #888;
-                margin: -0.4rem 0 0.75rem 0;
+                margin: -0.4rem 0 0.75rem 8.5rem;
                 min-height: 1.2em;
             }
         </style>
@@ -54,24 +54,14 @@
                     <input id="endpoint" type="url" placeholder="Solr endpoint (will be saved in localStorage)">
                 </div>
                 <div class="field-row">
+                    <label class="param-label" for="saved">saved queries</label>
                     <select id="saved">
                         <option value="">— saved queries —</option>
-                        <option value="q=*:*" data-description="Match every document in the index.">all documents</option>
-                        <option value="q=author:Sapkowski&amp;fl=id,title,author,publishDate,topic" data-description="Restrict to documents where the author field contains 'Sapkowski'. The fl param picks which fields come back.">by author</option>
-                        <option value="q=genre:Musikdruck AND author:Weill AND title:Kurt&amp;rows=10&amp;start=0&amp;fl=id,title,author,publishDate,genre" data-description="Combine three field constraints with AND — all three must match.">genre + author + keyword</option>
-                        <option value="q=title:&quot;Der Herr der Ringe&quot;" data-description="Quoted terms become a phrase: words must appear in order, adjacent.">phrase query</option>
-                        <option value="q=title:Witch*" data-description="`*` matches any sequence of characters; `?` matches a single character.">wildcard match</option>
-                        <option value="q=author:Sapkowski~1" data-description="`~N` after a term allows up to N character edits (insert/delete/substitute/transpose). Tolerates typos.">fuzzy search (~1 edit)</option>
-                        <option value="q=title:&quot;Kurt Weill&quot;~5" data-description="`~N` after a quoted phrase allows the words to be up to N positions apart instead of strictly adjacent.">proximity (within 5 words)</option>
-                        <option value="q=publishDate:[2000 TO 2010]" data-description="`[a TO b]` is an inclusive range; `{a TO b}` is exclusive. `*` works as an open bound.">date range (inclusive)</option>
-                        <option value="q=title:witcher^3 OR title:wizard" data-description="`^N` boosts the score of matches on that term — useful for ranking when combining alternatives with OR.">boosted terms</option>
-                        <option value="q=topic:(magic OR dragons OR elves)" data-description="`field:(a OR b)` is shorthand for `(field:a OR field:b)` — applies the field to each term in the group.">field grouping</option>
-                        <option value="q=(author:Sapkowski OR author:Weill) AND NOT genre:Musikdruck" data-description="Parentheses group sub-expressions; `AND NOT` excludes documents matching the right side.">grouped + negated</option>
-                        <option value="q=%2Bauthor:Sapkowski -genre:Comic" data-description="`+` requires a clause to match; `-` requires it not to match. Alternative to AND/NOT.">required + prohibited</option>
                     </select>
                 </div>
                 <p id="saved-help" class="saved-help"></p>
                 <div class="field-row q-row">
+                    <label class="param-label" for="q">query</label>
                     <textarea id="q" rows="3" placeholder="*:*">*:*</textarea>
                 </div>
                 <div class="field-row">
@@ -113,6 +103,81 @@
         <script>
             const ENDPOINT_KEY = "bib-pods.solr-endpoint"
 
+            const SAVED_QUERIES = [
+                {
+                    label: "all documents",
+                    description: "Match every document in the index.",
+                    q: "*:*",
+                },
+                {
+                    label: "by author",
+                    description: "Restrict to documents where the author field contains 'Sapkowski'. The fl param picks which fields come back.",
+                    q: "author:Sapkowski",
+                    fl: "id,title,author,publishDate,topic",
+                },
+                {
+                    label: "genre + author + keyword",
+                    description: "Combine three field constraints with AND — all three must match.",
+                    q: "genre:Musikdruck AND author:Weill AND title:Kurt",
+                    fl: "id,title,author,publishDate,genre",
+                    rows: 10,
+                },
+                {
+                    label: "phrase query",
+                    description: "Quoted terms become a phrase: words must appear in order, adjacent.",
+                    q: 'title:"Der Herr der Ringe"',
+                    fl: "id,title",
+                },
+                {
+                    label: "wildcard match",
+                    description: "`*` matches any sequence of characters; `?` matches a single character.",
+                    q: "title:Witch*",
+                    fl: "id,title,author",
+                },
+                {
+                    label: "fuzzy search (~1 edit)",
+                    description: "`~N` after a term allows up to N character edits (insert/delete/substitute/transpose). Tolerates typos.",
+                    q: "author:Sapkowski~1",
+                    fl: "id,author,title",
+                },
+                {
+                    label: "proximity (within 5 words)",
+                    description: "`~N` after a quoted phrase allows the words to be up to N positions apart instead of strictly adjacent.",
+                    q: 'title:"Kurt Weill"~5',
+                    fl: "id,title",
+                },
+                {
+                    label: "date range (inclusive)",
+                    description: "`[a TO b]` is an inclusive range; `{a TO b}` is exclusive. `*` works as an open bound.",
+                    q: "publishDate:[2000 TO 2010]",
+                    fl: "id,title,publishDate",
+                },
+                {
+                    label: "boosted terms",
+                    description: "`^N` boosts the score of matches on that term — useful for ranking when combining alternatives with OR.",
+                    q: "title:witcher^3 OR title:wizard",
+                    fl: "id,title,score",
+                },
+                {
+                    label: "field grouping",
+                    description: "`field:(a OR b)` is shorthand for `(field:a OR field:b)` — applies the field to each term in the group.",
+                    q: "topic:(magic OR dragons OR elves)",
+                    fl: "id,title,topic",
+                },
+                {
+                    label: "grouped + negated",
+                    description: "Parentheses group sub-expressions; `AND NOT` excludes documents matching the right side.",
+                    q: "(author:Sapkowski OR author:Weill) AND NOT genre:Musikdruck",
+                    fl: "id,title,author,genre",
+                },
+                {
+                    label: "required + prohibited",
+                    description: "`+` requires a clause to match; `-` requires it not to match. Alternative to AND/NOT.",
+                    q: "+author:Sapkowski -genre:Comic",
+                    fl: "id,author,genre",
+                },
+            ]
+
             const form = document.getElementById("q-form")
             const endpointInput = document.getElementById("endpoint")
             const savedSelect = document.getElementById("saved")
@@ -144,14 +209,20 @@
                 localStorage.setItem(ENDPOINT_KEY, endpointInput.value)
             })
 
+            for (const sq of SAVED_QUERIES) {
+                const opt = document.createElement("option")
+                opt.value = sq.label
+                opt.textContent = sq.label
+                savedSelect.appendChild(opt)
+            }
+
             savedSelect.addEventListener("change", () => {
-                if (!savedSelect.value) return
-                const opt = savedSelect.selectedOptions[0]
-                savedHelp.textContent = opt.dataset.description || ""
-                const params = new URLSearchParams(savedSelect.value)
-                editor.setValue(params.get("q") || "")
-                flInput.value = params.get("fl") || ""
-                rowsInput.value = params.get("rows") || DEFAULT_ROWS
+                const sq = SAVED_QUERIES.find(s => s.label === savedSelect.value)
+                if (!sq) return
+                savedHelp.textContent = sq.description || ""
+                editor.setValue(sq.q || "")
+                flInput.value = sq.fl || ""
+                rowsInput.value = sq.rows || DEFAULT_ROWS
                 editor.focus()
             })
 
