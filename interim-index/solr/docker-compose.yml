@@ -1,8 +1,12 @@
-# docker compose up -d
+# docker compose up -d --build
 # docker compose down
+
+# Default credentials are solr:SolrRocks. Change after first start:
+# curl --user solr:SolrRocks 'http://localhost:8983/solr/admin/authentication' -H 'Content-type: application/json' -d '{"set-user": {"solr": "new-password"}}'
+
 services:
   solr:
-    image: solr
+    build: .
     ports:
       - "8983:8983"
     volumes:

@@ -1,0 +1,21 @@
+{
+  "authentication": {
+    "class": "solr.BasicAuthPlugin",
+    "blockUnknown": false,
+    "realm": "interim-index",
+    "credentials": {
+      "solr": "IV0EHq1OnNrj6gvRCwvFwTrZ1+z1oBbnQdiVC3otuq0= Ndd7LKvVBAaZIF0QAVi1ekCfAJXr1GGfLtRUXhgrF8c="
+    }
+  },
+  "authorization": {
+    "class": "solr.RuleBasedAuthorizationPlugin",
+    "permissions": [
+      { "name": "anon-select", "collection": "*", "path": "/select", "role": null },
+      { "name": "anon-get",    "collection": "*", "path": "/get",    "role": null },
+      { "name": "all",                                               "role": "admin" }
+    ],
+    "user-role": {
+      "solr": "admin"
+    }
+  }
+}
