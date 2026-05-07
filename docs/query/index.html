@@ -72,6 +72,10 @@
                     <label class="param-label" for="rows">rows</label>
                     <input id="rows" type="text" value="10">
                 </div>
+                <div class="field-row">
+                    <label class="param-label" for="params">extra params</label>
+                    <textarea id="params" rows="4" placeholder="defType=edismax&#10;qf=title^4 author^2 topic^3&#10;pf=title^10 topic^5&#10;tie=0.1"></textarea>
+                </div>
                 <div class="field-row actions">
                     <button type="submit">search</button>
                 </div>
@@ -176,6 +180,78 @@
                     q: "+author:Sapkowski -genre:Comic",
                     fl: "id,author,genre",
                 },
+                {
+                    label: "edismax: PDF baseline (recommended)",
+                    description: "All PDF recommendations applied at once: qf weights, pf phrase boost, tie blend, AND default, slop tolerances, stopwords off, synonyms on. The 'start here' preset.",
+                    q: "Kurt Weill",
+                    fl: "*,score",
+                    rows: 20,
+                    params: "defType=edismax\nqf=title^4 author^2 topic^3\npf=title^10 topic^5\ntie=0.1\nq.op=AND\nps=1\nqs=1\nstopwords=false\nsynonyms=true",
+                },
+                {
+                    label: "edismax: untuned (qf only)",
+                    description: "Edismax with the same fields as the baseline but no tuning — uniform weights, no pf/tie/AND/slop/linguistic settings. Flip between this and the baseline to see whether the PDF recommendations actually improve ranking on your data.",
+                    q: "Kurt Weill",
+                    fl: "*,score",
+                    rows: 20,
+                    params: "defType=edismax\nqf=title author topic",
+                },
+                {
+                    label: "edismax: weighted fields (qf)",
+                    description: "edismax searches free text across multiple fields. `qf` weights each field — title matches count 4×, author 2×, topic 3×. Multi-term q so weighting visibly differentiates ranking.",
+                    q: "Kurt Weill",
+                    fl: "*,score",
+                    rows: 20,
+                    params: "defType=edismax\nqf=title^4 author^2 topic^3",
+                },
+                {
+                    label: "edismax: phrase boost (pf)",
+                    description: "`pf` rewards documents where the words appear together as a phrase, on top of normal qf scoring. Great for ranking exact phrases higher without requiring them.",
+                    q: "Kurt Weill",
+                    fl: "*,score",
+                    rows: 20,
+                    params: "defType=edismax\nqf=title^4 author^2\npf=title^10 topic^5",
+                },
+                {
+                    label: "edismax: tie (multi-field blending)",
+                    description: "`tie` blends scores from secondary field matches. 0.0 = take the best field only (disjunction-max); 1.0 = sum all fields. 0.1 nudges multi-field hits up.",
+                    q: "magic dragons",
+                    fl: "*,score",
+                    rows: 20,
+                    params: "defType=edismax\nqf=title^4 topic^3\ntie=0.1",
+                },
+                {
+                    label: "edismax: strict AND (q.op)",
+                    description: "`q.op=AND` requires every term to match somewhere in the qf fields. Strict — best when the user's intent is precise. Leave `mm` empty under AND.",
+                    q: "Kurt Weill",
+                    fl: "id,title,author,score",
+                    rows: 20,
+                    params: "defType=edismax\nqf=title^4 author^2\nq.op=AND",
+                },
+                {
+                    label: "edismax: OR + mm 75%",
+                    description: "`q.op=OR` loosens matching; `mm=75%` requires 75% of terms to hit. Balances recall and precision when users type many words.",
+                    q: "magic dragons elves wizards",
+                    fl: "id,title,topic,score",
+                    rows: 20,
+                    params: "defType=edismax\nqf=title^4 topic^3\nq.op=OR\nmm=75%",
+                },
+                {
+                    label: "edismax: phrase + query slop (ps/qs)",
+                    description: "`ps` allows pf phrase matches with N words between; `qs` does the same for explicit phrase queries. Tolerates slightly out-of-order phrases.",
+                    q: "Herr Ringe",
+                    fl: "id,title,score",
+                    rows: 20,
+                    params: "defType=edismax\nqf=title^4\npf=title^10\nps=2\nqs=1",
+                },
+                {
+                    label: "edismax: stopwords + synonyms",
+                    description: "Toggle linguistic preprocessing. PDF recommendation: stopwords=false (don't drop them — they may matter in titles), synonyms=true (expand).",
+                    q: "Der Herr der Ringe",
+                    fl: "id,title,score",
+                    rows: 20,
+                    params: "defType=edismax\nqf=title^4\nstopwords=false\nsynonyms=true",
+                },
             ]
 
             const form = document.getElementById("q-form")
@@ -185,6 +261,7 @@
             const qTextarea = document.getElementById("q")
             const flInput = document.getElementById("fl")
             const rowsInput = document.getElementById("rows")
+            const paramsTextarea = document.getElementById("params")
             const result = document.getElementById("result")
             const tableMeta = document.getElementById("table-meta")
             const tableHead = document.getElementById("table-head")
@@ -223,6 +300,7 @@
                 editor.setValue(sq.q || "")
                 flInput.value = sq.fl || ""
                 rowsInput.value = sq.rows || DEFAULT_ROWS
+                paramsTextarea.value = sq.params || ""
                 editor.focus()
             })
 
@@ -310,6 +388,18 @@
                 params.set("rows", currentRows)
                 params.set("start", currentStart)
                 params.set("wt", "json")
+                const extras = paramsTextarea.value.trim()
+                if (extras) {
+                    for (const line of extras.split("\n")) {
+                        const trimmed = line.trim()
+                        if (!trimmed) continue
+                        const eq = trimmed.indexOf("=")
+                        if (eq < 0) continue
+                        const key = trimmed.slice(0, eq).trim()
+                        const value = trimmed.slice(eq + 1).trim()
+                        if (key) params.append(key, value)
+                    }
+                }
                 const url = `${endpoint}?${params.toString()}`
                 result.textContent = "Loading…"
                 tableMeta.textContent = "Loading…"
