@@ -37,6 +37,71 @@
                 margin: -0.4rem 0 0.75rem 8.5rem;
                 min-height: 1.2em;
             }
+            .query-tabs {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.25rem;
+                margin-bottom: 1.5rem;
+                border-bottom: 1px solid #ddd;
+            }
+            .query-tab {
+                padding: 0.5rem 0.8rem;
+                background: none;
+                border: none;
+                border-bottom: 2px solid transparent;
+                cursor: pointer;
+                font: inherit;
+                color: #555;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.4rem;
+                margin-bottom: -1px;
+            }
+            .query-tab.active {
+                border-bottom-color: #07a;
+                color: #000;
+            }
+            .query-tab .close {
+                color: #aaa;
+                padding: 0 0.2rem;
+                border-radius: 3px;
+            }
+            .query-tab .close:hover {
+                background: #eee;
+                color: #c33;
+            }
+            .add-tab {
+                padding: 0.5rem 0.8rem;
+                background: none;
+                border: none;
+                cursor: pointer;
+                font: inherit;
+                color: #07a;
+            }
+            .add-tab:hover {
+                text-decoration: underline;
+            }
+            .tab-label-edit {
+                font: inherit;
+                border: 1px solid #07a;
+                border-radius: 2px;
+                padding: 0 0.2rem;
+                background: white;
+                width: 9rem;
+            }
+            .reset-tabs {
+                margin-left: auto;
+                padding: 0.5rem 0.8rem;
+                background: none;
+                border: none;
+                cursor: pointer;
+                font: inherit;
+                font-size: 0.85rem;
+                color: #999;
+            }
+            .reset-tabs:hover {
+                color: #c33;
+            }
         </style>
     </head>
     <body>
@@ -48,6 +113,7 @@
             <a href="https://github.com/it-at-m/bib-pods">GitHub</a>
         </nav>
         <main>
+            <div class="query-tabs" id="query-tabs"></div>
             <form id="q-form">
                 <div class="field-row">
                     <label class="param-label" for="endpoint">endpoint</label>
@@ -66,7 +132,7 @@
                 </div>
                 <div class="field-row">
                     <label class="param-label" for="fl">fields</label>
-                    <input id="fl" type="text" placeholder="id,title,author,...">
+                    <input id="fl" type="text" value="*">
                 </div>
                 <div class="field-row">
                     <label class="param-label" for="rows">rows</label>
@@ -74,7 +140,7 @@
                 </div>
                 <div class="field-row">
                     <label class="param-label" for="params">extra params</label>
-                    <textarea id="params" rows="4" placeholder="defType=edismax&#10;qf=title^4 author^2 topic^3&#10;pf=title^10 topic^5&#10;tie=0.1"></textarea>
+                    <textarea id="params" rows="4"></textarea>
                 </div>
                 <div class="field-row actions">
                     <button type="submit">search</button>
@@ -301,6 +367,11 @@
                 flInput.value = sq.fl || ""
                 rowsInput.value = sq.rows || DEFAULT_ROWS
                 paramsTextarea.value = sq.params || ""
+                if (tabs[activeTabIndex]) {
+                    tabs[activeTabIndex].label = sq.label
+                    renderTabs()
+                    persistTabs()
+                }
                 editor.focus()
             })
 
@@ -313,6 +384,10 @@
                     document.querySelectorAll(".output").forEach(o => {
                         o.classList.toggle("hidden", o.dataset.mode !== mode)
                     })
+                    if (tabs[activeTabIndex]) {
+                        tabs[activeTabIndex].outputMode = mode
+                        persistTabs()
+                    }
                 })
             })
 
@@ -444,6 +519,235 @@
                 currentStart = 0
                 runQuery()
             })
+
+            const queryTabsEl = document.getElementById("query-tabs")
+            const TABS_KEY = "bib-pods.solr-tabs"
+            let tabs = []
+            let activeTabIndex = 0
+            let tabCounter = 0
+
+            function persistTabs() {
+                saveActiveTabState()
+                const slim = tabs.map(t => {
+                    const { rawResult, ...rest } = t
+                    return rest
+                })
+                try {
+                    localStorage.setItem(TABS_KEY, JSON.stringify({
+                        tabs: slim,
+                        activeTabIndex,
+                        tabCounter,
+                    }))
+                } catch {}
+            }
+
+            function restoreTabs() {
+                try {
+                    const raw = localStorage.getItem(TABS_KEY)
+                    if (!raw) return false
+                    const data = JSON.parse(raw)
+                    if (!data || !Array.isArray(data.tabs) || data.tabs.length === 0) return false
+                    tabs = data.tabs.map(t => ({
+                        ...t,
+                        rawResult: "Enter a Solr query above.",
+                        endpoint: t.endpoint ?? (localStorage.getItem(ENDPOINT_KEY) || ""),
+                    }))
+                    activeTabIndex = Math.min(data.activeTabIndex || 0, tabs.length - 1)
+                    tabCounter = data.tabCounter || tabs.length
+                    return true
+                } catch {
+                    return false
+                }
+            }
+
+            function makeNewTab() {
+                tabCounter++
+                return {
+                    id: tabCounter,
+                    label: `Query ${tabCounter}`,
+                    endpoint: endpointInput.value || localStorage.getItem(ENDPOINT_KEY) || "",
+                    q: "*:*",
+                    fl: "*",
+                    rows: DEFAULT_ROWS,
+                    params: "",
+                    savedSelection: "",
+                    savedHelp: "",
+                    rawResult: "Enter a Solr query above.",
+                    currentStart: 0,
+                    currentRows: DEFAULT_ROWS,
+                    outputMode: "raw",
+                }
+            }
+
+            function saveActiveTabState() {
+                const t = tabs[activeTabIndex]
+                if (!t) return
+                t.endpoint = endpointInput.value
+                t.q = editor.getValue()
+                t.fl = flInput.value
+                t.rows = rowsInput.value
+                t.params = paramsTextarea.value
+                t.savedSelection = savedSelect.value
+                t.savedHelp = savedHelp.textContent
+                t.rawResult = result.textContent
+                t.currentStart = currentStart
+                t.currentRows = currentRows
+                const activeOut = document.querySelector(".output:not(.hidden)")
+                if (activeOut) t.outputMode = activeOut.dataset.mode
+            }
+
+            function loadTabState() {
+                const t = tabs[activeTabIndex]
+                if (!t) return
+                endpointInput.value = t.endpoint || ""
+                editor.setValue(t.q)
+                flInput.value = t.fl
+                rowsInput.value = t.rows
+                paramsTextarea.value = t.params
+                savedSelect.value = t.savedSelection
+                savedHelp.textContent = t.savedHelp || ""
+                result.textContent = t.rawResult
+                currentStart = t.currentStart
+                currentRows = t.currentRows
+                let parsed = null
+                try { parsed = JSON.parse(t.rawResult) } catch {}
+                if (parsed) {
+                    try { Prism.highlightElement(result) } catch {}
+                    renderTable(parsed)
+                    updatePagination(parsed)
+                } else {
+                    tableMeta.textContent = "Run a query first."
+                    tableHead.innerHTML = ""
+                    tableBody.innerHTML = ""
+                    pagination.hidden = true
+                }
+                document.querySelectorAll(".tab").forEach(x => {
+                    x.classList.toggle("active", x.dataset.mode === t.outputMode)
+                })
+                document.querySelectorAll(".output").forEach(o => {
+                    o.classList.toggle("hidden", o.dataset.mode !== t.outputMode)
+                })
+            }
+
+            function renderTabs() {
+                queryTabsEl.innerHTML = ""
+                tabs.forEach((tab, i) => {
+                    const btn = document.createElement("button")
+                    btn.type = "button"
+                    btn.className = "query-tab" + (i === activeTabIndex ? " active" : "")
+                    const labelSpan = document.createElement("span")
+                    labelSpan.textContent = tab.label
+                    labelSpan.title = "Double-click to rename"
+                    labelSpan.addEventListener("dblclick", (e) => {
+                        e.stopPropagation()
+                        const input = document.createElement("input")
+                        input.type = "text"
+                        input.value = tab.label
+                        input.className = "tab-label-edit"
+                        labelSpan.replaceWith(input)
+                        input.focus()
+                        input.select()
+                        let finished = false
+                        const finish = (commit) => {
+                            if (finished) return
+                            finished = true
+                            if (commit) {
+                                const newLabel = input.value.trim()
+                                if (newLabel) tabs[i].label = newLabel
+                            }
+                            renderTabs()
+                            persistTabs()
+                        }
+                        input.addEventListener("blur", () => finish(true))
+                        input.addEventListener("keydown", (ev) => {
+                            if (ev.key === "Enter") { ev.preventDefault(); input.blur() }
+                            else if (ev.key === "Escape") { ev.preventDefault(); finish(false) }
+                        })
+                        input.addEventListener("click", (ev) => ev.stopPropagation())
+                        input.addEventListener("mousedown", (ev) => ev.stopPropagation())
+                    })
+                    btn.appendChild(labelSpan)
+                    if (tabs.length > 1) {
+                        const closeSpan = document.createElement("span")
+                        closeSpan.className = "close"
+                        closeSpan.textContent = "×"
+                        closeSpan.title = "Close tab"
+                        closeSpan.addEventListener("click", (e) => {
+                            e.stopPropagation()
+                            closeTab(i)
+                        })
+                        btn.appendChild(closeSpan)
+                    }
+                    btn.addEventListener("click", () => switchTab(i))
+                    queryTabsEl.appendChild(btn)
+                })
+                const addBtn = document.createElement("button")
+                addBtn.type = "button"
+                addBtn.className = "add-tab"
+                addBtn.textContent = "+ new query"
+                addBtn.addEventListener("click", addTab)
+                queryTabsEl.appendChild(addBtn)
+                const resetBtn = document.createElement("button")
+                resetBtn.type = "button"
+                resetBtn.className = "reset-tabs"
+                resetBtn.textContent = "reset"
+                resetBtn.title = "Clear all tabs and local storage"
+                resetBtn.addEventListener("click", resetAll)
+                queryTabsEl.appendChild(resetBtn)
+            }
+
+            function resetAll() {
+                if (!confirm("Clear all tabs and local storage?")) return
+                localStorage.removeItem(TABS_KEY)
+                localStorage.removeItem(ENDPOINT_KEY)
+                endpointInput.value = ""
+                tabs = []
+                activeTabIndex = 0
+                tabCounter = 0
+                tabs.push(makeNewTab())
+                loadTabState()
+                renderTabs()
+            }
+
+            function switchTab(index) {
+                if (index === activeTabIndex) return
+                saveActiveTabState()
+                activeTabIndex = index
+                loadTabState()
+                renderTabs()
+                persistTabs()
+            }
+
+            function addTab() {
+                saveActiveTabState()
+                tabs.push(makeNewTab())
+                activeTabIndex = tabs.length - 1
+                loadTabState()
+                renderTabs()
+                persistTabs()
+            }
+
+            function closeTab(index) {
+                if (tabs.length <= 1) return
+                const wasActive = index === activeTabIndex
+                tabs.splice(index, 1)
+                if (wasActive) {
+                    activeTabIndex = Math.min(index, tabs.length - 1)
+                    loadTabState()
+                } else if (activeTabIndex > index) {
+                    activeTabIndex--
+                }
+                renderTabs()
+                persistTabs()
+            }
+
+            if (restoreTabs()) {
+                loadTabState()
+            } else {
+                tabs.push(makeNewTab())
+            }
+            renderTabs()
+            window.addEventListener("beforeunload", persistTabs)
         </script>
     </body>
 </html>
