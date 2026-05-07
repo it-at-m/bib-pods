@@ -636,6 +636,7 @@
                     tableHead.innerHTML = ""
                     tableBody.innerHTML = ""
                     pagination.hidden = true
+                    pageInfo.textContent = ""
                 }
                 document.querySelectorAll(".tab").forEach(x => {
                     x.classList.toggle("active", x.dataset.mode === t.outputMode)
