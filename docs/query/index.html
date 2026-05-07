@@ -102,6 +102,12 @@
             .reset-tabs:hover {
                 color: #c33;
             }
+            .timing {
+                font-size: 0.85rem;
+                color: #999;
+                margin-left: 1rem;
+                align-self: center;
+            }
         </style>
     </head>
     <body>
@@ -144,6 +150,7 @@
                 </div>
                 <div class="field-row actions">
                     <button type="submit">search</button>
+                    <span id="timing" class="timing"></span>
                 </div>
             </form>
             <div class="tabs">
@@ -336,6 +343,7 @@
             const pageInfo = document.getElementById("page-info")
             const prevBtn = document.getElementById("prev-page")
             const nextBtn = document.getElementById("next-page")
+            const timing = document.getElementById("timing")
 
             const DEFAULT_ROWS = 10
             let currentStart = 0
@@ -481,6 +489,8 @@
                 tableHead.innerHTML = ""
                 tableBody.innerHTML = ""
                 pagination.hidden = true
+                timing.textContent = "…"
+                const requestStart = performance.now()
                 try {
                     const r = await fetch(url)
                     const text = await r.text()
@@ -501,6 +511,9 @@
                 } catch (err) {
                     result.textContent = "Request failed: " + err.message
                     tableMeta.textContent = "Request failed."
+                } finally {
+                    const ms = performance.now() - requestStart
+                    timing.textContent = ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`
                 }
             }
 
@@ -573,6 +586,7 @@
                     savedSelection: "",
                     savedHelp: "",
                     rawResult: "Enter a Solr query above.",
+                    timing: "",
                     currentStart: 0,
                     currentRows: DEFAULT_ROWS,
                     outputMode: "raw",
@@ -590,6 +604,7 @@
                 t.savedSelection = savedSelect.value
                 t.savedHelp = savedHelp.textContent
                 t.rawResult = result.textContent
+                t.timing = timing.textContent
                 t.currentStart = currentStart
                 t.currentRows = currentRows
                 const activeOut = document.querySelector(".output:not(.hidden)")
@@ -607,6 +622,7 @@
                 savedSelect.value = t.savedSelection
                 savedHelp.textContent = t.savedHelp || ""
                 result.textContent = t.rawResult
+                timing.textContent = t.timing || ""
                 currentStart = t.currentStart
                 currentRows = t.currentRows
                 let parsed = null
