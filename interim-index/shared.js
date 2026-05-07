@@ -2,7 +2,7 @@ import { XMLParser } from "fast-xml-parser"
 import path from "path"
 import fs from "fs"
 
-const DATA_DIR = path.join(import.meta.dirname, "oai", "data")
+const DEFAULT_DATA_DIR = path.join(import.meta.dirname, "oai", "data")
 const CURSOR_FILE = path.join(import.meta.dirname, ".import-cursor.json")
 
 const parser = new XMLParser({
@@ -99,6 +99,7 @@ function mapRecord(oaiRecord) {
 
     return {
         id:               controlField(marc, "001"),
+        oai_identifier:   oaiRecord.header?.identifier ?? null,
 
         // Title (VuFind: title=245ab, title_short=245a, title_sub=245b, title_alt=…)
         title,
@@ -192,15 +193,24 @@ function formatDuration(sec) {
     return `${Math.floor(sec / 3600)}h${String(Math.floor((sec % 3600) / 60)).padStart(2, "0")}m`
 }
 
-export async function runImport({ targetUrl, batchSize = 2000, limit = null, postBatch, finalize }) {
+export async function runImport({
+    targetUrl,
+    dataDir = DEFAULT_DATA_DIR,
+    batchSize = 2000,
+    limit = null,
+    postBatch,
+    postDeletes,
+    finalize,
+}) {
     const testMode = limit != null
+    const cursorKey = `${targetUrl}::${dataDir}`
 
-    const allFiles = fs.readdirSync(DATA_DIR)
+    const allFiles = fs.readdirSync(dataDir)
         .filter(f => f.endsWith(".xml"))
         .sort()
-        .map(f => path.join(DATA_DIR, f))
+        .map(f => path.join(dataDir, f))
 
-    const cursor = testMode ? null : readCursorMap()[targetUrl]
+    const cursor = testMode ? null : readCursorMap()[cursorKey]
     const cursorIdx = cursor ? allFiles.indexOf(cursor) : -1
     const startIdx = cursorIdx >= 0 ? cursorIdx + 1 : 0
     let files = allFiles.slice(startIdx)
@@ -209,11 +219,12 @@ export async function runImport({ targetUrl, batchSize = 2000, limit = null, pos
     if (cursor && cursorIdx < 0) console.warn(`Cursor refers to unknown file ${cursor}, starting from beginning`)
     if (cursor && cursorIdx >= 0) console.log(`Resuming after ${path.basename(cursor)} (${files.length} of ${allFiles.length} files remaining)`)
     if (testMode) console.log(`TEST MODE: limited to first ${files.length} file(s); cursor is not read or written`)
-    console.log(`Indexing ${files.length} file(s) (of ${allFiles.length} total) into ${targetUrl}, batch size ${batchSize}...`)
+    console.log(`Indexing ${files.length} file(s) from ${dataDir} (of ${allFiles.length} total) into ${targetUrl}, batch size ${batchSize}...`)
 
     const startTime = Date.now()
     let total = 0
     let batch = []
+    const deletedOaiIds = []
     let lastFullyParsedFileIdx = -1   // absolute index into allFiles
     let inFlight = Promise.resolve()
     let inFlightTag = -1               // file idx fully covered by batch currently in flight
@@ -235,7 +246,7 @@ export async function runImport({ targetUrl, batchSize = 2000, limit = null, pos
         batch = []
         const tag = lastFullyParsedFileIdx
         await inFlight
-        if (!testMode && inFlightTag >= 0) saveCursor(targetUrl, allFiles[inFlightTag])
+        if (!testMode && inFlightTag >= 0) saveCursor(cursorKey, allFiles[inFlightTag])
         inFlightTag = tag
         const sendCount = toSend.length
         const myTag = tag
@@ -251,6 +262,11 @@ export async function runImport({ targetUrl, batchSize = 2000, limit = null, pos
         const oaiRecords = parsed["OAI-PMH"]?.ListRecords?.record ?? []
 
         for (const oaiRecord of oaiRecords) {
+            if (oaiRecord.header?.["@_status"] === "deleted") {
+                const oaiId = oaiRecord.header.identifier
+                if (oaiId) deletedOaiIds.push(oaiId)
+                continue
+            }
             const doc = mapRecord(oaiRecord)
             if (!doc.id) continue
             batch.push(doc)
@@ -262,13 +278,22 @@ export async function runImport({ targetUrl, batchSize = 2000, limit = null, pos
 
     await flush()
     await inFlight
-    if (!testMode && inFlightTag >= 0) saveCursor(targetUrl, allFiles[inFlightTag])
+    if (!testMode && inFlightTag >= 0) saveCursor(cursorKey, allFiles[inFlightTag])
+
+    if (deletedOaiIds.length > 0) {
+        if (postDeletes) {
+            console.log(`Deleting ${deletedOaiIds.length.toLocaleString()} record(s) marked deleted in OAI...`)
+            await postDeletes(deletedOaiIds)
+        } else {
+            console.warn(`${deletedOaiIds.length} OAI deletion(s) seen but no postDeletes handler — skipping. Index may have stale records.`)
+        }
+    }
 
     console.log("Finalizing...")
     await finalize()
-    if (!testMode) clearCursor(targetUrl)
+    if (!testMode) clearCursor(cursorKey)
 
     const elapsed = (Date.now() - startTime) / 1000
     const rate = elapsed > 0 ? total / elapsed : 0
-    console.log(`Done. ${total.toLocaleString()} records indexed in ${formatDuration(elapsed)} (${Math.round(rate).toLocaleString()}/s).`)
+    console.log(`Done. ${total.toLocaleString()} records indexed, ${deletedOaiIds.length.toLocaleString()} deleted in ${formatDuration(elapsed)} (${Math.round(rate).toLocaleString()}/s).`)
 }
