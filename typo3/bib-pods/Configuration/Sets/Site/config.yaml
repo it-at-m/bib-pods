@@ -1,0 +1,4 @@
+name: bib-pods/site
+label: bib-pods
+dependencies:
+  - typo3/fluid-styled-content
