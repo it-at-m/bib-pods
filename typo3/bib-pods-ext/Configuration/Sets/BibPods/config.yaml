@@ -1,4 +1,0 @@
-name: bib-pods/typo3-ext
-label: bib-pods typo3 site package
-dependencies:
-  - typo3/fluid-styled-content
