@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<xliff version="1.0">
+    <file source-language="en" datatype="plaintext" original="messages" product-name="bib_pods">
+        <header/>
+        <body>
+            <trans-unit id="plugin.pod.title" xml:space="preserve">
+                <source>bib-pods</source>
+            </trans-unit>
+            <trans-unit id="plugin.pod.description" xml:space="preserve">
+                <source>bib-pods</source>
+            </trans-unit>
+        </body>
+    </file>
+</xliff>

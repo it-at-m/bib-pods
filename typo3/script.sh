@@ -112,7 +112,7 @@ YAML
     echo "DELETE FROM sys_template;" | ddev mysql
 
     echo "==> Seeding bib-pods plugin content element on root page..."
-    echo "INSERT INTO tt_content (pid, CType, list_type, colPos, header) VALUES (1, 'list', 'bibpods_pod', 0, 'bib-pods');" | ddev mysql
+    echo "INSERT INTO tt_content (pid, CType, colPos, header) VALUES (1, 'bibpods_pod', 0, 'bib-pods');" | ddev mysql
 
     echo "==> Flushing TYPO3 caches..."
     typo3 cache:flush
