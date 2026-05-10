@@ -101,11 +101,11 @@ dependencies:
   - bib-pods/site
 languages:
   -
-    title: English
+    title: Deutsch
     enabled: true
     languageId: 0
     base: /
-    locale: en_US.UTF-8
+    locale: de_DE.UTF-8
 YAML
 
     echo "==> Removing default sys_template..."
