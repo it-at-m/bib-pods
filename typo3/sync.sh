@@ -53,23 +53,38 @@ EOF
 
 SYNCIGNORE_FILE="$SCRIPT_DIR/.syncignore"
 EXCLUDES=""
+RSYNC_EXCLUDES=()
 if [[ -f "$SYNCIGNORE_FILE" ]]; then
     while IFS= read -r pattern || [[ -n "$pattern" ]]; do
         [[ -z "$pattern" || "$pattern" =~ ^[[:space:]]*# ]] && continue
         EXCLUDES+=" --exclude-glob $pattern"
+        RSYNC_EXCLUDES+=("--exclude=$pattern")
     done < "$SYNCIGNORE_FILE"
 fi
 MIRROR_FLAGS="--verbose --delete$EXCLUDES"
 
 case "${1:-}" in
     diff)
-        TMP=$(mktemp -d)
-        trap 'rm -rf "$TMP"' EXIT
+        LOCAL_TMP=$(mktemp -d)
+        REMOTE_TMP=$(mktemp -d)
+        trap 'rm -rf "$LOCAL_TMP" "$REMOTE_TMP"' EXIT
         echo "==> Fetching remote snapshot..."
-        run_lftp "mirror --exclude-glob .DS_Store \"$SFTP_REMOTE_PATH\" \"$TMP\""
+        run_lftp "mirror$EXCLUDES \"$SFTP_REMOTE_PATH\" \"$REMOTE_TMP\""
+        rsync -a "${RSYNC_EXCLUDES[@]}" "$LOCAL_DIR/" "$LOCAL_TMP/"
         echo "==> Diff (remote on the left, local on the right — '+' is what local adds):"
-        git --no-pager diff --no-index --color=always "$TMP" "$LOCAL_DIR" \
-            | sed -E "s|${LOCAL_DIR#/}|local|g; s|${TMP#/}|remote|g; /index [0-9a-f]+\.\.[0-9a-f]+/d" \
+        git --no-pager diff --no-index --color=always "$REMOTE_TMP" "$LOCAL_TMP" \
+            | sed -E "s|${LOCAL_TMP#/}|local|g; s|${REMOTE_TMP#/}|remote|g; /index [0-9a-f]+\.\.[0-9a-f]+/d" \
+            | awk '
+                /diff --git/ {
+                    if (/bundle\.js/) {
+                        print "[bundle.js: content diff suppressed]"
+                        skip = 1
+                        next
+                    }
+                    skip = 0
+                }
+                !skip
+            ' \
             || true
         ;;
 
