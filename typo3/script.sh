@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SITE_DIR="$SCRIPT_DIR/site"
-EXT_DIR="$SCRIPT_DIR/bib-pods"
+EXT_DIR="$SCRIPT_DIR/bib_pods"
 EXT_KEY="bib_pods"
 TYPO3_VERSION="13"
 
