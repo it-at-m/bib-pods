@@ -1,2 +1,4 @@
+[getenv("LOCAL_DEV_SETUP") == "1"]
 page = PAGE
 page.10 < styles.content.get
+[END]

@@ -49,6 +49,8 @@ services:
   web:
     volumes:
       - $EXT_DIR:/var/www/html/typo3conf/ext/$EXT_KEY:rw
+    environment:
+      LOCAL_DEV_SETUP: "1"
 DDEV
 
     echo "==> Starting DDEV..."
