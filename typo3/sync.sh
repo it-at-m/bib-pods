@@ -5,7 +5,7 @@
 #
 # Setup:
 #   1. brew install lftp
-#   2. Create .sftp-details next to this script (gitignored) with:
+#   2. Create .syncdetails next to this script (gitignored) with:
 #
 #        SFTP_HOST=""
 #        SFTP_PORT=""
@@ -17,7 +17,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOCAL_DIR="$SCRIPT_DIR/bib_pods"
-SFTP_FILE="$SCRIPT_DIR/.sftp-details"
+SFTP_FILE="$SCRIPT_DIR/.syncdetails"
 
 if ! command -v lftp >/dev/null 2>&1; then
     echo "Error: lftp is required. Install with: brew install lftp" >&2
