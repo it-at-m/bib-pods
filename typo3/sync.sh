@@ -51,7 +51,15 @@ bye
 EOF
 }
 
-MIRROR_FLAGS='--verbose --delete --exclude-glob .DS_Store'
+SYNCIGNORE_FILE="$SCRIPT_DIR/.syncignore"
+EXCLUDES=""
+if [[ -f "$SYNCIGNORE_FILE" ]]; then
+    while IFS= read -r pattern || [[ -n "$pattern" ]]; do
+        [[ -z "$pattern" || "$pattern" =~ ^[[:space:]]*# ]] && continue
+        EXCLUDES+=" --exclude-glob $pattern"
+    done < "$SYNCIGNORE_FILE"
+fi
+MIRROR_FLAGS="--verbose --delete$EXCLUDES"
 
 case "${1:-}" in
     diff)

@@ -1,0 +1,10 @@
+# Patterns to exclude when mirroring with sync.sh.
+# One per line. Glob-style. Trailing slash = directory.
+# Lines starting with '#' and blank lines are ignored.
+
+.DS_Store
+src/
+node_modules/
+package.json
+package-lock.json
+vite.config.js
