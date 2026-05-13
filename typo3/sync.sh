@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Usage: ./sync.sh {pull|push|diff}
+#
+# Mirrors typo3/bib_pods with a remote SFTP location
+#
+# Setup:
+#   1. brew install lftp
+#   2. Create .sftp-details next to this script (gitignored) with:
+#
+#        SFTP_HOST=""
+#        SFTP_PORT=""
+#        SFTP_USER=""
+#        SFTP_PASSWORD=""
+#        SFTP_REMOTE_PATH=""
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOCAL_DIR="$SCRIPT_DIR/bib_pods"
+SFTP_FILE="$SCRIPT_DIR/.sftp-details"
+
+if ! command -v lftp >/dev/null 2>&1; then
+    echo "Error: lftp is required. Install with: brew install lftp" >&2
+    exit 1
+fi
+
+if [[ ! -f "$SFTP_FILE" ]]; then
+    echo "Error: $SFTP_FILE not found." >&2
+    echo "See the setup instructions at the top of this script." >&2
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$SFTP_FILE"
+
+: "${SFTP_HOST:?SFTP_HOST not set in $SFTP_FILE}"
+: "${SFTP_PORT:?SFTP_PORT not set in $SFTP_FILE}"
+: "${SFTP_USER:?SFTP_USER not set in $SFTP_FILE}"
+: "${SFTP_PASSWORD:?SFTP_PASSWORD not set in $SFTP_FILE}"
+: "${SFTP_REMOTE_PATH:?SFTP_REMOTE_PATH not set in $SFTP_FILE}"
+
+mkdir -p "$LOCAL_DIR"
+
+run_lftp() {
+    lftp -u "$SFTP_USER,$SFTP_PASSWORD" "sftp://$SFTP_HOST:$SFTP_PORT" <<EOF
+set sftp:auto-confirm yes
+set net:timeout 10
+set net:max-retries 1
+$1
+bye
+EOF
+}
+
+MIRROR_FLAGS='--verbose --delete --exclude-glob .DS_Store'
+
+case "${1:-}" in
+    diff)
+        TMP=$(mktemp -d)
+        trap 'rm -rf "$TMP"' EXIT
+        echo "==> Fetching remote snapshot..."
+        run_lftp "mirror --exclude-glob .DS_Store \"$SFTP_REMOTE_PATH\" \"$TMP\""
+        echo "==> Diff (local on the left, remote on the right):"
+        git --no-pager diff --no-index --color=always "$LOCAL_DIR" "$TMP" \
+            | sed -E "s|${LOCAL_DIR#/}|local|g; s|${TMP#/}|remote|g; /index [0-9a-f]+\.\.[0-9a-f]+/d" \
+            || true
+        ;;
+
+    pull)
+        echo "==> Pulling remote -> local (mirror with --delete)..."
+        run_lftp "mirror $MIRROR_FLAGS \"$SFTP_REMOTE_PATH\" \"$LOCAL_DIR\""
+        echo "==> Done."
+        ;;
+
+    push)
+        echo "==> Pushing local -> remote (mirror with --delete)..."
+        run_lftp "mirror -R $MIRROR_FLAGS \"$LOCAL_DIR\" \"$SFTP_REMOTE_PATH\""
+        echo "==> Done."
+        ;;
+
+    *)
+        cat <<HELP >&2
+Usage: $0 {pull|push|diff}
+
+  diff   Show what pull and push would change (read-only).
+  pull   Mirror remote -> local. Overwrites local files; deletes locals not on remote.
+  push   Mirror local -> remote. Overwrites remote files; deletes remotes not local.
+
+SFTP connection details are read from: $SFTP_FILE
+HELP
+        exit 1
+        ;;
+esac
