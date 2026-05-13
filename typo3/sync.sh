@@ -59,8 +59,8 @@ case "${1:-}" in
         trap 'rm -rf "$TMP"' EXIT
         echo "==> Fetching remote snapshot..."
         run_lftp "mirror --exclude-glob .DS_Store \"$SFTP_REMOTE_PATH\" \"$TMP\""
-        echo "==> Diff (local on the left, remote on the right):"
-        git --no-pager diff --no-index --color=always "$LOCAL_DIR" "$TMP" \
+        echo "==> Diff (remote on the left, local on the right — '+' is what local adds):"
+        git --no-pager diff --no-index --color=always "$TMP" "$LOCAL_DIR" \
             | sed -E "s|${LOCAL_DIR#/}|local|g; s|${TMP#/}|remote|g; /index [0-9a-f]+\.\.[0-9a-f]+/d" \
             || true
         ;;
