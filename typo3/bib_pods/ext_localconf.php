@@ -9,6 +9,6 @@ ExtensionUtility::configurePlugin(
     'BibPods',
     'Pod',
     [PodController::class => 'list'],
-    [],
+    [PodController::class => 'list'],
     ExtensionUtility::PLUGIN_TYPE_CONTENT_ELEMENT,
 );
