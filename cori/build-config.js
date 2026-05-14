@@ -9,5 +9,6 @@ export function loadConfig() {
     const lookup = (predicate) => quads.find(q => q.predicate.value === BP + predicate).object.value
     return {
         solrEndpoint: lookup("solrEndpoint"),
+        mainPath: lookup("mainPath"),
     }
 }

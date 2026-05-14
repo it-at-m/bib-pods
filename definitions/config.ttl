@@ -3,6 +3,7 @@
 
 bp:config
     bp:solrEndpoint <https://bib-pods.ngrok.dev/solr/interim-index/select> ;
+    bp:mainPath "/bib-pods" ;
     bp:solidPodSuggestion <https://solidcommunity.net/>, <https://start.inrupt.com/profile> .
 
 <https://solidcommunity.net/>      rdfs:label "solidcommunity.net" .

@@ -6,6 +6,7 @@ const config = loadConfig()
 export default defineConfig({
     define: {
         __SOLR_ENDPOINT__: JSON.stringify(config.solrEndpoint),
+        __MAIN_PATH__: JSON.stringify(config.mainPath),
     },
     build: {
         outDir: "Resources/Public/JavaScript",

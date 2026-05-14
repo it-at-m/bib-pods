@@ -1,6 +1,5 @@
 import { querySolrCount, buildDemoTurtle } from "./lib.js"
-
-const STORAGE_KEY = "bib-pods.storage"
+import { getChoice, setChoice, clearChoice } from "./storage.js"
 
 const STATUS_LABELS = {
     local: "Speicherung: lokal in deinem Browser",
@@ -49,7 +48,7 @@ export function mount(root, { solrEndpoint, isLocalDev = false }) {
     const turtleOutput = root.querySelector("#bp-turtle-output")
 
     function applyChoice() {
-        const choice = localStorage.getItem(STORAGE_KEY)
+        const choice = getChoice()
         const isChosen = choice === "local" || choice === "solid"
         chooser.hidden = isChosen
         statusBox.hidden = !isChosen
@@ -57,17 +56,17 @@ export function mount(root, { solrEndpoint, isLocalDev = false }) {
     }
 
     root.querySelector("#bp-choose-local-btn").addEventListener("click", () => {
-        localStorage.setItem(STORAGE_KEY, "local")
+        setChoice("local")
         applyChoice()
     })
 
     root.querySelector("#bp-choose-solid-btn").addEventListener("click", () => {
-        localStorage.setItem(STORAGE_KEY, "solid")
+        setChoice("solid")
         applyChoice()
     })
 
     root.querySelector("#bp-switch-btn").addEventListener("click", () => {
-        localStorage.removeItem(STORAGE_KEY)
+        clearChoice()
         applyChoice()
     })
 
