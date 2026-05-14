@@ -1,6 +1,16 @@
+import { parser } from "@foerderfunke/sem-ops-utils"
 import { defineConfig } from "vite"
+import { readFileSync } from "fs"
+
+const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
+// make this a utils function in sem-ops-utils?
+const quads = parser.parse(readFileSync("../../definitions/config.ttl", "utf8"))
+const lookup = (predicate) => quads.find(q => q.predicate.value === BP + predicate).object.value
 
 export default defineConfig({
+    define: {
+        __SOLR_ENDPOINT__: JSON.stringify(lookup("solrEndpoint")),
+    },
     build: {
         outDir: "Resources/Public/JavaScript",
         emptyOutDir: false,

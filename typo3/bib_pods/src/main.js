@@ -3,6 +3,20 @@ import { newStore, addTriple, storeToTurtle } from "@foerderfunke/sem-ops-utils"
 const STORAGE_KEY = "bib-pods.storage"
 const root = document.getElementById("bib-pods-root")
 let turtleOutput = ""
+let solrOutput = ""
+
+async function querySolr() {
+    solrOutput = "Lade..."
+    render()
+    try {
+        const res = await fetch(`${__SOLR_ENDPOINT__}?q=*:*&rows=0&wt=json`)
+        const json = await res.json()
+        solrOutput = `Solr: ${json.response.numFound} Dokumente im Index`
+    } catch (err) {
+        solrOutput = `Solr error: ${err.message}`
+    }
+    render()
+}
 
 async function demoTriple() {
     const store = newStore()
@@ -46,7 +60,12 @@ function render() {
     const turtleBlock = turtleOutput
         ? `<hr><p>Example turtle:</p><pre>${escapeHtml(turtleOutput)}</pre>`
         : ""
-    root.innerHTML = `${views[view]()}${turtleBlock}`
+    const solrBlock = `
+        <hr>
+        <button data-action="solr">Query Solr</button>
+        ${solrOutput ? `<p>${escapeHtml(solrOutput)}</p>` : ""}
+    `
+    root.innerHTML = `${views[view]()}${solrBlock}${turtleBlock}`
 }
 
 root.addEventListener("click", (event) => {
@@ -57,6 +76,8 @@ root.addEventListener("click", (event) => {
     } else if (action === "switch") {
         localStorage.removeItem(STORAGE_KEY)
         render()
+    } else if (action === "solr") {
+        querySolr()
     }
 })
 
