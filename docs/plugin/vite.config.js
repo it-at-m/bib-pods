@@ -1,14 +1,11 @@
-import { parser } from "@foerderfunke/sem-ops-utils"
+import { loadConfig } from "cori/build-config.js"
 import { defineConfig } from "vite"
-import { readFileSync } from "fs"
 
-const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
-const quads = parser.parse(readFileSync("../../definitions/config.ttl", "utf8"))
-const lookup = (predicate) => quads.find(q => q.predicate.value === BP + predicate).object.value
+const config = loadConfig()
 
 export default defineConfig({
     define: {
-        __SOLR_ENDPOINT__: JSON.stringify(lookup("solrEndpoint")),
+        __SOLR_ENDPOINT__: JSON.stringify(config.solrEndpoint),
     },
     build: {
         outDir: "dist",
