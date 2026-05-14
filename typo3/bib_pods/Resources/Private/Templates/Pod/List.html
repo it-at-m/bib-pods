@@ -1,3 +1,23 @@
 <f:asset.script identifier="bib-pods" src="EXT:bib_pods/Resources/Public/JavaScript/bundle.js" type="module" />
 
-<div id="bib-pods-root"></div>
+<div id="bp-root">
+    <section id="bp-chooser">
+        <p>Wo sollen deine Daten gespeichert werden?</p>
+        <button id="bp-choose-local-btn">Lokal im Browser</button>
+        <button id="bp-choose-solid-btn">In meinem Solid Pod</button>
+    </section>
+    <section id="bp-status" hidden>
+        <p id="bp-status-text"></p>
+        <button id="bp-switch-btn">Speicherort wechseln</button>
+    </section>
+
+    <hr>
+    <button id="bp-query-solr-btn">Query Solr</button>
+    <p id="bp-solr-output"></p>
+
+    <section id="bp-turtle-section" hidden>
+        <hr>
+        <p>Example turtle:</p>
+        <pre id="bp-turtle-output"></pre>
+    </section>
+</div>
