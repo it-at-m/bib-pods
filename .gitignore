@@ -6,8 +6,11 @@ _local/
 node_modules/
 package-lock.json
 
+solid-server/data
+
 interim-index/oai/data*/
 interim-index/.import-cursor.json
+
 typo3/site/
 typo3/.syncdetails
 typo3/bib_pods/Resources/Public/JavaScript/bundle.js
