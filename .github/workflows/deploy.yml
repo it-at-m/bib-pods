@@ -16,8 +16,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install
-      - run: npm run build -w docs/plugin
+      - run: cd cori && npm install
+      - run: cd docs && npm install
+      - run: cd docs && npm run build
       - run: cp -R definitions docs/definitions
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,5 +1,5 @@
 {
-  "name": "library-pods-solid-server",
+  "name": "solid-server",
   "type": "module",
   "scripts": {
     "start": "npx @solid/community-server -c @css:config/file.json -f data/ --seedConfig seedConfig.json"

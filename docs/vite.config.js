@@ -9,9 +9,9 @@ export default defineConfig({
         __SOLID_POD_SUGGESTIONS__: JSON.stringify(config.solidPodSuggestions),
     },
     build: {
-        outDir: "dist",
+        outDir: "plugin/dist",
         lib: {
-            entry: "src/main.js",
+            entry: "plugin/src/main.js",
             formats: ["es"],
             fileName: () => "bundle.js",
         },

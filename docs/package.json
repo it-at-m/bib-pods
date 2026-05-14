@@ -1,0 +1,11 @@
+{
+    "name": "docs-webapp",
+    "type": "module",
+    "scripts": {
+        "build": "vite build"
+    },
+    "devDependencies": {
+        "cori": "file:../cori",
+        "vite": "^7.3.1"
+    }
+}

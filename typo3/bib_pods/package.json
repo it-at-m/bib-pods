@@ -6,7 +6,7 @@
     "build": "vite build"
   },
   "devDependencies": {
-    "@foerderfunke/sem-ops-utils": "^0.3.9",
+    "cori": "file:../../cori",
     "vite": "^7.3.1"
   }
 }
