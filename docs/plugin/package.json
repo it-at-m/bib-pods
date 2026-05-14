@@ -1,5 +1,5 @@
 {
-  "name": "typo3-plugin",
+  "name": "webapp",
   "type": "module",
   "scripts": {
     "dev": "vite build --watch",

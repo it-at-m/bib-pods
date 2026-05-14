@@ -1,0 +1,7 @@
+{
+    "name": "cori",
+    "type": "module",
+    "dependencies": {
+        "@foerderfunke/sem-ops-utils": "^0.3.9"
+    }
+}
