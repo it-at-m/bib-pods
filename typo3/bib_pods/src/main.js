@@ -8,6 +8,7 @@ if (root) {
     if (isMainPage || isActivated()) {
         mount(root, {
             solrEndpoint: __SOLR_ENDPOINT__,
+            solidPodSuggestions: __SOLID_POD_SUGGESTIONS__,
             isLocalDev: isMainPage && root.dataset.localDev === "1",
         })
         decorateH2s()

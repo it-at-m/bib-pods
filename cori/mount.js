@@ -12,6 +12,15 @@ const TEMPLATE = `
         <button id="bp-choose-local-btn">Lokal im Browser</button>
         <button id="bp-choose-solid-btn">In meinem Solid Pod</button>
     </section>
+    <section id="bp-solid-setup" hidden>
+        <p>Du hast noch keinen Pod? Hier sind einige Anbieter:</p>
+        <ul id="bp-solid-suggestions"></ul>
+        <p>
+            <input type="url" id="bp-solid-input" placeholder="Provider URL">
+            <button id="bp-solid-connect-btn">Verbinden</button>
+        </p>
+        <button id="bp-solid-cancel-btn">Zurück</button>
+    </section>
     <section id="bp-status" hidden>
         <p id="bp-status-text"></p>
         <button id="bp-switch-btn">Speicherort wechseln</button>
@@ -36,38 +45,60 @@ const DUMMY_H2S = `
     </section>
 `
 
-export function mount(root, { solrEndpoint, isLocalDev = false }) {
+export function mount(root, { solrEndpoint, solidPodSuggestions = [], isLocalDev = false }) {
     root.innerHTML = TEMPLATE
     if (isLocalDev) root.insertAdjacentHTML("afterend", DUMMY_H2S)
 
     const chooser = root.querySelector("#bp-chooser")
+    const solidSetup = root.querySelector("#bp-solid-setup")
+    const suggestionsList = root.querySelector("#bp-solid-suggestions")
     const statusBox = root.querySelector("#bp-status")
     const statusText = root.querySelector("#bp-status-text")
     const solrOutput = root.querySelector("#bp-solr-output")
     const turtleSection = root.querySelector("#bp-turtle-section")
     const turtleOutput = root.querySelector("#bp-turtle-output")
 
-    function applyChoice() {
+    solidPodSuggestions.forEach(({ url, label }) => {
+        const li = document.createElement("li")
+        const a = document.createElement("a")
+        a.href = url
+        a.target = "_blank"
+        a.rel = "noopener"
+        a.textContent = label
+        li.appendChild(a)
+        suggestionsList.appendChild(li)
+    })
+
+    let isInSolidSetup = false
+
+    function applyState() {
         const choice = getChoice()
         const isChosen = choice === "local" || choice === "solid"
-        chooser.hidden = isChosen
+        chooser.hidden = isChosen || isInSolidSetup
+        solidSetup.hidden = isChosen || !isInSolidSetup
         statusBox.hidden = !isChosen
         if (isChosen) statusText.textContent = STATUS_LABELS[choice]
     }
 
     root.querySelector("#bp-choose-local-btn").addEventListener("click", () => {
         setChoice("local")
-        applyChoice()
+        applyState()
     })
 
     root.querySelector("#bp-choose-solid-btn").addEventListener("click", () => {
-        setChoice("solid")
-        applyChoice()
+        isInSolidSetup = true
+        applyState()
+    })
+
+    root.querySelector("#bp-solid-cancel-btn").addEventListener("click", () => {
+        isInSolidSetup = false
+        applyState()
     })
 
     root.querySelector("#bp-switch-btn").addEventListener("click", () => {
         clearChoice()
-        applyChoice()
+        isInSolidSetup = false
+        applyState()
     })
 
     root.querySelector("#bp-query-solr-btn").addEventListener("click", async () => {
@@ -85,7 +116,7 @@ export function mount(root, { solrEndpoint, isLocalDev = false }) {
         turtleSection.hidden = false
     })
 
-    applyChoice()
+    applyState()
 }
 
 function decorateHeading(h2) {
