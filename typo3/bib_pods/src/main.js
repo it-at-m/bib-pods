@@ -63,5 +63,16 @@ async function demoTriple() {
     turtleSection.hidden = false
 }
 
+function decorateHeading(h2) {
+    const btn = document.createElement("button")
+    btn.textContent = "+"
+    btn.title = "Zu Favoriten hinzufügen"
+    btn.style.cssText = "margin-left: 0.5em; font-size: 0.7em; padding: 0.1em 0.4em;"
+    btn.addEventListener("click", () => console.log(h2.id))
+    h2.appendChild(btn)
+}
+
+document.querySelectorAll("h2").forEach(decorateHeading)
+
 applyChoice()
 demoTriple()
