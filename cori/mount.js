@@ -1,5 +1,5 @@
-import { querySolrCount, buildDemoTurtle } from "./lib.js"
 import { getChoice, setChoice, clearChoice } from "./storage.js"
+import { querySolrCount, buildDemoTurtle } from "./lib.js"
 
 const STATUS_LABELS = {
     local: "Speicherung: lokal in deinem Browser",
@@ -37,17 +37,8 @@ const TEMPLATE = `
     </section>
 `
 
-const DUMMY_H2S = `
-    <hr>
-    <section id="bp-dummy-h2s">
-        <h2 id="dummy-book-id-1">Buch 1</h2>
-        <h2 id="dummy-book-id-2">Buch 2</h2>
-    </section>
-`
-
-export function mount(root, { solrEndpoint, solidPodSuggestions = [], isLocalDev = false }) {
+export function mount(root, { solrEndpoint, solidPodSuggestions = [] }) {
     root.innerHTML = TEMPLATE
-    if (isLocalDev) root.insertAdjacentHTML("afterend", DUMMY_H2S)
 
     const chooser = root.querySelector("#bp-chooser")
     const solidSetup = root.querySelector("#bp-solid-setup")
