@@ -1,5 +1,4 @@
 import { getChoice, setChoice, clearChoice } from "./storage.js"
-import { querySolrCount, buildDemoTurtle } from "./lib.js"
 
 const STATUS_LABELS = {
     local: "Speicherung: lokal in deinem Browser",
@@ -25,16 +24,6 @@ const TEMPLATE = `
         <p id="bp-status-text"></p>
         <button id="bp-switch-btn">Speicherort wechseln</button>
     </section>
-
-    <hr>
-    <button id="bp-query-solr-btn">Query Solr</button>
-    <p id="bp-solr-output"></p>
-
-    <section id="bp-turtle-section" hidden>
-        <hr>
-        <p>Example turtle:</p>
-        <pre id="bp-turtle-output"></pre>
-    </section>
 `
 
 export function mount(root, { solrEndpoint, solidPodSuggestions = [] }) {
@@ -45,9 +34,6 @@ export function mount(root, { solrEndpoint, solidPodSuggestions = [] }) {
     const suggestionsList = root.querySelector("#bp-solid-suggestions")
     const statusBox = root.querySelector("#bp-status")
     const statusText = root.querySelector("#bp-status-text")
-    const solrOutput = root.querySelector("#bp-solr-output")
-    const turtleSection = root.querySelector("#bp-turtle-section")
-    const turtleOutput = root.querySelector("#bp-turtle-output")
 
     solidPodSuggestions.forEach(({ url, label }) => {
         const li = document.createElement("li")
@@ -90,21 +76,6 @@ export function mount(root, { solrEndpoint, solidPodSuggestions = [] }) {
         clearChoice()
         isInSolidSetup = false
         applyState()
-    })
-
-    root.querySelector("#bp-query-solr-btn").addEventListener("click", async () => {
-        solrOutput.textContent = "Lade..."
-        try {
-            const count = await querySolrCount(solrEndpoint)
-            solrOutput.textContent = `Solr: ${count} Dokumente im Index`
-        } catch (err) {
-            solrOutput.textContent = `Solr error: ${err.message}`
-        }
-    })
-
-    buildDemoTurtle().then(turtle => {
-        turtleOutput.textContent = turtle
-        turtleSection.hidden = false
     })
 
     applyState()
