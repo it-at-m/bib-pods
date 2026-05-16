@@ -6,6 +6,11 @@ const STATUS_LABELS = {
     solid: "Speicherung: in deinem Solid Pod",
 }
 
+const SWITCH_LABELS = {
+    local: "Speicherort wechseln",
+    solid: "Aus Pod abmelden",
+}
+
 const TEMPLATE = `
     <section id="bp-chooser">
         <p>Wo sollen deine Daten gespeichert werden?</p>
@@ -35,6 +40,7 @@ export async function mount(root, { solrEndpoint, solidPodSuggestions = [], soli
     const suggestionsList = root.querySelector("#bp-solid-suggestions")
     const statusBox = root.querySelector("#bp-status")
     const statusText = root.querySelector("#bp-status-text")
+    const switchBtn = root.querySelector("#bp-switch-btn")
     const solidInput = root.querySelector("#bp-solid-input")
 
     solidPodSuggestions.forEach(({ url, label }) => {
@@ -60,6 +66,7 @@ export async function mount(root, { solrEndpoint, solidPodSuggestions = [], soli
             const label = STATUS_LABELS[choice]
             const webId = choice === "solid" ? getWebId() : null
             statusText.textContent = webId ? `${label} (${webId})` : label
+            switchBtn.textContent = SWITCH_LABELS[choice]
         }
     }
 
@@ -91,15 +98,10 @@ export async function mount(root, { solrEndpoint, solidPodSuggestions = [], soli
         })
     })
 
-    root.querySelector("#bp-switch-btn").addEventListener("click", async () => {
-        const wasSolid = getChoice() === "solid"
+    switchBtn.addEventListener("click", async () => {
+        if (getChoice() === "solid") await logout()
         clearChoice()
         isInSolidSetup = false
-        if (wasSolid) {
-            await logout()
-            window.location.replace(currentPageUrl())
-            return
-        }
         applyState()
     })
 
