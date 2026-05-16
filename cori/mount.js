@@ -1,3 +1,4 @@
+import { initSession, login, logout, isLoggedIn, getWebId, currentPageUrl } from "./solid.js"
 import { getChoice, setChoice, clearChoice } from "./storage.js"
 
 const STATUS_LABELS = {
@@ -26,7 +27,7 @@ const TEMPLATE = `
     </section>
 `
 
-export function mount(root, { solrEndpoint, solidPodSuggestions = [] }) {
+export async function mount(root, { solrEndpoint, solidPodSuggestions = [], solidCallbackUrl } = {}) {
     root.innerHTML = TEMPLATE
 
     const chooser = root.querySelector("#bp-chooser")
@@ -34,6 +35,7 @@ export function mount(root, { solrEndpoint, solidPodSuggestions = [] }) {
     const suggestionsList = root.querySelector("#bp-solid-suggestions")
     const statusBox = root.querySelector("#bp-status")
     const statusText = root.querySelector("#bp-status-text")
+    const solidInput = root.querySelector("#bp-solid-input")
 
     solidPodSuggestions.forEach(({ url, label }) => {
         const li = document.createElement("li")
@@ -54,8 +56,16 @@ export function mount(root, { solrEndpoint, solidPodSuggestions = [] }) {
         chooser.hidden = isChosen || isInSolidSetup
         solidSetup.hidden = isChosen || !isInSolidSetup
         statusBox.hidden = !isChosen
-        if (isChosen) statusText.textContent = STATUS_LABELS[choice]
+        if (isChosen) {
+            const label = STATUS_LABELS[choice]
+            const webId = choice === "solid" ? getWebId() : null
+            statusText.textContent = webId ? `${label} (${webId})` : label
+        }
     }
+
+    const redirectUri = solidCallbackUrl ?? currentPageUrl()
+    await initSession({ redirectUri })
+    if (isLoggedIn() && getChoice() !== "solid") setChoice("solid")
 
     root.querySelector("#bp-choose-local-btn").addEventListener("click", () => {
         setChoice("local")
@@ -72,9 +82,24 @@ export function mount(root, { solrEndpoint, solidPodSuggestions = [] }) {
         applyState()
     })
 
-    root.querySelector("#bp-switch-btn").addEventListener("click", () => {
+    root.querySelector("#bp-solid-connect-btn").addEventListener("click", async () => {
+        const issuer = solidInput.value.trim()
+        if (!issuer) return
+        await login(issuer, {
+            redirectUri,
+            returnUrl: solidCallbackUrl ? window.location.href : undefined,
+        })
+    })
+
+    root.querySelector("#bp-switch-btn").addEventListener("click", async () => {
+        const wasSolid = getChoice() === "solid"
         clearChoice()
         isInSolidSetup = false
+        if (wasSolid) {
+            await logout()
+            window.location.replace(currentPageUrl())
+            return
+        }
         applyState()
     })
 
