@@ -2,11 +2,13 @@
     "name": "docs-webapp",
     "type": "module",
     "scripts": {
-        "dev": "vite",
-        "build": "vite build"
+        "dev": "serve . -l 5173 --no-clipboard",
+        "build": "vite build",
+        "build:watch": "vite build --watch"
     },
     "devDependencies": {
         "cori": "file:../cori",
+        "serve": "^14.2.6",
         "vite": "^7.3.1"
     }
 }
