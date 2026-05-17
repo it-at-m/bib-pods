@@ -1,4 +1,4 @@
-import { initSession, login, logout, isLoggedIn, getWebId, currentPageUrl } from "./solid.js"
+import { initSession, login, logout, isLoggedIn, getWebId, currentPageUrl, ensurePodSetup } from "./solid.js"
 import { getChoice, setChoice, clearChoice } from "./storage.js"
 
 const STATUS_LABELS = {
@@ -77,7 +77,10 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
 
     const redirectUri = solidCallbackUrl ?? currentPageUrl()
     await initSession({ redirectUri })
-    if (isLoggedIn() && getChoice() !== "solid") setChoice("solid")
+    if (isLoggedIn()) {
+        if (getChoice() !== "solid") setChoice("solid")
+        ensurePodSetup().catch(err => console.error("Solid pod setup failed:", err))
+    }
 
     root.querySelector("#bp-choose-local-btn").addEventListener("click", () => {
         setChoice("local")
