@@ -11,6 +11,11 @@ const SWITCH_LABELS = {
     solid: "Aus Pod abmelden",
 }
 
+const SOLID_POD_SUGGESTIONS = [
+    { url: "https://solidcommunity.net/", label: "solidcommunity.net" },
+    { url: "https://start.inrupt.com/profile", label: "Inrupt PodSpaces" },
+]
+
 const TEMPLATE = `
     <section id="bp-chooser">
         <p>Wo sollen deine Daten gespeichert werden?</p>
@@ -32,7 +37,7 @@ const TEMPLATE = `
     </section>
 `
 
-export async function mount(root, { solrEndpoint, solidPodSuggestions = [], solidCallbackUrl } = {}) {
+export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     root.innerHTML = TEMPLATE
 
     const chooser = root.querySelector("#bp-chooser")
@@ -43,7 +48,7 @@ export async function mount(root, { solrEndpoint, solidPodSuggestions = [], soli
     const switchBtn = root.querySelector("#bp-switch-btn")
     const solidInput = root.querySelector("#bp-solid-input")
 
-    solidPodSuggestions.forEach(({ url, label }) => {
+    SOLID_POD_SUGGESTIONS.forEach(({ url, label }) => {
         const li = document.createElement("li")
         const a = document.createElement("a")
         a.href = url
