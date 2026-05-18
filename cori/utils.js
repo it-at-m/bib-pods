@@ -1,7 +1,14 @@
 import { newStore, addTriple, storeToTurtle, parser } from "@foerderfunke/sem-ops-utils"
 
 export const EX = "http://example.org/"
-const PREFIXES = { ex: EX }
+export const PREFIXES = { ex: EX }
+
+export function expandTerm(token) {
+    const colonIdx = token.indexOf(":")
+    if (colonIdx === -1) return token
+    const scheme = token.slice(0, colonIdx)
+    return scheme in PREFIXES ? PREFIXES[scheme] + token.slice(colonIdx + 1) : token
+}
 
 export function parseTurtle(text) {
     const store = newStore()

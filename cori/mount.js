@@ -1,13 +1,9 @@
-import { initSession, login, logout, isLoggedIn, getWebId, currentPageUrl } from "./storage/solid.js"
-import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, testRead, testWrite } from "./storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, getStorageInfo } from "./storage/index.js"
+import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
+import { expandTerm } from "./utils.js"
 import cockpitCss from "./ui/cockpit.css?raw"
 import entryHtml from "./ui/entry.html?raw"
 import modalHtml from "./ui/modal.html?raw"
-
-const STATUS_LABELS = {
-    local: "Speicherung: lokal in deinem Browser",
-    solid: "Speicherung: in deinem Solid Pod",
-}
 
 const SWITCH_LABELS = {
     local: "Speicherort wechseln",
@@ -52,11 +48,10 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     const solidSetup = dialog.querySelector("#bp-solid-setup")
     const suggestionsList = dialog.querySelector("#bp-solid-suggestions")
     const statusBox = dialog.querySelector("#bp-status")
-    const statusText = dialog.querySelector("#bp-status-text")
     const switchBtn = dialog.querySelector("#bp-switch-btn")
-    const testActions = dialog.querySelector("#bp-test-actions")
-    const testWriteBtn = dialog.querySelector("#bp-test-write-btn")
-    const testReadBtn = dialog.querySelector("#bp-test-read-btn")
+    const infoDetails = dialog.querySelector("#bp-info-details")
+    const addTripleBtn = dialog.querySelector("#bp-add-triple-btn")
+    const downloadBtn = dialog.querySelector("#bp-download-btn")
     const solidInput = dialog.querySelector("#bp-solid-input")
 
     SOLID_POD_SUGGESTIONS.forEach(({ url, label }) => {
@@ -79,16 +74,38 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         welcomeText.textContent = isChosen ? "Bibliotheks-Pods Plugin" : "Willkommen zum Bibliotheks-Pods Plugin"
         openBtn.textContent = isChosen ? "Cockpit" : "Einrichten"
         if (isChosen) {
-            const label = STATUS_LABELS[choice]
-            const webId = choice === "solid" ? getWebId() : null
-            statusText.textContent = webId ? `${label} (${webId})` : label
             switchBtn.textContent = SWITCH_LABELS[choice]
-            testActions.hidden = !isStorageReady()
+            renderInfo()
         }
 
         chooser.hidden = isChosen || isInSolidSetup
         solidSetup.hidden = isChosen || !isInSolidSetup
         statusBox.hidden = !isChosen
+    }
+
+    async function renderInfo() {
+        infoDetails.innerHTML = ""
+        try {
+            const info = await getStorageInfo()
+            for (const [k, v] of Object.entries(info)) {
+                const tr = infoDetails.insertRow()
+                tr.insertCell().textContent = k + ":"
+                tr.insertCell().textContent = v
+            }
+        } catch (err) {
+            console.error("[bib-pods] info render failed:", err)
+        }
+    }
+
+    async function downloadProfile() {
+        const ttl = await loadAsTurtle()
+        const blob = new Blob([ttl], { type: "text/turtle" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = "bib-pods.ttl"
+        a.click()
+        URL.revokeObjectURL(url)
     }
 
     function openModal() {
@@ -145,14 +162,28 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         applyState()
     })
 
-    testWriteBtn.addEventListener("click", async (e) => {
-        e.preventDefault()
-        await testWrite()
+    addTripleBtn.addEventListener("click", async () => {
+        const input = window.prompt("Triple eingeben (Subjekt Prädikat Objekt, durch Leerzeichen getrennt).\nPräfixe sind möglich, z.B.: ex:alice ex:knows ex:bob",)
+        if (!input) return
+        const terms = input.trim().split(/\s+/)
+        if (terms.length !== 3) {
+            console.error(`[bib-pods] expected 3 tokens (subject predicate object), got ${terms.length}:`, terms)
+            return
+        }
+        const [s, p, o] = terms.map(expandTerm)
+        try {
+            await addTriple(s, p, o)
+        } catch (err) {
+            console.error("[bib-pods] addTriple failed:", err)
+        }
     })
 
-    testReadBtn.addEventListener("click", async (e) => {
-        e.preventDefault()
-        await testRead()
+    downloadBtn.addEventListener("click", async () => {
+        try {
+            await downloadProfile()
+        } catch (err) {
+            console.error("[bib-pods] download failed:", err)
+        }
     })
 
     applyState()

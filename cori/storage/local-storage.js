@@ -23,3 +23,7 @@ export async function load() {
 export async function save(store) {
     localStorage.setItem(KEY, await serializeTurtle(store))
 }
+
+export function getInfo() {
+    return { Speicherung: "lokal in deinem Browser" }
+}

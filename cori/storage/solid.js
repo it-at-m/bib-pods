@@ -238,3 +238,14 @@ export async function save(store) {
     const uri = await ensurePodSetup()
     await putResource(uri, await serializeTurtle(store), session)
 }
+
+export async function getInfo() {
+    const base = { Speicherung: "in deinem Solid Pod" }
+    if (!session?.webId) return base
+    const fileUri = await ensurePodSetup()
+    return {
+        ...base,
+        WebID: session.webId,
+        Datei: fileUri,
+    }
+}

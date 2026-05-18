@@ -1,7 +1,7 @@
 // Storage abstraction. The app reads/writes an RDF graph via the active backend;
-// each backend (local, solid, …) implements { isReady, load, save }. Adding a
-// new backend means dropping in a new module here and wiring it in BACKENDS.
-import { addTriple, newStore } from "@foerderfunke/sem-ops-utils"
+// each backend (local, solid, …) implements { isReady, load, save, getInfo }.
+// Adding a new backend means dropping in a new module here and wiring it in BACKENDS.
+import { addTriple as addTripleToStore, newStore } from "@foerderfunke/sem-ops-utils"
 import { EX, serializeTurtle } from "../utils.js"
 import * as localBackend from "./local-storage.js"
 import * as solidBackend from "./solid.js"
@@ -44,6 +44,21 @@ export function warmupStorage() {
     return getStorage().warmup()
 }
 
+export async function getStorageInfo() {
+    return await getStorage().getInfo()
+}
+
+export async function addTriple(subject, predicate, object) {
+    const store = await getStorage().load()
+    addTripleToStore(store, subject, predicate, object)
+    await getStorage().save(store)
+}
+
+export async function loadAsTurtle() {
+    const store = await getStorage().load()
+    return await serializeTurtle(store)
+}
+
 export async function testRead() {
     const store = await getStorage().load()
     const pretty = await serializeTurtle(store)
@@ -53,6 +68,6 @@ export async function testRead() {
 
 export async function testWrite() {
     const store = newStore()
-    addTriple(store, EX + "sub", EX + "pred", EX + "obj")
+    addTripleToStore(store, EX + "sub", EX + "pred", EX + "obj")
     await getStorage().save(store)
 }

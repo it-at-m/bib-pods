@@ -24,3 +24,16 @@
     margin-bottom: 1rem;
 }
 .bp-modal-header h3 { margin: 0; }
+.bp-info-details {
+    color: #666;
+    font-size: 0.85em;
+    margin: 0.5rem 0 1rem 0;
+    border-collapse: collapse;
+}
+.bp-info-details td { vertical-align: top; word-break: break-all; }
+.bp-info-details td:first-child { padding-right: 1rem; }
+.bp-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
