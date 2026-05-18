@@ -1,6 +1,9 @@
 import { getResource, parseToN3, createContainer, putResource, getContainerItems, getLinkHeader, SPACE, SOLID, RDF } from "@uvdsl/solid-requests"
 import { Session } from "@uvdsl/solid-oidc-client-browser"
+import { newStore, addTriple, storeToTurtle, parser } from "@foerderfunke/sem-ops-utils"
 import { setChoice } from "./storage.js"
+
+const EX = "http://example.org/"
 
 const DEBUG = true
 const log = (...args) => DEBUG && console.log("[bib-pods]", ...args)
@@ -15,6 +18,7 @@ export const currentPageUrl = () => window.location.origin + window.location.pat
 
 let session = null
 let readyPromise = null
+let setupPromise = null
 
 // Lazy init so callers can supply the right redirect URI (which must be registered
 // with the IdP via Dynamic Client Registration — for TYPO3 that's the static callback
@@ -69,6 +73,7 @@ export async function handleSolidCallback() {
 
 export async function logout() {
     await session.logout()
+    setupPromise = null
     localStorage.removeItem(WEBID_KEY)
 }
 
@@ -147,7 +152,7 @@ async function discoverStorageRoot(webId) {
     return null
 }
 
-export async function ensurePodSetup() {
+async function doEnsurePodSetup() {
     if (!session?.webId) throw new Error("Solid session has no webId")
     const webId = session.webId
     log("ensurePodSetup: webId =", webId)
@@ -179,4 +184,38 @@ export async function ensurePodSetup() {
     }
     log("ensurePodSetup done, file URI =", fileUri)
     return fileUri
+}
+
+// Memoized for the page session — discovery and existence checks only run once.
+// Cleared on logout so a fresh login re-verifies.
+export function ensurePodSetup() {
+    if (!setupPromise) {
+        setupPromise = doEnsurePodSetup().catch(err => {
+            setupPromise = null
+            throw err
+        })
+    }
+    return setupPromise
+}
+
+export async function testReadPodFile() {
+    const uri = await ensurePodSetup()
+    const resp = await getResource(uri, session)
+    const text = await resp.text()
+    const quads = parser.parse(text)
+    const store = newStore()
+    quads.forEach(q => store.addQuad(q))
+    const pretty = await storeToTurtle(store, { ex: EX })
+    console.log(`[bib-pods] contents of ${uri}:\n${pretty}`)
+    return pretty
+}
+
+export async function testWritePodTriple() {
+    const uri = await ensurePodSetup()
+    const store = newStore()
+    addTriple(store, EX + "sub", EX + "pred", EX + "obj")
+    const ttl = await storeToTurtle(store, { ex: EX })
+    log("test write: PUT to", uri)
+    await putResource(uri, ttl, session)
+    log("test write: done")
 }

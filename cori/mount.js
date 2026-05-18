@@ -1,4 +1,4 @@
-import { initSession, login, logout, isLoggedIn, getWebId, currentPageUrl, ensurePodSetup } from "./solid.js"
+import { initSession, login, logout, isLoggedIn, getWebId, currentPageUrl, ensurePodSetup, testReadPodFile, testWritePodTriple } from "./solid.js"
 import { getChoice, setChoice, clearChoice } from "./storage.js"
 
 const STATUS_LABELS = {
@@ -34,6 +34,10 @@ const TEMPLATE = `
     <section id="bp-status" hidden>
         <p id="bp-status-text"></p>
         <button id="bp-switch-btn">Speicherort wechseln</button>
+        <span id="bp-test-actions" hidden>
+            &nbsp;&nbsp;<a id="bp-test-write-btn" href="#">test write</a>
+            &nbsp;<a id="bp-test-read-btn" href="#">test read</a>
+        </span>
     </section>
 `
 
@@ -46,6 +50,9 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     const statusBox = root.querySelector("#bp-status")
     const statusText = root.querySelector("#bp-status-text")
     const switchBtn = root.querySelector("#bp-switch-btn")
+    const testActions = root.querySelector("#bp-test-actions")
+    const testWriteBtn = root.querySelector("#bp-test-write-btn")
+    const testReadBtn = root.querySelector("#bp-test-read-btn")
     const solidInput = root.querySelector("#bp-solid-input")
 
     SOLID_POD_SUGGESTIONS.forEach(({ url, label }) => {
@@ -72,6 +79,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
             const webId = choice === "solid" ? getWebId() : null
             statusText.textContent = webId ? `${label} (${webId})` : label
             switchBtn.textContent = SWITCH_LABELS[choice]
+            testActions.hidden = choice !== "solid" || !isLoggedIn()
         }
     }
 
@@ -111,6 +119,16 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         clearChoice()
         isInSolidSetup = false
         applyState()
+    })
+
+    testWriteBtn.addEventListener("click", async (e) => {
+        e.preventDefault()
+        await testWritePodTriple()
+    })
+
+    testReadBtn.addEventListener("click", async (e) => {
+        e.preventDefault()
+        await testReadPodFile()
     })
 
     applyState()
