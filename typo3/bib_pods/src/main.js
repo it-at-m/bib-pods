@@ -1,4 +1,4 @@
-import { mount, decorateH2s, decorateBooks } from "cori/mount.js"
+import { mount, decorateBooks } from "cori/mount.js"
 import { isActivated } from "cori/storage/index.js"
 import { handleSolidCallback } from "cori/storage/solid.js"
 
@@ -14,7 +14,6 @@ if (document.body.hasAttribute("data-bp-solid-callback")) {
             solrEndpoint: __SOLR_ENDPOINT__,
             solidCallbackUrl,
         })
-        decorateH2s()
         decorateBooks()
     }
 }

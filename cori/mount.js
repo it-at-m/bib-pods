@@ -1,6 +1,6 @@
 import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadQuads, getStorageInfo, clearStorage } from "./storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
-import { expandTerm, contractTerm, getLabel } from "./utils.js"
+import { expandTerm, contractTerm, getLabel, fetchBook } from "./utils.js"
 import cockpitCss from "./ui/cockpit.css?raw"
 import entryHtml from "./ui/entry.html?raw"
 import modalHtml from "./ui/modal.html?raw"
@@ -19,6 +19,10 @@ const SOLID_POD_SUGGESTIONS = [
 // look without coordinating stylesheets.
 const STYLE_ID = "bp-cori-styles"
 
+// Captured from mount() options so decorateBooks() can reach the Solr endpoint
+// without changing its public signature.
+let solrEndpointUrl = null
+
 function injectStyles() {
     if (document.getElementById(STYLE_ID)) return
     const style = document.createElement("style")
@@ -30,6 +34,7 @@ function injectStyles() {
 
 export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     injectStyles()
+    solrEndpointUrl = solrEndpoint
     root.innerHTML = entryHtml
 
     // Native <dialog> opened via showModal() renders in the browser's top layer,
@@ -221,50 +226,44 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     applyState()
 }
 
-function decorateHeading(h2) {
-    const btn = document.createElement("button")
-    btn.textContent = "+"
-    btn.title = "Zu Favoriten hinzufügen"
-    btn.style.cssText = "margin-left: 0.5em; font-size: 0.7em; padding: 0.1em 0.4em;"
-    btn.addEventListener("click", () => console.log(h2.id))
-    h2.appendChild(btn)
-}
-
-export function decorateH2s() {
-    document.querySelectorAll("h2").forEach(decorateHeading)
-}
-
 // aDIS/BMS SOPAC URLs use `sp=S<key>` where the leading `S` is a service-param
 // type tag and the numeric portion is zero-padded to 8 digits. Solr stores the
 // bare MARC 001 (e.g. "AK4250109"), so strip both.
 const SOPAC_RE = /[?&]sp=S(AK)0*(\d+)/
 
-function decorateBookLink(link) {
-    const match = link.href.match(SOPAC_RE)
-    if (!match) return
-    const sopacId = match[1] + match[2]
-    // Mount outside the .linkify-active wrap so the carousel's click delegation
-    // never sees the button. Inside the wrap, any click bubbles through linkify
-    // and the host scrolls/highlights the book link — stopPropagation isn't
-    // enough because linkify can listen capture-phase or at document level.
-    const wrap = link.closest(".coverflow__wrap")
-    const host = wrap?.parentElement ?? link.closest("li") ?? link.parentElement
-    if (!host) return
+function decorateBookCard(target, sopacId) {
+    // msbWrap is the MSB carousel's .linkify-active wrapper around a real
+    // book — truthy means we're on production HTML, null means we're decorating
+    // a dev pseudo book (just a [data-sopac-id] element). For real books we
+    // must mount the button *outside* this wrapper (linkify can listen capture-
+    // phase / at document level, so stopPropagation isn't enough); for pseudo
+    // books we mount directly on the target.
+    const msbWrap = target.closest(".coverflow__wrap")
+    const host = msbWrap?.parentElement ?? target
 
     const btn = document.createElement("button")
     btn.type = "button"
     btn.textContent = "+"
     btn.title = "Zu Favoriten hinzufügen"
-    btn.style.cssText = "position: absolute; top: 0.4em; right: 0.4em; z-index: 10; width: 1.7em; height: 1.7em; padding: 0; font-size: 1.1em; font-weight: bold; line-height: 1; border: 1px solid currentColor; border-radius: 50%; background: rgba(255,255,255,0.92); cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.4);"
+    btn.style.cssText = msbWrap
+        ? "position: absolute; top: 0.4em; right: 0.4em; z-index: 10; width: 1.7em; height: 1.7em; padding: 0; font-size: 1.1em; font-weight: bold; line-height: 1; border: 1px solid currentColor; border-radius: 50%; background: rgba(255,255,255,0.92); cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.4);"
+        : "margin-left: 0.5em; cursor: pointer;"
 
-    if (getComputedStyle(host).position === "static") host.style.position = "relative"
-    btn.addEventListener("click", () => console.log(sopacId))
+    if (msbWrap && getComputedStyle(host).position === "static") host.style.position = "relative"
+    btn.addEventListener("click", async () => {
+        try {
+            const book = await fetchBook(solrEndpointUrl, sopacId)
+            console.log("[bib-pods] book:", book)
+        } catch (err) {
+            console.error("[bib-pods] fetchBook failed:", err)
+        }
+    })
     host.appendChild(btn)
 
-    // Anchor the button's center to the cover image's top-right corner (slide
-    // is wider than the auto-width cover, so em offsets land off the artwork).
-    // Re-anchor on image load if it hadn't sized yet.
-    const img = wrap?.querySelector(".cf-image img")
+    // For carousel books, anchor the button's center to the cover image's
+    // top-right corner (slide is wider than the auto-width cover, so em offsets
+    // land off the artwork). Re-anchor on image load if it hadn't sized yet.
+    const img = msbWrap?.querySelector(".cf-image img")
     if (img) {
         const anchor = () => {
             const hostRect = host.getBoundingClientRect()
@@ -279,5 +278,12 @@ function decorateBookLink(link) {
 }
 
 export function decorateBooks() {
-    document.querySelectorAll('a[href*="sp=SAK"]').forEach(decorateBookLink)
+    document.querySelectorAll('a[href*="sp=SAK"]').forEach(link => {
+        const match = link.href.match(SOPAC_RE)
+        if (match) decorateBookCard(link, match[1] + match[2])
+    })
+    // Pseudo books carry the already-clean id directly; used for dev/testing.
+    document.querySelectorAll("[data-sopac-id]").forEach(el => {
+        decorateBookCard(el, el.dataset.sopacId)
+    })
 }

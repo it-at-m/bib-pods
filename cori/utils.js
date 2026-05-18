@@ -52,11 +52,11 @@ export function serializeTurtle(store) {
     return storeToTurtle(store, PREFIXES)
 }
 
-export async function querySolrCount(endpoint) {
-    const res = await fetch(`${endpoint}?q=*:*&rows=0&wt=json`)
+export async function fetchBook(endpoint, id) {
+    const res = await fetch(`${endpoint}?q=id:${encodeURIComponent(id)}&wt=json`)
     if (!res.ok) throw new Error(`Solr ${res.status}: ${res.statusText}`)
     const json = await res.json()
-    return json.response.numFound
+    return json.response.docs[0]
 }
 
 export async function buildDemoTurtle() {
