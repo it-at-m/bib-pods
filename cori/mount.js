@@ -1,5 +1,5 @@
-import { initSession, login, logout, isLoggedIn, getWebId, currentPageUrl, ensurePodSetup, testReadPodFile, testWritePodTriple } from "./solid.js"
-import { getChoice, setChoice, clearChoice } from "./storage.js"
+import { initSession, login, logout, isLoggedIn, getWebId, currentPageUrl } from "./storage/solid.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, testRead, testWrite } from "./storage/index.js"
 
 const STATUS_LABELS = {
     local: "Speicherung: lokal in deinem Browser",
@@ -79,20 +79,21 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
             const webId = choice === "solid" ? getWebId() : null
             statusText.textContent = webId ? `${label} (${webId})` : label
             switchBtn.textContent = SWITCH_LABELS[choice]
-            testActions.hidden = choice !== "solid" || !isLoggedIn()
+            testActions.hidden = !isStorageReady()
         }
     }
 
     const redirectUri = solidCallbackUrl ?? currentPageUrl()
     await initSession({ redirectUri })
-    if (isLoggedIn()) {
-        if (getChoice() !== "solid") setChoice("solid")
-        ensurePodSetup().catch(err => console.error("Solid pod setup failed:", err))
+    if (isLoggedIn() && getChoice() !== "solid") setChoice("solid")
+    if (isStorageReady()) {
+        warmupStorage().catch(err => console.error("Storage warmup failed:", err))
     }
 
     root.querySelector("#bp-choose-local-btn").addEventListener("click", () => {
         setChoice("local")
         applyState()
+        warmupStorage().catch(err => console.error("Storage warmup failed:", err))
     })
 
     root.querySelector("#bp-choose-solid-btn").addEventListener("click", () => {
@@ -123,12 +124,12 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
 
     testWriteBtn.addEventListener("click", async (e) => {
         e.preventDefault()
-        await testWritePodTriple()
+        await testWrite()
     })
 
     testReadBtn.addEventListener("click", async (e) => {
         e.preventDefault()
-        await testReadPodFile()
+        await testRead()
     })
 
     applyState()

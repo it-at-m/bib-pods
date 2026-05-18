@@ -1,9 +1,12 @@
+// Solid-pod-backed storage: OIDC auth lifecycle + pod discovery + setup + CRUD
+// Exported surface:
+//   Auth: initSession, getSession, isLoggedIn, getWebId, login, logout,
+//         handleSolidCallback, currentPageUrl
+//   Storage interface: isReady, warmup, load, save
 import { getResource, parseToN3, createContainer, putResource, getContainerItems, getLinkHeader, SPACE, SOLID, RDF } from "@uvdsl/solid-requests"
+import { parseTurtle, serializeTurtle } from "../utils.js"
 import { Session } from "@uvdsl/solid-oidc-client-browser"
-import { newStore, addTriple, storeToTurtle, parser } from "@foerderfunke/sem-ops-utils"
-import { setChoice } from "./storage.js"
-
-const EX = "http://example.org/"
+import { setChoice } from "./index.js"
 
 const DEBUG = true
 const log = (...args) => DEBUG && console.log("[bib-pods]", ...args)
@@ -19,12 +22,15 @@ export const currentPageUrl = () => window.location.origin + window.location.pat
 let session = null
 let readyPromise = null
 let setupPromise = null
+let cachedWebId = null
 
 // URL of the worker emitted by emitRefreshWorker — see refresh-worker-plugin.js
 // for why we serve it separately. Filename held in a const (not a string literal)
 // so Vite's URL pattern matcher doesn't grab it and re-inline the worker.
 const WORKER_FILENAME = "RefreshWorker.js"
 const workerUrl = new URL(WORKER_FILENAME, import.meta.url).href
+
+// --- Auth ---
 
 // Lazy init so callers can supply the right redirect URI (which must be registered
 // with the IdP via Dynamic Client Registration — for TYPO3 that's the static callback
@@ -79,9 +85,10 @@ export async function handleSolidCallback() {
 
 export async function logout() {
     await session.logout()
-    setupPromise = null
     localStorage.removeItem(WEBID_KEY)
 }
+
+// --- Discovery ---
 
 // Walk one path segment up from a URL; returns null if already at origin root.
 function parentContainerOf(url) {
@@ -158,6 +165,8 @@ async function discoverStorageRoot(webId) {
     return null
 }
 
+// --- Pod setup ---
+
 async function doEnsurePodSetup() {
     if (!session?.webId) throw new Error("Solid session has no webId")
     const webId = session.webId
@@ -192,9 +201,14 @@ async function doEnsurePodSetup() {
     return fileUri
 }
 
-// Memoized for the page session — discovery and existence checks only run once.
-// Cleared on logout so a fresh login re-verifies.
-export function ensurePodSetup() {
+// Memoized for the page session; invalidated when the active WebID changes
+// (logout, or login as a different user).
+function ensurePodSetup() {
+    const webId = session?.webId
+    if (webId !== cachedWebId) {
+        cachedWebId = webId
+        setupPromise = null
+    }
     if (!setupPromise) {
         setupPromise = doEnsurePodSetup().catch(err => {
             setupPromise = null
@@ -204,24 +218,23 @@ export function ensurePodSetup() {
     return setupPromise
 }
 
-export async function testReadPodFile() {
-    const uri = await ensurePodSetup()
-    const resp = await getResource(uri, session)
-    const text = await resp.text()
-    const quads = parser.parse(text)
-    const store = newStore()
-    quads.forEach(q => store.addQuad(q))
-    const pretty = await storeToTurtle(store, { ex: EX })
-    console.log(`[bib-pods] contents of ${uri}:\n${pretty}`)
-    return pretty
+// --- Storage interface ---
+
+export function isReady() {
+    return isLoggedIn()
 }
 
-export async function testWritePodTriple() {
+export function warmup() {
+    return ensurePodSetup()
+}
+
+export async function load() {
     const uri = await ensurePodSetup()
-    const store = newStore()
-    addTriple(store, EX + "sub", EX + "pred", EX + "obj")
-    const ttl = await storeToTurtle(store, { ex: EX })
-    log("test write: PUT to", uri)
-    await putResource(uri, ttl, session)
-    log("test write: done")
+    const resp = await getResource(uri, session)
+    return parseTurtle(await resp.text())
+}
+
+export async function save(store) {
+    const uri = await ensurePodSetup()
+    await putResource(uri, await serializeTurtle(store), session)
 }
