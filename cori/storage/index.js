@@ -1,8 +1,8 @@
 // Storage abstraction. The app reads/writes an RDF graph via the active backend;
-// each backend (local, solid, …) implements { isReady, load, save, getInfo }.
+// each backend (local, solid, …) implements { isReady, warmup, load, save, getInfo }.
 // Adding a new backend means dropping in a new module here and wiring it in BACKENDS.
-import { addTriple as addTripleToStore, newStore } from "@foerderfunke/sem-ops-utils"
-import { EX, serializeTurtle } from "../utils.js"
+import { addTriple as addTripleToStore } from "@foerderfunke/sem-ops-utils"
+import { serializeTurtle } from "../utils.js"
 import * as localBackend from "./local-storage.js"
 import * as solidBackend from "./solid.js"
 
@@ -59,15 +59,7 @@ export async function loadAsTurtle() {
     return await serializeTurtle(store)
 }
 
-export async function testRead() {
+export async function loadQuads() {
     const store = await getStorage().load()
-    const pretty = await serializeTurtle(store)
-    console.log(`[bib-pods] storage contents:\n${pretty}`)
-    return pretty
-}
-
-export async function testWrite() {
-    const store = newStore()
-    addTripleToStore(store, EX + "sub", EX + "pred", EX + "obj")
-    await getStorage().save(store)
+    return store.getQuads(null, null, null, null)
 }

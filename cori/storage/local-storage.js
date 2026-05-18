@@ -1,6 +1,7 @@
 // localStorage-backed storage. Whole graph held as a turtle string under one key.
-import { parseTurtle, serializeTurtle } from "../utils.js"
+import { parseTurtle, serializeTurtle, seedStore } from "../utils.js"
 
+const DEBUG = true
 const KEY = "bib-pods.local.ttl"
 
 export function isReady() {
@@ -10,9 +11,12 @@ export function isReady() {
 export async function warmup() {
     const text = localStorage.getItem(KEY)
     if (text) {
-        console.log(`[bib-pods] local: using existing localStorage entry "${KEY}" (${text.length} chars)`)
+        if (DEBUG) console.log(`[bib-pods] local: using existing localStorage entry "${KEY}" (${text.length} chars)`)
     } else {
-        console.log(`[bib-pods] local: no entry "${KEY}" yet, will be created on first write`)
+        const store = parseTurtle("")
+        seedStore(store)
+        localStorage.setItem(KEY, await serializeTurtle(store))
+        if (DEBUG) console.log(`[bib-pods] local: created entry "${KEY}" with dev seed data`)
     }
 }
 

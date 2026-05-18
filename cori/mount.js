@@ -1,6 +1,6 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, getStorageInfo } from "./storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadQuads, getStorageInfo } from "./storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
-import { expandTerm } from "./utils.js"
+import { expandTerm, contractTerm, getLabel } from "./utils.js"
 import cockpitCss from "./ui/cockpit.css?raw"
 import entryHtml from "./ui/entry.html?raw"
 import modalHtml from "./ui/modal.html?raw"
@@ -50,6 +50,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     const statusBox = dialog.querySelector("#bp-status")
     const switchBtn = dialog.querySelector("#bp-switch-btn")
     const infoDetails = dialog.querySelector("#bp-info-details")
+    const profileDetails = dialog.querySelector("#bp-profile-details")
     const addTripleBtn = dialog.querySelector("#bp-add-triple-btn")
     const downloadBtn = dialog.querySelector("#bp-download-btn")
     const solidInput = dialog.querySelector("#bp-solid-input")
@@ -76,6 +77,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         if (isChosen) {
             switchBtn.textContent = SWITCH_LABELS[choice]
             renderInfo()
+            renderProfile()
         }
 
         chooser.hidden = isChosen || isInSolidSetup
@@ -94,6 +96,22 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
             }
         } catch (err) {
             console.error("[bib-pods] info render failed:", err)
+        }
+    }
+
+    async function renderProfile() {
+        profileDetails.innerHTML = ""
+        if (!isStorageReady()) return
+        try {
+            const quads = await loadQuads()
+            for (const q of quads) {
+                const tr = profileDetails.insertRow()
+                tr.insertCell().textContent = contractTerm(q.subject.value)
+                tr.insertCell().textContent = getLabel(q.predicate.value) ?? contractTerm(q.predicate.value)
+                tr.insertCell().textContent = contractTerm(q.object.value)
+            }
+        } catch (err) {
+            console.error("[bib-pods] profile render failed:", err)
         }
     }
 
@@ -173,6 +191,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         const [s, p, o] = terms.map(expandTerm)
         try {
             await addTriple(s, p, o)
+            renderProfile()
         } catch (err) {
             console.error("[bib-pods] addTriple failed:", err)
         }

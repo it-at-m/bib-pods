@@ -4,7 +4,7 @@
 //         handleSolidCallback, currentPageUrl
 //   Storage interface: isReady, warmup, load, save
 import { getResource, parseToN3, createContainer, putResource, getContainerItems, getLinkHeader, SPACE, SOLID, RDF } from "@uvdsl/solid-requests"
-import { parseTurtle, serializeTurtle } from "../utils.js"
+import { parseTurtle, serializeTurtle, seedStore } from "../utils.js"
 import { Session } from "@uvdsl/solid-oidc-client-browser"
 import { setChoice } from "./index.js"
 
@@ -193,8 +193,10 @@ async function doEnsurePodSetup() {
     if (coriItems.includes(fileUri)) {
         log("bib-pods.ttl already exists:", fileUri)
     } else {
-        log("creating bib-pods.ttl at", fileUri)
-        const resp = await putResource(fileUri, "", session)
+        log("creating bib-pods.ttl at", fileUri, "with dev seed data")
+        const store = parseTurtle("")
+        seedStore(store)
+        const resp = await putResource(fileUri, await serializeTurtle(store), session)
         log("bib-pods.ttl created, server response status =", resp.status)
     }
     log("ensurePodSetup done, file URI =", fileUri)
