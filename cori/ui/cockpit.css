@@ -1,12 +1,12 @@
 .bp-welcome {
     border: 1px solid #ccc;
-    border-radius: 8px;
+    border-radius: var(--border-radius, 8px);
     padding: 1rem;
 }
 .bp-modal {
     padding: 0;
     border: none;
-    border-radius: 12px;
+    border-radius: var(--border-radius, 12px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
     max-width: min(36rem, 92vw);
     max-height: 92vh;
@@ -36,9 +36,27 @@
     padding: 0.3rem 0.6rem;
     border: 1px solid #eee;
 }
+/* Chooser buttons stack vertically; the <p> still stretches naturally. */
+#bp-chooser {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+#bp-chooser[hidden] { display: none; }
+#bp-chooser .button { align-self: flex-start; }
+/* Action buttons in a stable single column — no flex-wrap means no row
+   re-shuffle on hover/transition width changes. */
 .bp-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin: 1rem 0;
 }
+/* Override host's .button min-width: 12rem so pills fit our compact modal. */
+.bp-actions .button,
+.bp-welcome .button,
+#bp-chooser .button {
+    min-width: 0;
+}
+#bp-switch-btn { margin-top: 0.5rem; }

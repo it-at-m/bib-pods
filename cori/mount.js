@@ -33,12 +33,14 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     root.innerHTML = entryHtml
 
     // Native <dialog> opened via showModal() renders in the browser's top layer,
-    // so parent overflow/z-index can't clip it. Attached to <body> as a neutral
-    // host outside the cori-controlled root. Created once per mount() call.
+    // so parent overflow/z-index can't clip it regardless of DOM position. We
+    // attach inside `root` (not <body>) so the dialog stays within the host's
+    // content scope — e.g. on TYPO3 it sits inside `.maincontents` and inherits
+    // the brand's button/link styling. Created once per mount() call.
     const modalHost = document.createElement("div")
     modalHost.innerHTML = modalHtml
     const dialog = modalHost.firstElementChild
-    document.body.appendChild(dialog)
+    root.appendChild(dialog)
 
     const welcomeText = root.querySelector(".bp-welcome-text")
     const openBtn = root.querySelector(".bp-open-btn")
