@@ -1,8 +1,4 @@
-.bp-welcome {
-    border: 1px solid #ccc;
-    border-radius: var(--border-radius, 8px);
-    padding: 1rem;
-}
+.bp-entry { text-align: right; }
 .bp-modal {
     padding: 0;
     border: none;
@@ -55,7 +51,7 @@
 }
 /* Override host's .button min-width: 12rem so pills fit our compact modal. */
 .bp-actions .button,
-.bp-welcome .button,
+.bp-open-btn,
 #bp-chooser .button {
     min-width: 0;
 }

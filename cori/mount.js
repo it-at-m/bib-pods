@@ -35,6 +35,14 @@ function injectStyles() {
 export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     injectStyles()
     solrEndpointUrl = solrEndpoint
+    // Host's .button pill styling is scoped to .maincontents. On pages where
+    // TYPO3 places #bp-root outside that scope (e.g. homepage header), reparent
+    // it so the entry button + modal sit inside .maincontents and pick up the
+    // host's styling naturally. On /bib-pods (already inside) this is a no-op.
+    const mainContents = document.querySelector(".maincontents")
+    if (mainContents && !root.closest(".maincontents")) {
+        mainContents.prepend(root)
+    }
     root.innerHTML = entryHtml
 
     // Native <dialog> opened via showModal() renders in the browser's top layer,
@@ -47,7 +55,6 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     const dialog = modalHost.firstElementChild
     root.appendChild(dialog)
 
-    const welcomeText = root.querySelector(".bp-welcome-text")
     const openBtn = root.querySelector(".bp-open-btn")
 
     const closeBtn = dialog.querySelector(".bp-modal-close")
@@ -80,8 +87,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         const choice = getChoice()
         const isChosen = choice === "local" || choice === "solid"
 
-        welcomeText.textContent = isChosen ? "Bibliotheks-Pods Plugin" : "Willkommen zum Bibliotheks-Pods Plugin"
-        openBtn.textContent = isChosen ? "Cockpit" : "Einrichten"
+        openBtn.textContent = isChosen ? "Bibliotheks-Pods Cockpit" : "Bibliotheks-Pods aktivieren"
         if (isChosen) {
             switchBtn.textContent = SWITCH_LABELS[choice]
             renderInfo()
