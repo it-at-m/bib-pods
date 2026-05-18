@@ -76,8 +76,8 @@ case "${1:-}" in
             | sed -E "s|${LOCAL_TMP#/}|local|g; s|${REMOTE_TMP#/}|remote|g; /index [0-9a-f]+\.\.[0-9a-f]+/d" \
             | awk '
                 /diff --git/ {
-                    if (/bundle\.js/) {
-                        print "[bundle.js: content diff suppressed]"
+                    if (match($0, /(bundle|RefreshWorker)\.js/)) {
+                        print "[" substr($0, RSTART, RLENGTH) ": content diff suppressed]"
                         skip = 1
                         next
                     }

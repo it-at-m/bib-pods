@@ -20,15 +20,21 @@ let session = null
 let readyPromise = null
 let setupPromise = null
 
+// URL of the worker emitted by emitRefreshWorker — see refresh-worker-plugin.js
+// for why we serve it separately. Filename held in a const (not a string literal)
+// so Vite's URL pattern matcher doesn't grab it and re-inline the worker.
+const WORKER_FILENAME = "RefreshWorker.js"
+const workerUrl = new URL(WORKER_FILENAME, import.meta.url).href
+
 // Lazy init so callers can supply the right redirect URI (which must be registered
 // with the IdP via Dynamic Client Registration — for TYPO3 that's the static callback
 // page, for docs it's the current page).
 export function initSession({ redirectUri }) {
     if (readyPromise) return readyPromise
-    session = new Session({
-        redirect_uris: [redirectUri],
-        client_name: CLIENT_NAME,
-    })
+    session = new Session(
+        { redirect_uris: [redirectUri], client_name: CLIENT_NAME },
+        { workerUrl },
+    )
     const hasAuthCode = new URLSearchParams(window.location.search).has("code")
     readyPromise = (hasAuthCode
         ? session.handleRedirectFromLogin()
