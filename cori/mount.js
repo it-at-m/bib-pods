@@ -1,4 +1,4 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadQuads, getStorageInfo } from "./storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadQuads, getStorageInfo, clearStorage } from "./storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
 import { expandTerm, contractTerm, getLabel } from "./utils.js"
 import cockpitCss from "./ui/cockpit.css?raw"
@@ -53,6 +53,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     const profileDetails = dialog.querySelector("#bp-profile-details")
     const addTripleBtn = dialog.querySelector("#bp-add-triple-btn")
     const downloadBtn = dialog.querySelector("#bp-download-btn")
+    const clearBtn = dialog.querySelector("#bp-clear-btn")
     const solidInput = dialog.querySelector("#bp-solid-input")
 
     SOLID_POD_SUGGESTIONS.forEach(({ url, label }) => {
@@ -202,6 +203,16 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
             await downloadProfile()
         } catch (err) {
             console.error("[bib-pods] download failed:", err)
+        }
+    })
+
+    clearBtn.addEventListener("click", async () => {
+        if (!window.confirm("Wirklich alle Einträge im Profil löschen? Dies kann nicht rückgängig gemacht werden.")) return
+        try {
+            await clearStorage()
+            renderProfile()
+        } catch (err) {
+            console.error("[bib-pods] clearStorage failed:", err)
         }
     })
 
