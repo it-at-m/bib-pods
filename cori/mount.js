@@ -233,3 +233,51 @@ function decorateHeading(h2) {
 export function decorateH2s() {
     document.querySelectorAll("h2").forEach(decorateHeading)
 }
+
+// aDIS/BMS SOPAC URLs use `sp=S<key>` where the leading `S` is a service-param
+// type tag and the numeric portion is zero-padded to 8 digits. Solr stores the
+// bare MARC 001 (e.g. "AK4250109"), so strip both.
+const SOPAC_RE = /[?&]sp=S(AK)0*(\d+)/
+
+function decorateBookLink(link) {
+    const match = link.href.match(SOPAC_RE)
+    if (!match) return
+    const sopacId = match[1] + match[2]
+    // Mount outside the .linkify-active wrap so the carousel's click delegation
+    // never sees the button. Inside the wrap, any click bubbles through linkify
+    // and the host scrolls/highlights the book link — stopPropagation isn't
+    // enough because linkify can listen capture-phase or at document level.
+    const wrap = link.closest(".coverflow__wrap")
+    const host = wrap?.parentElement ?? link.closest("li") ?? link.parentElement
+    if (!host) return
+
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.textContent = "+"
+    btn.title = "Zu Favoriten hinzufügen"
+    btn.style.cssText = "position: absolute; top: 0.4em; right: 0.4em; z-index: 10; width: 1.7em; height: 1.7em; padding: 0; font-size: 1.1em; font-weight: bold; line-height: 1; border: 1px solid currentColor; border-radius: 50%; background: rgba(255,255,255,0.92); cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.4);"
+
+    if (getComputedStyle(host).position === "static") host.style.position = "relative"
+    btn.addEventListener("click", () => console.log(sopacId))
+    host.appendChild(btn)
+
+    // Anchor the button's center to the cover image's top-right corner (slide
+    // is wider than the auto-width cover, so em offsets land off the artwork).
+    // Re-anchor on image load if it hadn't sized yet.
+    const img = wrap?.querySelector(".cf-image img")
+    if (img) {
+        const anchor = () => {
+            const hostRect = host.getBoundingClientRect()
+            const imgRect = img.getBoundingClientRect()
+            if (imgRect.width === 0) return
+            btn.style.top = `${imgRect.top - hostRect.top - btn.offsetHeight / 2}px`
+            btn.style.right = `${hostRect.right - imgRect.right - btn.offsetWidth / 2}px`
+        }
+        anchor()
+        if (!img.complete) img.addEventListener("load", anchor, { once: true })
+    }
+}
+
+export function decorateBooks() {
+    document.querySelectorAll('a[href*="sp=SAK"]').forEach(decorateBookLink)
+}
