@@ -1,0 +1,26 @@
+.bp-welcome {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 1rem;
+}
+.bp-modal {
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    max-width: min(36rem, 92vw);
+    max-height: 92vh;
+    overflow: auto;
+}
+.bp-modal::backdrop {
+    background: rgba(0, 0, 0, 0.4);
+}
+.bp-modal-content {
+    padding: 1.5rem;
+}
+.bp-modal-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.bp-modal-header h3 { margin: 0; }

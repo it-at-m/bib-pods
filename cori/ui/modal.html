@@ -1,0 +1,31 @@
+<dialog class="bp-modal" aria-labelledby="bp-modal-title">
+    <div class="bp-modal-content">
+        <div class="bp-modal-header">
+            <h3 id="bp-modal-title">Cockpit</h3>
+            <button type="button" class="bp-modal-close">Schließen</button>
+        </div>
+        <section id="bp-chooser">
+            <p>Wo sollen deine Daten gespeichert werden?</p>
+            <button id="bp-choose-local-btn" type="button">Lokal im Browser</button>
+            <button id="bp-choose-solid-btn" type="button">In meinem Solid Pod</button>
+        </section>
+        <section id="bp-solid-setup" hidden>
+            <p>Du hast noch keinen Pod? Hier sind einige Anbieter:</p>
+            <ul id="bp-solid-suggestions"></ul>
+            <p>
+                <input type="url" id="bp-solid-input" placeholder="Provider URL">
+                <button id="bp-solid-connect-btn" type="button">Verbinden</button>
+            </p>
+            <button id="bp-solid-cancel-btn" type="button">Zurück</button>
+        </section>
+        <section id="bp-status" hidden>
+            <p id="bp-status-text"></p>
+            <button id="bp-switch-btn" type="button">Speicherort wechseln</button>
+            <p id="bp-test-actions" hidden>
+                <a id="bp-test-write-btn" href="#">test write</a>
+                &nbsp;
+                <a id="bp-test-read-btn" href="#">test read</a>
+            </p>
+        </section>
+    </div>
+</dialog>

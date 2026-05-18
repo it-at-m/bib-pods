@@ -1,5 +1,8 @@
 import { initSession, login, logout, isLoggedIn, getWebId, currentPageUrl } from "./storage/solid.js"
 import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, testRead, testWrite } from "./storage/index.js"
+import cockpitCss from "./ui/cockpit.css?raw"
+import entryHtml from "./ui/entry.html?raw"
+import modalHtml from "./ui/modal.html?raw"
 
 const STATUS_LABELS = {
     local: "Speicherung: lokal in deinem Browser",
@@ -16,44 +19,45 @@ const SOLID_POD_SUGGESTIONS = [
     { url: "https://start.inrupt.com/profile", label: "Inrupt PodSpaces" },
 ]
 
-const TEMPLATE = `
-    <section id="bp-chooser">
-        <p>Wo sollen deine Daten gespeichert werden?</p>
-        <button id="bp-choose-local-btn">Lokal im Browser</button>
-        <button id="bp-choose-solid-btn">In meinem Solid Pod</button>
-    </section>
-    <section id="bp-solid-setup" hidden>
-        <p>Du hast noch keinen Pod? Hier sind einige Anbieter:</p>
-        <ul id="bp-solid-suggestions"></ul>
-        <p>
-            <input type="url" id="bp-solid-input" placeholder="Provider URL">
-            <button id="bp-solid-connect-btn">Verbinden</button>
-        </p>
-        <button id="bp-solid-cancel-btn">Zurück</button>
-    </section>
-    <section id="bp-status" hidden>
-        <p id="bp-status-text"></p>
-        <button id="bp-switch-btn">Speicherort wechseln</button>
-        <span id="bp-test-actions" hidden>
-            &nbsp;&nbsp;<a id="bp-test-write-btn" href="#">test write</a>
-            &nbsp;<a id="bp-test-read-btn" href="#">test read</a>
-        </span>
-    </section>
-`
+// Scoped styles injected once into <head>. Both hosts (docs, TYPO3) get the same
+// look without coordinating stylesheets.
+const STYLE_ID = "bp-cori-styles"
+
+function injectStyles() {
+    if (document.getElementById(STYLE_ID)) return
+    const style = document.createElement("style")
+    style.id = STYLE_ID
+    style.textContent = cockpitCss
+    document.head.appendChild(style)
+}
+
 
 export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
-    root.innerHTML = TEMPLATE
+    injectStyles()
+    root.innerHTML = entryHtml
 
-    const chooser = root.querySelector("#bp-chooser")
-    const solidSetup = root.querySelector("#bp-solid-setup")
-    const suggestionsList = root.querySelector("#bp-solid-suggestions")
-    const statusBox = root.querySelector("#bp-status")
-    const statusText = root.querySelector("#bp-status-text")
-    const switchBtn = root.querySelector("#bp-switch-btn")
-    const testActions = root.querySelector("#bp-test-actions")
-    const testWriteBtn = root.querySelector("#bp-test-write-btn")
-    const testReadBtn = root.querySelector("#bp-test-read-btn")
-    const solidInput = root.querySelector("#bp-solid-input")
+    // Native <dialog> opened via showModal() renders in the browser's top layer,
+    // so parent overflow/z-index can't clip it. Attached to <body> as a neutral
+    // host outside the cori-controlled root. Created once per mount() call.
+    const modalHost = document.createElement("div")
+    modalHost.innerHTML = modalHtml
+    const dialog = modalHost.firstElementChild
+    document.body.appendChild(dialog)
+
+    const welcomeText = root.querySelector(".bp-welcome-text")
+    const openBtn = root.querySelector(".bp-open-btn")
+
+    const closeBtn = dialog.querySelector(".bp-modal-close")
+    const chooser = dialog.querySelector("#bp-chooser")
+    const solidSetup = dialog.querySelector("#bp-solid-setup")
+    const suggestionsList = dialog.querySelector("#bp-solid-suggestions")
+    const statusBox = dialog.querySelector("#bp-status")
+    const statusText = dialog.querySelector("#bp-status-text")
+    const switchBtn = dialog.querySelector("#bp-switch-btn")
+    const testActions = dialog.querySelector("#bp-test-actions")
+    const testWriteBtn = dialog.querySelector("#bp-test-write-btn")
+    const testReadBtn = dialog.querySelector("#bp-test-read-btn")
+    const solidInput = dialog.querySelector("#bp-solid-input")
 
     SOLID_POD_SUGGESTIONS.forEach(({ url, label }) => {
         const li = document.createElement("li")
@@ -71,9 +75,9 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     function applyState() {
         const choice = getChoice()
         const isChosen = choice === "local" || choice === "solid"
-        chooser.hidden = isChosen || isInSolidSetup
-        solidSetup.hidden = isChosen || !isInSolidSetup
-        statusBox.hidden = !isChosen
+
+        welcomeText.textContent = isChosen ? "Bibliotheks-Pods Plugin" : "Willkommen zum Bibliotheks-Pods Plugin"
+        openBtn.textContent = isChosen ? "Cockpit" : "Einrichten"
         if (isChosen) {
             const label = STATUS_LABELS[choice]
             const webId = choice === "solid" ? getWebId() : null
@@ -81,6 +85,15 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
             switchBtn.textContent = SWITCH_LABELS[choice]
             testActions.hidden = !isStorageReady()
         }
+
+        chooser.hidden = isChosen || isInSolidSetup
+        solidSetup.hidden = isChosen || !isInSolidSetup
+        statusBox.hidden = !isChosen
+    }
+
+    function openModal() {
+        applyState()
+        dialog.showModal()
     }
 
     const redirectUri = solidCallbackUrl ?? currentPageUrl()
@@ -90,23 +103,33 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         warmupStorage().catch(err => console.error("Storage warmup failed:", err))
     }
 
-    root.querySelector("#bp-choose-local-btn").addEventListener("click", () => {
+    openBtn.addEventListener("click", openModal)
+    closeBtn.addEventListener("click", () => dialog.close())
+    dialog.addEventListener("click", (e) => {
+        if (e.target === dialog) dialog.close()
+    })
+    dialog.addEventListener("close", () => {
+        isInSolidSetup = false
+        applyState()
+    })
+
+    dialog.querySelector("#bp-choose-local-btn").addEventListener("click", () => {
         setChoice("local")
         applyState()
         warmupStorage().catch(err => console.error("Storage warmup failed:", err))
     })
 
-    root.querySelector("#bp-choose-solid-btn").addEventListener("click", () => {
+    dialog.querySelector("#bp-choose-solid-btn").addEventListener("click", () => {
         isInSolidSetup = true
         applyState()
     })
 
-    root.querySelector("#bp-solid-cancel-btn").addEventListener("click", () => {
+    dialog.querySelector("#bp-solid-cancel-btn").addEventListener("click", () => {
         isInSolidSetup = false
         applyState()
     })
 
-    root.querySelector("#bp-solid-connect-btn").addEventListener("click", async () => {
+    dialog.querySelector("#bp-solid-connect-btn").addEventListener("click", async () => {
         const issuer = solidInput.value.trim()
         if (!issuer) return
         await login(issuer, {
