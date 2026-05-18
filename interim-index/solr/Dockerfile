@@ -1,2 +1,2 @@
-FROM solr
+FROM solr@sha256:2690f8b9bd9afe9f0b10ea5c292118aaac39419beba934a6461fe5ca559a7087
 COPY --chown=solr:solr security.json /var/solr/data/security.json

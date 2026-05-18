@@ -2,8 +2,8 @@
     "name": "cori",
     "type": "module",
     "dependencies": {
-        "@foerderfunke/sem-ops-utils": "^0.3.9",
-        "@uvdsl/solid-oidc-client-browser": "^0.2.2",
-        "@uvdsl/solid-requests": "^0.0.7"
+        "@foerderfunke/sem-ops-utils": "0.3.9",
+        "@uvdsl/solid-oidc-client-browser": "0.2.2",
+        "@uvdsl/solid-requests": "0.0.7"
     }
 }
