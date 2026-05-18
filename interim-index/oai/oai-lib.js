@@ -66,6 +66,7 @@ export function formatProgress(done, total, elapsedMs, currentPage) {
 export async function harvest({
     outDir,
     from = null,
+    startPage = 0,
     baseUrl = DEFAULT_BASE_URL,
     set = DEFAULT_SET,
     metadataPrefix = DEFAULT_METADATA_PREFIX,
@@ -74,7 +75,7 @@ export async function harvest({
     if (!outDir) throw new Error("outDir is required")
     fs.mkdirSync(outDir, { recursive: true })
 
-    let page = 0
+    let page = startPage
     let token = null
     let totalSize = null
     let totalBytesDownloaded = 0

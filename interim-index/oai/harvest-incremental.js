@@ -1,17 +1,23 @@
 // Reads existing data/*.xml, finds the latest <datestamp>, and runs an OAI
-// ListRecords harvest with from=<latest-date>, writing pages to data-new/.
+// ListRecords harvest with from=<latest-date>, appending pages to data/ with
+// continued numbering (page-NNNNNN.xml resumes after the highest existing N).
 //
 // Datestamps are day-granularity, so from=<latest-date> is inclusive and
 // re-fetches records modified on that day. Downstream dedup by record id
 // handles the overlap. Using date+1 would risk missing same-day updates,
 // so the extra fetches are the safer trade.
+//
+// Safe to re-run at any time: with no changes since the latest datestamp,
+// OAI returns noRecordsMatch and no files are written. Pair each run with
+// solr/import-incremental.js — running this script twice without importing
+// in between will re-harvest same-day records to new pages (Solr dedups on
+// import, so it stays correct, just wasted disk + import work).
 
 import { harvest } from "./oai-lib.js"
 import path from "path"
 import fs from "fs"
 
 const DATA_DIR = path.join(import.meta.dirname, "data")
-const OUT_DIR = path.join(import.meta.dirname, "data-new")
 
 // Reads files in reverse filename order (most recently harvested first) with
 // bounded parallelism, exiting early once the running max has been stable for
@@ -58,6 +64,14 @@ async function findLatestDatestamp(dir, { concurrency = 32, stableThreshold = 50
     return latest
 }
 
+function findNextPageNumber(dir) {
+    if (!fs.existsSync(dir)) return 0
+    const files = fs.readdirSync(dir).filter(f => /^page-\d+\.xml$/.test(f)).sort()
+    if (files.length === 0) return 0
+    const last = files[files.length - 1]
+    return parseInt(last.match(/page-(\d+)\.xml/)[1], 10) + 1
+}
+
 console.log(`Scanning ${DATA_DIR} for latest datestamp...`)
 const latestDate = await findLatestDatestamp(DATA_DIR)
 if (!latestDate) {
@@ -65,11 +79,11 @@ if (!latestDate) {
     process.exit(1)
 }
 
-console.log(`Latest datestamp in ${DATA_DIR}: ${latestDate}`)
-
-fs.rmSync(OUT_DIR, { recursive: true, force: true })
+const startPage = findNextPageNumber(DATA_DIR)
+console.log(`Latest datestamp in ${DATA_DIR}: ${latestDate}; appending starting at page ${startPage}`)
 
 await harvest({
-    outDir: OUT_DIR,
+    outDir: DATA_DIR,
     from: latestDate,
+    startPage,
 })

@@ -173,15 +173,17 @@ function readCursorMap() {
     catch { return {} }
 }
 
-function saveCursor(targetUrl, lastFile) {
+function saveCursor(cursorKey, lastFile) {
     const data = readCursorMap()
-    data[targetUrl] = lastFile
+    data[cursorKey] = lastFile
     fs.writeFileSync(CURSOR_FILE, JSON.stringify(data))
 }
 
-function clearCursor(targetUrl) {
+export function clearImportCursor({ targetUrl, dataDir = DEFAULT_DATA_DIR }) {
+    const cursorKey = `${targetUrl}::${dataDir}`
     const data = readCursorMap()
-    delete data[targetUrl]
+    if (!(cursorKey in data)) return
+    delete data[cursorKey]
     if (Object.keys(data).length === 0 && fs.existsSync(CURSOR_FILE)) fs.unlinkSync(CURSOR_FILE)
     else fs.writeFileSync(CURSOR_FILE, JSON.stringify(data))
 }
@@ -238,8 +240,10 @@ export async function runImport({
     }
 
     // Pipelined flush: while one batch is being POSTed, the main loop continues parsing
-    // the next batch. Cursor is advanced only after a batch's POST acks, so on crash we
-    // resume from a file whose records are all durable in the index.
+    // the next batch. Cursor is advanced only after a batch's POST acks. It is NOT
+    // cleared on successful completion, so it doubles as (a) the resume point after a
+    // crash and (b) a persistent high-water mark — a later run picks up only files
+    // added past it. Use clearImportCursor() to reset (e.g. when reseeding the index).
     async function flush() {
         if (batch.length === 0) return
         const toSend = batch
@@ -291,7 +295,6 @@ export async function runImport({
 
     console.log("Finalizing...")
     await finalize()
-    if (!testMode) clearCursor(cursorKey)
 
     const elapsed = (Date.now() - startTime) / 1000
     const rate = elapsed > 0 ? total / elapsed : 0

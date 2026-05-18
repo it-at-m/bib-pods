@@ -1,3 +1,8 @@
+// Incremental Solr import. Reads from oai/data/ and uses the cursor in
+// .import-cursor.json as a persistent high-water mark — only files past the
+// cursor are imported, and the cursor advances on success. Safe to re-run:
+// with no new files it's a no-op (an empty Solr commit).
+
 import { runImport } from "../shared.js"
 import path from "path"
 
@@ -5,7 +10,7 @@ const SOLR_URL  = "http://localhost:8983/solr/interim-index"
 const SOLR_USER = "solr"
 const SOLR_PASS = "SolrRocks"
 const LIMIT = null
-const DATA_DIR = path.join(import.meta.dirname, "..", "oai", "data-new")
+const DATA_DIR = path.join(import.meta.dirname, "..", "oai", "data")
 
 const AUTH_HEADER = "Basic " + Buffer.from(`${SOLR_USER}:${SOLR_PASS}`).toString("base64")
 

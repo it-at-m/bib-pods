@@ -1,3 +1,5 @@
+// NOTE: This script is out of date relative to the Solr workflow
+
 import { runImport } from "../shared.js"
 
 const ES_URL = "http://localhost:9200/interim-index"
