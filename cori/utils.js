@@ -92,7 +92,7 @@ function seedMessage(store, uri, content) {
 }
 
 export function mintMessageUri() {
-    return EX + "msg-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+    return EX + "msg-" + Math.random().toString(36).slice(2, 7)
 }
 
 // --- Graph helpers ---
