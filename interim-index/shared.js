@@ -61,15 +61,21 @@ const AUTHORITY_BASES = {
     fast: "http://id.worldcat.org/fast/",
 }
 
+// Sentinel emitted when a label has no resolvable authority IRI. Uses the RFC 2606
+// reserved `.invalid` TLD so it is guaranteed never to resolve. Not "" because Solr's
+// JSON update handler silently drops empty strings from multiValued arrays, which
+// would break positional alignment with the parallel label array.
+const NO_IRI = "https://unknown.invalid/"
+
 // Per datafield with one of `tags`, mint a resolvable authority IRI from $0 + $2.
 // $0 typically holds `(DE-XXX)…` where DE-XXX is the MARC organization code of the
 // authority maintaining the record; the prefix is dropped because the URI base
 // already identifies the authority. $2 names the vocabulary (gnd/lcsh/fast/…).
 // If $0 is already a full http(s) URI it passes through. MSB occasionally omits
 // $2 on 1xx/6xx but always uses (DE-588)…, so we infer GND from that prefix as a
-// dataset-specific fallback. Unresolvable entries become "" so the array stays
+// dataset-specific fallback. Unresolvable entries become NO_IRI so the array stays
 // position-aligned with the parallel label array (e.g. author2_uri_str_mv[i] is
-// always about author2[i]); consumers treat "" as "no IRI for this entry".
+// always about author2[i]); consumers treat NO_IRI as "no IRI for this entry".
 function authorityUris(marc, tags) {
     const want = new Set(tags)
     const out = []
@@ -77,12 +83,12 @@ function authorityUris(marc, tags) {
         if (!want.has(f["@_tag"])) continue
         const subs = f.subfield ?? []
         const raw0 = subs.find(s => s["@_code"] === "0")?.["#text"]
-        if (!raw0) { out.push(""); continue }
+        if (!raw0) { out.push(NO_IRI); continue }
         const v0 = String(raw0).trim()
         if (/^https?:\/\//i.test(v0)) { out.push(v0); continue }
         const vocab = String(subs.find(s => s["@_code"] === "2")?.["#text"] ?? "").trim().toLowerCase()
         const base = AUTHORITY_BASES[vocab] ?? (v0.startsWith("(DE-588)") ? AUTHORITY_BASES.gnd : null)
-        if (!base) { out.push(""); continue }
+        if (!base) { out.push(NO_IRI); continue }
         out.push(base + v0.replace(/^\([^)]+\)/, ""))
     }
     return out
