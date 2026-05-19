@@ -1,5 +1,14 @@
 {
   "type": "module",
+  "scripts": {
+    "solr:up":                 "cd solr && docker compose up -d --build",
+    "solr:down":               "cd solr && docker compose down",
+    "solr:reset":              "cd solr && docker compose down -v",
+    "solr:proxy":              "node solr/proxy.js",
+    "solr:tunnel":             "ngrok http 8984 --url=bib-pods.ngrok.dev",
+    "solr:import-all":         "node solr/import-all.js",
+    "solr:import-incremental": "node solr/import-incremental.js"
+  },
   "dependencies": {
     "fast-xml-parser": "5.8.0"
   }

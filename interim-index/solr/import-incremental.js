@@ -7,17 +7,13 @@ import { runImport } from "../shared.js"
 import path from "path"
 
 const SOLR_URL  = "http://localhost:8983/solr/interim-index"
-const SOLR_USER = "solr"
-const SOLR_PASS = "SolrRocks"
 const LIMIT = null
 const DATA_DIR = path.join(import.meta.dirname, "..", "oai", "data")
-
-const AUTH_HEADER = "Basic " + Buffer.from(`${SOLR_USER}:${SOLR_PASS}`).toString("base64")
 
 async function postBatch(docs) {
     const res = await fetch(`${SOLR_URL}/update`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": AUTH_HEADER },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(docs)
     })
     if (!res.ok) throw new Error(`Solr update error ${res.status}: ${await res.text()}`)
@@ -30,7 +26,7 @@ async function postDeletes(oaiIds) {
         const query = chunk.map(id => `oai_identifier:"${id.replace(/"/g, '\\"')}"`).join(" OR ")
         const res = await fetch(`${SOLR_URL}/update`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": AUTH_HEADER },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ delete: { query } })
         })
         if (!res.ok) throw new Error(`Solr delete error ${res.status}: ${await res.text()}`)
@@ -40,7 +36,7 @@ async function postDeletes(oaiIds) {
 async function finalize() {
     const res = await fetch(`${SOLR_URL}/update?commit=true`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": AUTH_HEADER },
+        headers: { "Content-Type": "application/json" },
         body: "[]"
     })
     if (!res.ok) throw new Error(`Solr commit error ${res.status}`)
