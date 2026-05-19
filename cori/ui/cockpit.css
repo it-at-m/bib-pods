@@ -1,4 +1,24 @@
 .bp-entry { text-align: right; }
+.bp-open-btn { position: relative; }
+.bp-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--contrastcolor, #d14900);
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 18px;
+    text-align: center;
+    box-shadow: 0 0 0 2px #fff;
+}
+.bp-badge[hidden] { display: none; }
+#bp-messages > summary { font-weight: bold; margin: 0.5rem 0; }
+#bp-msg-old-section { font-size: 0.85em; color: #666; }
 .bp-modal {
     padding: 0;
     border: none;

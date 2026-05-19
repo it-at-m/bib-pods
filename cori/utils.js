@@ -6,6 +6,7 @@ let labels = null
 
 export const EX = "http://example.org/"
 export const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
+export const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 export const PREFIXES = { ex: EX, bp: BP }
 
 export function expandTerm(token) {
@@ -33,13 +34,33 @@ export function getLabel(uri) {
     return labels.get(uri)
 }
 
-// for dev purposes
-export function seedStore(store) {
+// Dev-only seeds. Invoked manually via window.bibPods.addTestProfile() / addTestMessages()
+
+export function seedProfile(store) {
     const me = EX + "me"
     addTriple(store, me, BP + "favoriteWork", "Moby-Dick")
     addTriple(store, me, BP + "favoriteAuthor", "Herman Melville")
     addTriple(store, me, BP + "favoriteGenre", "Roman")
     addTriple(store, me, BP + "interestedIn", "Wale")
+}
+
+export function seedMessages(store) {
+    let n = 0
+    for (const q of store.getQuads(null, RDF_TYPE, null, null)) {
+        if (q.object.value === BP + "Message") n++
+    }
+    seedMessage(store, mintMessageUri(), "Testnachricht " + (n + 1))
+    seedMessage(store, mintMessageUri(), "Testnachricht " + (n + 2))
+}
+
+function seedMessage(store, uri, content) {
+    addTriple(store, uri, RDF_TYPE, BP + "Message")
+    addTriple(store, uri, BP + "content", content)
+    addTriple(store, uri, BP + "read", "false")
+}
+
+export function mintMessageUri() {
+    return EX + "msg-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 }
 
 export function parseTurtle(text) {

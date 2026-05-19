@@ -1,13 +1,19 @@
 // Storage abstraction. The app reads/writes an RDF graph via the active backend;
 // each backend (local, solid, …) implements { isReady, warmup, load, save, getInfo }.
 // Adding a new backend means dropping in a new module here and wiring it in BACKENDS.
+import { serializeTurtle, seedProfile, seedMessages, mintMessageUri, BP, RDF_TYPE } from "../utils.js"
 import { addTriple as addTripleToStore, newStore } from "@foerderfunke/sem-ops-utils"
-import { serializeTurtle, seedStore } from "../utils.js"
 import * as localBackend from "./local-storage.js"
 import * as solidBackend from "./solid.js"
 
 const CHOICE_KEY = "bib-pods.storage"
 const BACKENDS = { local: localBackend, solid: solidBackend }
+
+const MESSAGE_TYPE = BP + "Message"
+const CONTENT_PRED = BP + "content"
+const READ_PRED = BP + "read"
+
+// --- Backend selection ---
 
 export function getChoice() {
     return localStorage.getItem(CHOICE_KEY)
@@ -48,11 +54,7 @@ export async function getStorageInfo() {
     return await getStorage().getInfo()
 }
 
-export async function addTriple(subject, predicate, object) {
-    const store = await getStorage().load()
-    addTripleToStore(store, subject, predicate, object)
-    await getStorage().save(store)
-}
+// --- Reading ---
 
 export async function loadAsTurtle() {
     const store = await getStorage().load()
@@ -64,8 +66,51 @@ export async function loadQuads() {
     return store.getQuads(null, null, null, null)
 }
 
-export async function clearStorage() {
-    const store = newStore()
-    seedStore(store) // dev: re-seed on clear; drop this line once the dev seed goes away
+// --- Mutation ---
+
+async function mutate(fn) {
+    const store = await getStorage().load()
+    await fn(store)
     await getStorage().save(store)
 }
+
+export const addTriple = (subject, predicate, object) =>
+    mutate(store => addTripleToStore(store, subject, predicate, object))
+
+export const clearStorage = () => getStorage().save(newStore())
+
+// --- Messages / recommendations ---
+
+export const addMessage = (content) => mutate(store => {
+    const uri = mintMessageUri()
+    addTripleToStore(store, uri, RDF_TYPE, MESSAGE_TYPE)
+    addTripleToStore(store, uri, CONTENT_PRED, content)
+    addTripleToStore(store, uri, READ_PRED, "false")
+})
+
+export async function listMessages() {
+    const store = await getStorage().load()
+    const out = []
+    for (const typeQuad of store.getQuads(null, RDF_TYPE, null, null)) {
+        if (typeQuad.object.value !== MESSAGE_TYPE) continue
+        const uri = typeQuad.subject.value
+        const content = store.getObjects(uri, CONTENT_PRED, null)[0]?.value
+        const readVal = store.getObjects(uri, READ_PRED, null)[0]?.value
+        out.push({ uri, content, read: readVal === "true" })
+    }
+    return out
+}
+
+export async function markMessageRead(uri) {
+    const store = await getStorage().load()
+    const readQuads = store.getQuads(uri, READ_PRED, null, null)
+    if (readQuads.some(q => q.object.value === "true")) return
+    for (const q of readQuads) store.removeQuad(q)
+    addTripleToStore(store, uri, READ_PRED, "true")
+    await getStorage().save(store)
+}
+
+// --- Dev helpers, exposed via window.bibPods.* in browser console ---
+
+export const addTestProfile = () => mutate(seedProfile)
+export const addTestMessages = () => mutate(seedMessages)

@@ -1,6 +1,6 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadQuads, getStorageInfo, clearStorage } from "./storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadQuads, getStorageInfo, clearStorage, listMessages, markMessageRead, addTestProfile, addTestMessages } from "./storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
-import { expandTerm, contractTerm, getLabel, fetchBook } from "./utils.js"
+import { expandTerm, contractTerm, getLabel, fetchBook, BP, RDF_TYPE } from "./utils.js"
 import cockpitCss from "./ui/cockpit.css?raw"
 import entryHtml from "./ui/entry.html?raw"
 import modalHtml from "./ui/modal.html?raw"
@@ -56,6 +56,8 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     root.appendChild(dialog)
 
     const openBtn = root.querySelector(".bp-open-btn")
+    const openBtnLabel = root.querySelector(".bp-open-btn-label")
+    const badge = root.querySelector(".bp-badge")
 
     const closeBtn = dialog.querySelector(".bp-modal-close")
     const chooser = dialog.querySelector("#bp-chooser")
@@ -65,6 +67,11 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     const switchBtn = dialog.querySelector("#bp-switch-btn")
     const infoDetails = dialog.querySelector("#bp-info-details")
     const profileDetails = dialog.querySelector("#bp-profile-details")
+    const messagesSection = dialog.querySelector("#bp-messages")
+    const msgNewSection = dialog.querySelector("#bp-msg-new-section")
+    const msgOldSection = dialog.querySelector("#bp-msg-old-section")
+    const msgNewList = dialog.querySelector("#bp-msg-new")
+    const msgOldList = dialog.querySelector("#bp-msg-old")
     const addTripleBtn = dialog.querySelector("#bp-add-triple-btn")
     const downloadBtn = dialog.querySelector("#bp-download-btn")
     const clearBtn = dialog.querySelector("#bp-clear-btn")
@@ -87,11 +94,15 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         const choice = getChoice()
         const isChosen = choice === "local" || choice === "solid"
 
-        openBtn.textContent = isChosen ? "Bibliotheks-Pods Cockpit" : "Bibliotheks-Pods aktivieren"
+        openBtnLabel.textContent = isChosen ? "Bibliotheks-Pods Cockpit" : "Bibliotheks-Pods aktivieren"
         if (isChosen) {
             switchBtn.textContent = SWITCH_LABELS[choice]
             renderInfo()
             renderProfile()
+            renderMessages()
+        } else {
+            badge.hidden = true
+            messagesSection.hidden = true
         }
 
         chooser.hidden = isChosen || isInSolidSetup
@@ -118,7 +129,16 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         if (!isStorageReady()) return
         try {
             const quads = await loadQuads()
+            // Exclude triples whose subject is a bp:Message — those belong in
+            // the Empfehlungen section, not in the profile data table.
+            const messageSubjects = new Set()
             for (const q of quads) {
+                if (q.predicate.value === RDF_TYPE && q.object.value === BP + "Message") {
+                    messageSubjects.add(q.subject.value)
+                }
+            }
+            for (const q of quads) {
+                if (messageSubjects.has(q.subject.value)) continue
                 const tr = profileDetails.insertRow()
                 tr.insertCell().textContent = contractTerm(q.subject.value)
                 tr.insertCell().textContent = getLabel(q.predicate.value) ?? contractTerm(q.predicate.value)
@@ -126,6 +146,52 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
             }
         } catch (err) {
             console.error("[bib-pods] profile render failed:", err)
+        }
+    }
+
+    async function renderMessages() {
+        msgNewList.innerHTML = ""
+        msgOldList.innerHTML = ""
+        badge.hidden = true
+        messagesSection.hidden = true
+        msgNewSection.hidden = true
+        msgOldSection.hidden = true
+        if (!isStorageReady()) return
+        try {
+            const messages = await listMessages()
+            if (messages.length === 0) return
+            messagesSection.hidden = false
+            const unread = messages.filter(m => !m.read)
+            const readMessages = messages.filter(m => m.read)
+            messagesSection.open = unread.length > 0
+            msgNewSection.hidden = unread.length === 0
+            msgOldSection.hidden = readMessages.length === 0
+            for (const m of unread) {
+                const li = document.createElement("li")
+                li.textContent = m.content
+                li.style.cursor = "pointer"
+                li.title = "Als gelesen markieren"
+                li.addEventListener("click", async () => {
+                    try {
+                        await markMessageRead(m.uri)
+                        renderMessages()
+                    } catch (err) {
+                        console.error("[bib-pods] markMessageRead failed:", err)
+                    }
+                })
+                msgNewList.appendChild(li)
+            }
+            for (const m of readMessages) {
+                const li = document.createElement("li")
+                li.textContent = m.content
+                msgOldList.appendChild(li)
+            }
+            if (unread.length > 0) {
+                badge.textContent = unread.length > 9 ? "9+" : String(unread.length)
+                badge.hidden = false
+            }
+        } catch (err) {
+            console.error("[bib-pods] messages render failed:", err)
         }
     }
 
@@ -228,6 +294,13 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
             console.error("[bib-pods] clearStorage failed:", err)
         }
     })
+
+    if (typeof window !== "undefined") {
+        window.bibPods = Object.assign(window.bibPods ?? {}, {
+            addTestProfile: async () => { await addTestProfile(); applyState() },
+            addTestMessages: async () => { await addTestMessages(); applyState() },
+        })
+    }
 
     applyState()
 }

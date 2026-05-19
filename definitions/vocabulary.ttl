@@ -2,7 +2,9 @@
 @prefix bf:      <http://id.loc.gov/ontologies/bibframe/> .
 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
 
+# Profile properties: what the user keeps about themselves
 # https://id.loc.gov/ontologies/bibframe.html
 
 bp:favoriteWork a rdf:Property ;
@@ -20,3 +22,19 @@ bp:favoriteGenre a rdf:Property ;
 bp:interestedIn a rdf:Property ;
     rdfs:label "interested in" ;
     rdfs:range bf:Topic .
+
+# Messages: recommendations / notifications surfaced in the cockpit
+
+bp:Message a rdfs:Class ;
+    rdfs:label "message" ;
+    rdfs:comment "A recommendation or notification shown to the user in the cockpit." .
+
+bp:content a rdf:Property ;
+    rdfs:label "content" ;
+    rdfs:domain bp:Message ;
+    rdfs:range xsd:string .
+
+bp:read a rdf:Property ;
+    rdfs:label "read" ;
+    rdfs:domain bp:Message ;
+    rdfs:range xsd:boolean .
