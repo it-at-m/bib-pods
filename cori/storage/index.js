@@ -1,7 +1,7 @@
 // Storage abstraction. The app reads/writes an RDF graph via the active backend;
 // each backend (local, solid, …) implements { isReady, warmup, load, save, getInfo }.
 // Adding a new backend means dropping in a new module here and wiring it in BACKENDS.
-import { serializeTurtle, seedProfile, seedMessages, mintMessageUri, BP, RDF_TYPE } from "../utils.js"
+import { serializeTurtle, seedProfile, seedMessages, mintMessageUri, subjectsOfType, getOne, replaceProperty, BP, RDF_TYPE } from "../utils.js"
 import { addTriple as addTripleToStore, newStore } from "@foerderfunke/sem-ops-utils"
 import * as localBackend from "./local-storage.js"
 import * as solidBackend from "./solid.js"
@@ -61,9 +61,8 @@ export async function loadAsTurtle() {
     return await serializeTurtle(store)
 }
 
-export async function loadQuads() {
-    const store = await getStorage().load()
-    return store.getQuads(null, null, null, null)
+export async function loadStore() {
+    return await getStorage().load()
 }
 
 // --- Mutation ---
@@ -90,23 +89,17 @@ export const addMessage = (content) => mutate(store => {
 
 export async function listMessages() {
     const store = await getStorage().load()
-    const out = []
-    for (const typeQuad of store.getQuads(null, RDF_TYPE, null, null)) {
-        if (typeQuad.object.value !== MESSAGE_TYPE) continue
-        const uri = typeQuad.subject.value
-        const content = store.getObjects(uri, CONTENT_PRED, null)[0]?.value
-        const readVal = store.getObjects(uri, READ_PRED, null)[0]?.value
-        out.push({ uri, content, read: readVal === "true" })
-    }
-    return out
+    return subjectsOfType(store, MESSAGE_TYPE).map(uri => ({
+        uri,
+        content: getOne(store, uri, CONTENT_PRED),
+        read:    getOne(store, uri, READ_PRED) === "true",
+    }))
 }
 
 export async function markMessageRead(uri) {
     const store = await getStorage().load()
-    const readQuads = store.getQuads(uri, READ_PRED, null, null)
-    if (readQuads.some(q => q.object.value === "true")) return
-    for (const q of readQuads) store.removeQuad(q)
-    addTripleToStore(store, uri, READ_PRED, "true")
+    if (getOne(store, uri, READ_PRED) === "true") return
+    replaceProperty(store, uri, READ_PRED, "true")
     await getStorage().save(store)
 }
 

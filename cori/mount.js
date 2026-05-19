@@ -1,6 +1,6 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadQuads, getStorageInfo, clearStorage, listMessages, markMessageRead, addTestProfile, addTestMessages } from "./storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, clearStorage, listMessages, markMessageRead, addTestProfile, addTestMessages } from "./storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
-import { expandTerm, contractTerm, getLabel, fetchBook, BP, RDF_TYPE } from "./utils.js"
+import { expandTerm, contractTerm, getLabel, fetchBook, subjectsOfType, BP } from "./utils.js"
 import cockpitCss from "./ui/cockpit.css?raw"
 import entryHtml from "./ui/entry.html?raw"
 import modalHtml from "./ui/modal.html?raw"
@@ -128,16 +128,11 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         profileDetails.innerHTML = ""
         if (!isStorageReady()) return
         try {
-            const quads = await loadQuads()
+            const store = await loadStore()
             // Exclude triples whose subject is a bp:Message — those belong in
             // the Empfehlungen section, not in the profile data table.
-            const messageSubjects = new Set()
-            for (const q of quads) {
-                if (q.predicate.value === RDF_TYPE && q.object.value === BP + "Message") {
-                    messageSubjects.add(q.subject.value)
-                }
-            }
-            for (const q of quads) {
+            const messageSubjects = new Set(subjectsOfType(store, BP + "Message"))
+            for (const q of store.getQuads(null, null, null, null)) {
                 if (messageSubjects.has(q.subject.value)) continue
                 const tr = profileDetails.insertRow()
                 tr.insertCell().textContent = contractTerm(q.subject.value)

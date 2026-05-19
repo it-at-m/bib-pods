@@ -45,10 +45,7 @@ export function seedProfile(store) {
 }
 
 export function seedMessages(store) {
-    let n = 0
-    for (const q of store.getQuads(null, RDF_TYPE, null, null)) {
-        if (q.object.value === BP + "Message") n++
-    }
+    const n = subjectsOfType(store, BP + "Message").length
     seedMessage(store, mintMessageUri(), "Testnachricht " + (n + 1))
     seedMessage(store, mintMessageUri(), "Testnachricht " + (n + 2))
 }
@@ -61,6 +58,24 @@ function seedMessage(store, uri, content) {
 
 export function mintMessageUri() {
     return EX + "msg-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+}
+
+// --- Graph helpers ---
+
+export function subjectsOfType(store, typeIri) {
+    return store.getSubjects(RDF_TYPE, typeIri, null).map(t => t.value)
+}
+
+// if multiple values exist, returns the first one
+export function getOne(store, subject, predicate) {
+    return store.getObjects(subject, predicate, null)[0]?.value
+}
+
+export function replaceProperty(store, subject, predicate, value) {
+    for (const q of store.getQuads(subject, predicate, null, null)) {
+        store.removeQuad(q)
+    }
+    addTriple(store, subject, predicate, value)
 }
 
 export function parseTurtle(text) {
