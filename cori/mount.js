@@ -319,10 +319,15 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     dialog.querySelector("#bp-solid-connect-btn").addEventListener("click", async () => {
         const issuer = solidInput.value.trim()
         if (!issuer) return
-        await login(issuer, {
-            redirectUri,
-            returnUrl: solidCallbackUrl ? window.location.href : undefined,
-        })
+        try {
+            await login(issuer, {
+                redirectUri,
+                returnUrl: solidCallbackUrl ? window.location.href : undefined,
+            })
+        } catch (err) {
+            console.error("[bib-pods] Solid login failed:", err)
+            window.alert(`Verbindung zu ${issuer} fehlgeschlagen:\n${err?.message ?? err}`)
+        }
     })
 
     switchBtn.addEventListener("click", async () => {
