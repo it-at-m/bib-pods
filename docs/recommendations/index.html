@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>recommendations — bib-pods</title>
+        <link rel="stylesheet" href="../styles.css">
+        <style>
+            .strategy-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 1.5rem 0;
+                background: #fff;
+                border: 1px solid #e5e5e5;
+                border-radius: 6px;
+                overflow: hidden;
+            }
+            .strategy-table th, .strategy-table td {
+                text-align: left;
+                padding: 0.6rem 0.9rem;
+                border-bottom: 1px solid #eee;
+            }
+            .strategy-table th {
+                background: #f4f4f4;
+                font-weight: 600;
+            }
+            .strategy-table tr:last-child td { border-bottom: none; }
+            .strategy-table code {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: 0.9em;
+            }
+            .combine {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: 0.85em;
+                color: #555;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="top-menu">
+            <a href="../">home</a>
+            <a href="../vocabulary/">vocabulary</a>
+            <a href="../query/">query</a>
+            <a href="../plugin/">plugin</a>
+            <a href="../interactions/">interactions</a>
+            <a class="brand" href="../recommendations/">recommendations</a>
+            <span class="spacer"></span>
+            <a href="https://github.com/it-at-m/bib-pods">GitHub</a>
+        </nav>
+        <main>
+            <table class="strategy-table" id="strategy-table">
+                <thead>
+                    <tr>
+                        <th>Strategie</th>
+                        <th>Profil-Properties</th>
+                        <th>Verknüpfung</th>
+                    </tr>
+                </thead>
+                <tbody id="strategy-tbody"></tbody>
+            </table>
+        </main>
+        <script type="module">
+            import { getStrategies, contractTerm } from "./dist/bundle.js"
+
+            const tbody = document.getElementById("strategy-tbody")
+            const strategies = getStrategies()
+            if (strategies.length === 0) {
+                const tr = document.createElement("tr")
+                const td = document.createElement("td")
+                td.colSpan = 3
+                td.textContent = "Keine Strategien deklariert."
+                tr.appendChild(td)
+                tbody.appendChild(tr)
+            }
+            for (const s of strategies) {
+                const tr = document.createElement("tr")
+
+                const labelCell = document.createElement("td")
+                labelCell.textContent = s.label
+                const iriLine = document.createElement("div")
+                iriLine.innerHTML = `<code>${contractTerm(s.iri)}</code>`
+                iriLine.style.color = "#888"
+                iriLine.style.fontSize = "0.85em"
+                labelCell.appendChild(iriLine)
+                tr.appendChild(labelCell)
+
+                const propsCell = document.createElement("td")
+                propsCell.innerHTML = s.properties.map(p => `<code>${contractTerm(p)}</code>`).join(", ")
+                tr.appendChild(propsCell)
+
+                const combineCell = document.createElement("td")
+                combineCell.className = "combine"
+                combineCell.textContent = s.combine.toUpperCase()
+                tr.appendChild(combineCell)
+
+                tbody.appendChild(tr)
+            }
+        </script>
+    </body>
+</html>
