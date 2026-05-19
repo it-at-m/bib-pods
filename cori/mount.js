@@ -1,6 +1,7 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, clearStorage, listMessages, markMessageRead, addTestProfile, addTestMessages } from "./storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, clearStorage, listMessages, markMessageRead, addInquiryFacts, addTestProfile, addTestMessages, PROFILE_SUBJECT } from "./storage/index.js"
+import { expandTerm, contractTerm, getLabel, getOne, fetchBook, getFollowUpsFor, BP, LOCAL, RDFS_LABEL, NO_IRI } from "./utils.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
-import { expandTerm, contractTerm, getLabel, fetchBook, subjectsOfType, BP } from "./utils.js"
+import bookPromptHtml from "./ui/book-prompt.html?raw"
 import cockpitCss from "./ui/cockpit.css?raw"
 import entryHtml from "./ui/entry.html?raw"
 import modalHtml from "./ui/modal.html?raw"
@@ -15,13 +16,10 @@ const SOLID_POD_SUGGESTIONS = [
     { url: "https://start.inrupt.com/profile", label: "Inrupt PodSpaces" },
 ]
 
-// Scoped styles injected once into <head>. Both hosts (docs, TYPO3) get the same
-// look without coordinating stylesheets.
+// scoped styles injected once into <head>: both hosts (docs, TYPO3) get the same look without coordinating stylesheets
 const STYLE_ID = "bp-cori-styles"
-
-// Captured from mount() options so decorateBooks() can reach the Solr endpoint
-// without changing its public signature.
 let solrEndpointUrl = null
+let openBookPrompt = null
 
 function injectStyles() {
     if (document.getElementById(STYLE_ID)) return
@@ -54,6 +52,82 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     modalHost.innerHTML = modalHtml
     const dialog = modalHost.firstElementChild
     root.appendChild(dialog)
+
+    // Second dialog: book-prompt. Same top-layer mechanism, same host scope.
+    const bookHost = document.createElement("div")
+    bookHost.innerHTML = bookPromptHtml
+    const bookDialog = bookHost.firstElementChild
+    root.appendChild(bookDialog)
+
+    const bookTitleEl = bookDialog.querySelector("#bp-book-title")
+    const bookFallbackEl = bookDialog.querySelector("#bp-book-fallback")
+    const bookSectionsEl = bookDialog.querySelector("#bp-book-sections")
+    const bookMerklisteBox = bookDialog.querySelector("#bp-book-merkliste")
+    const bookCancelBtn = bookDialog.querySelector("#bp-book-cancel")
+    const bookSaveBtn = bookDialog.querySelector("#bp-book-save")
+    let currentSopacId = null
+    let currentEntries = []
+
+    openBookPrompt = async (sopacId, book) => {
+        currentSopacId = sopacId
+        currentEntries = []
+        bookTitleEl.textContent = book?.title?.[0] ?? sopacId
+        bookFallbackEl.hidden = book !== null
+        bookFallbackEl.textContent = "Buchdaten konnten gerade nicht geladen werden — du kannst das Buch trotzdem speichern."
+        bookMerklisteBox.checked = true
+        bookSectionsEl.innerHTML = ""
+        if (book) {
+            for (const spec of await getFollowUpsFor(BP + "BookSelection")) {
+                const items = collectBookItems(spec, book)
+                if (items.length === 0) continue
+                const { section, entries } = buildBookSection(spec, items)
+                bookSectionsEl.appendChild(section)
+                currentEntries.push(...entries)
+            }
+        }
+        bookDialog.showModal()
+    }
+
+    bookCancelBtn.addEventListener("click", () => bookDialog.close())
+    bookDialog.addEventListener("click", (e) => {
+        if (e.target === bookDialog) bookDialog.close()
+    })
+    bookSaveBtn.addEventListener("click", async () => {
+        if (!currentSopacId) return
+        const facts = []
+        if (bookMerklisteBox.checked) {
+            facts.push({ predicate: BP + "savedBook", object: currentSopacId })
+        }
+        for (const { predicate, cleanedLabel, rawLabel, iri, checkbox } of currentEntries) {
+            if (!checkbox.checked) continue
+            const wasCleaned = rawLabel !== cleanedLabel
+            if (iri) {
+                // authority IRI is the source of truth, we store however the cleaned label locally
+                facts.push({ predicate, object: iri })
+                facts.push({ subject: iri, predicate: RDFS_LABEL, object: cleanedLabel })
+            } else if (wasCleaned) {
+                // no authority IRI, mint a local URN so the entity has a graph node to attach facts to
+                const localUri = LOCAL + "author:" + encodeURIComponent(rawLabel)
+                facts.push({ predicate, object: localUri })
+                facts.push({ subject: localUri, predicate: RDFS_LABEL, object: cleanedLabel })
+                facts.push({ subject: localUri, predicate: BP + "sourceLabel", object: rawLabel })
+            } else {
+                // no IRI, rawLabel === cleanedLabel, nothing to preserve, store as plain literal
+                facts.push({ predicate, object: cleanedLabel })
+            }
+        }
+        if (facts.length === 0) {
+            bookDialog.close()
+            return
+        }
+        try {
+            await addInquiryFacts(facts)
+            bookDialog.close()
+            applyState()
+        } catch (err) {
+            console.error("[bib-pods] addInquiryFacts failed:", err)
+        }
+    })
 
     const openBtn = root.querySelector(".bp-open-btn")
     const openBtnLabel = root.querySelector(".bp-open-btn-label")
@@ -129,15 +203,15 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         if (!isStorageReady()) return
         try {
             const store = await loadStore()
-            // Exclude triples whose subject is a bp:Message — those belong in
-            // the Empfehlungen section, not in the profile data table.
-            const messageSubjects = new Set(subjectsOfType(store, BP + "Message"))
-            for (const q of store.getQuads(null, null, null, null)) {
-                if (messageSubjects.has(q.subject.value)) continue
+            // show only profile-triples
+            for (const q of store.getQuads(PROFILE_SUBJECT, null, null, null)) {
                 const tr = profileDetails.insertRow()
                 tr.insertCell().textContent = contractTerm(q.subject.value)
                 tr.insertCell().textContent = getLabel(q.predicate.value) ?? contractTerm(q.predicate.value)
-                tr.insertCell().textContent = contractTerm(q.object.value)
+                // IRI objects: prefer the locally stored and cleaned rdfs:label; literals pass through
+                tr.insertCell().textContent = q.object.termType === "NamedNode"
+                    ? (getOne(store, q.object.value, RDFS_LABEL) ?? contractTerm(q.object.value))
+                    : q.object.value
             }
         } catch (err) {
             console.error("[bib-pods] profile render failed:", err)
@@ -305,6 +379,54 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
 // bare MARC 001 (e.g. "AK4250109"), so strip both.
 const SOPAC_RE = /[?&]sp=S(AK)0*(\d+)/
 
+// MARC 100 author strings arrive as "Lastname, Firstname YYYY-YYYY?"
+// strip the trailing date range and swap the comma'd name to its natural order
+function cleanAuthorName(s) {
+    const withoutDates = s.replace(/\s+\d{4}-\d{0,4}\s*$/, "").trim()
+    const comma = withoutDates.indexOf(",")
+    if (comma === -1) return withoutDates
+    const last = withoutDates.slice(0, comma).trim()
+    const first = withoutDates.slice(comma + 1).trim()
+    return first ? `${first} ${last}` : last
+}
+
+// walk a follow-up spec against a book and return one { rawLabel, iri } item per value found.
+function collectBookItems(spec, book) {
+    const items = []
+    for (const f of spec.fields) {
+        const labels = book[f.labelField]
+        if (!labels || labels.length === 0) continue
+        const iris = f.iriField ? book[f.iriField] : null
+        for (let i = 0; i < labels.length; i++) {
+            const iri = iris?.[i]
+            items.push({ rawLabel: labels[i], iri: iri === NO_IRI ? undefined : iri })
+        }
+    }
+    return items
+}
+
+function buildBookSection(spec, items) {
+    const section = document.createElement("div")
+    const heading = document.createElement("p")
+    heading.className = "bp-book-section-heading"
+    heading.textContent = spec.label
+    section.appendChild(heading)
+    const clean = spec.property === BP + "favoriteAuthor" ? cleanAuthorName : (s) => s
+    const entries = []
+    for (const it of items) {
+        const cleanedLabel = clean(it.rawLabel)
+        const labelEl = document.createElement("label")
+        labelEl.className = "bp-book-option"
+        const checkbox = document.createElement("input")
+        checkbox.type = "checkbox"
+        labelEl.appendChild(checkbox)
+        labelEl.appendChild(document.createTextNode(" " + cleanedLabel))
+        section.appendChild(labelEl)
+        entries.push({ predicate: spec.property, cleanedLabel, rawLabel: it.rawLabel, iri: it.iri, checkbox })
+    }
+    return { section, entries }
+}
+
 function decorateBookCard(target, sopacId) {
     // msbWrap is the MSB carousel's .linkify-active wrapper around a real
     // book — truthy means we're on production HTML, null means we're decorating
@@ -325,12 +447,14 @@ function decorateBookCard(target, sopacId) {
 
     if (msbWrap && getComputedStyle(host).position === "static") host.style.position = "relative"
     btn.addEventListener("click", async () => {
+        let book = null
         try {
-            const book = await fetchBook(solrEndpointUrl, sopacId)
-            console.log("[bib-pods] book:", book)
+            book = await fetchBook(solrEndpointUrl, sopacId)
+            console.log("[bib-pods] fetched book:", book)
         } catch (err) {
             console.error("[bib-pods] fetchBook failed:", err)
         }
+        openBookPrompt?.(sopacId, book)
     })
     host.appendChild(btn)
 

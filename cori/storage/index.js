@@ -1,7 +1,7 @@
 // Storage abstraction. The app reads/writes an RDF graph via the active backend;
 // each backend (local, solid, …) implements { isReady, warmup, load, save, getInfo }.
 // Adding a new backend means dropping in a new module here and wiring it in BACKENDS.
-import { serializeTurtle, seedProfile, seedMessages, mintMessageUri, subjectsOfType, getOne, replaceProperty, BP, RDF_TYPE } from "../utils.js"
+import { serializeTurtle, seedProfile, seedMessages, mintMessageUri, subjectsOfType, getOne, replaceProperty, EX, BP, RDF_TYPE } from "../utils.js"
 import { addTriple as addTripleToStore, newStore } from "@foerderfunke/sem-ops-utils"
 import * as localBackend from "./local-storage.js"
 import * as solidBackend from "./solid.js"
@@ -12,6 +12,7 @@ const BACKENDS = { local: localBackend, solid: solidBackend }
 const MESSAGE_TYPE = BP + "Message"
 const CONTENT_PRED = BP + "content"
 const READ_PRED = BP + "read"
+export const PROFILE_SUBJECT = EX + "me"
 
 // --- Backend selection ---
 
@@ -102,6 +103,12 @@ export async function markMessageRead(uri) {
     replaceProperty(store, uri, READ_PRED, "true")
     await getStorage().save(store)
 }
+
+export const addInquiryFacts = (facts) => mutate(store => {
+    for (const { subject, predicate, object } of facts) {
+        addTripleToStore(store, subject ?? PROFILE_SUBJECT, predicate, object)
+    }
+})
 
 // --- Dev helpers, exposed via window.bibPods.* in browser console ---
 

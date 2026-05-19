@@ -1,13 +1,25 @@
-import { newStore, addTriple, storeToTurtle, parser } from "@foerderfunke/sem-ops-utils"
+import { newStore, addTriple, storeToTurtle, storeFromTurtles, sparqlSelect } from "@foerderfunke/sem-ops-utils"
 import vocabularyTtl from "../definitions/vocabulary.ttl?raw"
 
-const RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
-let labels = null
+export const RDFS = "http://www.w3.org/2000/01/rdf-schema#"
+export const RDFS_LABEL = RDFS + "label"
+let vocabStore = null
+function getVocabStore() {
+    if (!vocabStore) vocabStore = parseTurtle(vocabularyTtl)
+    return vocabStore
+}
 
 export const EX = "http://example.org/"
 export const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
+export const GND = "https://d-nb.info/gnd/"
+// URN base for locally minted identifiers (e.g. authors without authority IRIs)
+export const LOCAL = "urn:bibpods:"
 export const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-export const PREFIXES = { ex: EX, bp: BP }
+// sentinel emitted by the indexer for unresolvable authority entries,
+// so *_uri_str_mv arrays stay position-aligned with their label counterparts.
+// we treat it as "no IRI for this entry"
+export const NO_IRI = "https://unknown.invalid/"
+export const PREFIXES = { ex: EX, bp: BP, gnd: GND }
 
 export function expandTerm(token) {
     const colonIdx = token.indexOf(":")
@@ -24,14 +36,37 @@ export function contractTerm(uri) {
 }
 
 export function getLabel(uri) {
-    if (!labels) {
-        labels = new Map()
-        const store = parseTurtle(vocabularyTtl)
-        for (const q of store.getQuads(null, RDFS_LABEL, null, null)) {
-            labels.set(q.subject.value, q.object.value)
+    const labels = getVocabStore().getObjects(uri, RDFS_LABEL, null)
+    return labels.find(t => t.language === "de")?.value ?? labels[0]?.value
+}
+
+// collects the follow-up questions declared on a bp:UserAction in the vocabulary
+export async function getFollowUpsFor(actionUri) {
+    const rows = await sparqlSelect(`
+        PREFIX bp: <${BP}>
+        PREFIX rdfs: <${RDFS}>
+        SELECT ?property ?label ?labelField ?iriField WHERE {
+            <${actionUri}> bp:followUpQuestion ?property .
+            ?property bp:linkedToIndex ?link .
+            ?link bp:labelField ?labelField .
+            OPTIONAL { ?link bp:iriField ?iriField }
+            OPTIONAL { ?property rdfs:label ?label . FILTER(lang(?label) = "de") }
+        }`, [getVocabStore()])
+    const byProperty = new Map()
+    for (const r of rows) {
+        if (!byProperty.has(r.property)) {
+            byProperty.set(r.property, {
+                property: r.property,
+                label: r.label ?? contractTerm(r.property),
+                fields: [],
+            })
         }
+        byProperty.get(r.property).fields.push({
+            labelField: r.labelField,
+            iriField: r.iriField,
+        })
     }
-    return labels.get(uri)
+    return [...byProperty.values()]
 }
 
 // Dev-only seeds. Invoked manually via window.bibPods.addTestProfile() / addTestMessages()
@@ -79,9 +114,7 @@ export function replaceProperty(store, subject, predicate, value) {
 }
 
 export function parseTurtle(text) {
-    const store = newStore()
-    if (text) parser.parse(text).forEach(q => store.addQuad(q))
-    return store
+    return storeFromTurtles([text])
 }
 
 export function serializeTurtle(store) {

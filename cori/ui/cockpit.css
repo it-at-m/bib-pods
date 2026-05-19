@@ -19,6 +19,18 @@
 .bp-badge[hidden] { display: none; }
 #bp-messages > summary { font-weight: bold; margin: 0.5rem 0; }
 #bp-msg-old-section { font-size: 0.85em; color: #666; }
+.bp-book-title {
+    font-weight: bold;
+    background: #f4f1ea;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--border-radius, 8px);
+    margin: 0.75rem 0 1rem;
+}
+.bp-book-fallback { color: #666; font-style: italic; }
+#bp-book-sections > div { margin-bottom: 1rem; }
+.bp-book-section-heading { font-weight: bold; margin: 0.5rem 0 0.25rem; }
+.bp-book-option { display: block; cursor: pointer; padding: 0.15rem 0; }
+.bp-book-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
 .bp-modal {
     padding: 0;
     border: none;

@@ -1,29 +1,65 @@
 @prefix bp:      <https://www.muenchner-stadtbibliothek.de/bib-pods#> .
-@prefix bf:      <http://id.loc.gov/ontologies/bibframe/> .
+@prefix bf:      <http://id.loc.gov/ontologies/bibframe/> . # https://id.loc.gov/ontologies/bibframe.html
 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
 
-# Profile properties: what the user keeps about themselves
-# https://id.loc.gov/ontologies/bibframe.html
+# ----- Profile -----
 
 bp:favoriteWork a rdf:Property ;
-    rdfs:label "favorite work" ;
+    rdfs:label "favorite work"@en, "Lieblingsbuch"@de ;
     rdfs:range bf:Work .
 
 bp:favoriteAuthor a rdf:Property ;
-    rdfs:label "favorite author" ;
-    rdfs:range bf:Person .
+    rdfs:label "favorite author"@en, "Autor*in"@de ;
+    rdfs:range bf:Person ;
+    bp:linkedToIndex [
+        bp:labelField "author" ;
+        bp:iriField "author_uri_str_mv"
+    ], [
+        bp:labelField "author2" ;
+        bp:iriField "author2_uri_str_mv"
+    ] .
 
 bp:favoriteGenre a rdf:Property ;
-    rdfs:label "favorite genre" ;
-    rdfs:range bf:GenreForm .
+    rdfs:label "favorite genre"@en, "Genre"@de ;
+    rdfs:range bf:GenreForm ;
+    bp:linkedToIndex [
+        bp:labelField "genre" ;
+        bp:iriField "genre_uri_str_mv"
+    ] .
 
 bp:interestedIn a rdf:Property ;
-    rdfs:label "interested in" ;
-    rdfs:range bf:Topic .
+    rdfs:label "interested in"@en, "Thema"@de ;
+    rdfs:range bf:Topic ;
+    bp:linkedToIndex [
+        bp:labelField "topic" ;
+        bp:iriField "topic_uri_str_mv"
+    ] .
 
-# Messages: recommendations / notifications surfaced in the cockpit
+bp:savedBook a rdf:Property ; # SOPAC identifier
+    rdfs:label "saved book"@en, "Gemerktes Buch"@de ;
+    rdfs:range xsd:string .
+
+bp:linkedToIndex a rdf:Property .
+bp:labelField a rdf:Property .
+bp:iriField a rdf:Property .
+bp:sourceLabel a rdf:Property . # on profile entries where an IRI isn't available, this anchors it at least back to what's bp:labelField pointing to in the index
+
+# ----- Interactions -----
+
+bp:BookSelection a bp:UserAction ;
+    rdfs:label "user action: click book on site"@en ;
+    bp:followUpQuestion bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn .
+
+bp:UserAction a rdfs:Class .
+
+bp:followUpQuestion a rdf:Property ;
+    rdfs:label "follow-up question"@en ;
+    rdfs:domain bp:UserAction ;
+    rdfs:range rdf:Property .
+
+# ----- Messages -----
 
 bp:Message a rdfs:Class ;
     rdfs:label "message" ;
