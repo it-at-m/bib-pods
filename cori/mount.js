@@ -1,4 +1,4 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, clearStorage, listMessages, markMessageRead, addInquiryFacts, addTestProfile, addTestMessages, PROFILE_SUBJECT } from "./storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, isActivated, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, clearStorage, listMessages, markMessageRead, addInquiryFacts, addTestProfile, addTestMessages, PROFILE_SUBJECT } from "./storage/index.js"
 import { expandTerm, contractTerm, getLabel, getOne, fetchBook, getFollowUpsFor, BP, LOCAL, RDFS_LABEL, NO_IRI } from "./utils.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
 import bookPromptHtml from "./ui/book-prompt.html?raw"
@@ -182,6 +182,9 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         chooser.hidden = isChosen || isInSolidSetup
         solidSetup.hidden = isChosen || !isInSolidSetup
         statusBox.hidden = !isChosen
+
+        if (isChosen) decorateBooks()
+        else undecorateBooks()
     }
 
     async function renderInfo() {
@@ -428,6 +431,8 @@ function buildBookSection(spec, items) {
 }
 
 function decorateBookCard(target, sopacId) {
+    if (target.dataset.bpDecorated) return
+    target.dataset.bpDecorated = "true"
     // msbWrap is the MSB carousel's .linkify-active wrapper around a real
     // book — truthy means we're on production HTML, null means we're decorating
     // a dev pseudo book (just a [data-sopac-id] element). For real books we
@@ -439,6 +444,7 @@ function decorateBookCard(target, sopacId) {
 
     const btn = document.createElement("button")
     btn.type = "button"
+    btn.className = "bp-decoration"
     btn.textContent = "+"
     btn.title = "Zu Favoriten hinzufügen"
     btn.style.cssText = msbWrap
@@ -476,6 +482,7 @@ function decorateBookCard(target, sopacId) {
 }
 
 export function decorateBooks() {
+    if (!isActivated()) return
     document.querySelectorAll('a[href*="sp=SAK"]').forEach(link => {
         const match = link.href.match(SOPAC_RE)
         if (match) decorateBookCard(link, match[1] + match[2])
@@ -484,4 +491,9 @@ export function decorateBooks() {
     document.querySelectorAll("[data-sopac-id]").forEach(el => {
         decorateBookCard(el, el.dataset.sopacId)
     })
+}
+
+function undecorateBooks() {
+    document.querySelectorAll(".bp-decoration").forEach(el => el.remove())
+    document.querySelectorAll("[data-bp-decorated]").forEach(el => delete el.dataset.bpDecorated)
 }
