@@ -2,7 +2,7 @@
     "name": "docs-webapp",
     "type": "module",
     "scripts": {
-        "dev": "serve . -l 5173 --no-clipboard",
+        "dev": "serve .. -l 5173 --no-clipboard",
         "build": "npm run build:plugin && npm run build:interactions",
         "build:plugin": "vite build --config vite.plugin.config.js",
         "build:interactions": "vite build --config vite.interactions.config.js",
