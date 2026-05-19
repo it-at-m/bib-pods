@@ -49,10 +49,11 @@ bp:sourceLabel a rdf:Property . # on profile entries where an IRI isn't availabl
 # ----- Interactions -----
 
 bp:BookSelection a bp:UserAction ;
-    rdfs:label "user action: click book on site"@en ;
+    rdfs:label "user clicks on a book --> follow-up questions"@en, "Nutzer*in klickt auf ein Buch - Folgefragen"@de ;
     bp:followUpQuestion bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn .
 
-bp:UserAction a rdfs:Class .
+bp:UserAction a rdfs:Class ;
+    rdfs:label "interaction pattern"@en, "Interaktionsmuster"@de .
 
 bp:followUpQuestion a rdf:Property ;
     rdfs:label "follow-up question"@en ;

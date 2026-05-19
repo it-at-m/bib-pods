@@ -19,7 +19,14 @@ export const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 // so *_uri_str_mv arrays stay position-aligned with their label counterparts.
 // we treat it as "no IRI for this entry"
 export const NO_IRI = "https://unknown.invalid/"
-export const PREFIXES = { ex: EX, bp: BP, gnd: GND }
+export const PREFIXES = {
+    ex: EX,
+    bp: BP,
+    gnd: GND,
+    rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    rdfs: RDFS,
+    xsd: "http://www.w3.org/2001/XMLSchema#",
+}
 
 export function expandTerm(token) {
     const colonIdx = token.indexOf(":")

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>interactions — bib-pods</title>
+        <link rel="stylesheet" href="../styles.css">
+        <style>
+            main { max-width: 1100px; }
+            .graph-card {
+                margin: 1.5rem 0;
+                background: #fff;
+                border: 1px solid #e5e5e5;
+                border-radius: 6px;
+                padding: 1rem 1.2rem 1.2rem;
+            }
+            .graph-card h2 {
+                margin: 0 0 0.6rem 0;
+                font-size: 1.05rem;
+            }
+            .graph-container {
+                width: 100%;
+                height: 520px;
+                border: 1px solid #eee;
+                border-radius: 4px;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="top-menu">
+            <a href="../index.html">home</a>
+            <a href="../vocabulary/">vocabulary</a>
+            <a href="../query/">query</a>
+            <a href="../plugin/">plugin</a>
+            <a class="brand" href="../interactions/">interactions</a>
+            <span class="spacer"></span>
+            <a href="https://github.com/it-at-m/bib-pods">GitHub</a>
+        </nav>
+        <main>
+            <div id="graphs"></div>
+        </main>
+        <script type="module">
+            import { getUserActionGraphs, ForceGraph } from "./dist/bundle.js"
+
+            const NODE_COLOR = {
+                NamedNode: "#07a",
+                BlankNode: "#999",
+                Literal: "#3a9d3a",
+            }
+
+            const graphs = getUserActionGraphs()
+            const host = document.getElementById("graphs")
+            if (graphs.length === 0) {
+                host.innerHTML = "<p>No <code>bp:UserAction</code> instances found in the vocabulary.</p>"
+            }
+            for (const g of graphs) {
+                const card = document.createElement("div")
+                card.className = "graph-card"
+                const heading = document.createElement("h2")
+                heading.textContent = g.label
+                const container = document.createElement("div")
+                container.className = "graph-container"
+                card.append(heading, container)
+                host.appendChild(card)
+
+                ForceGraph()(container)
+                    .width(container.clientWidth)
+                    .height(container.clientHeight)
+                    .graphData({
+                        nodes: g.nodes.map(n => ({ ...n })),
+                        links: g.links.map(l => ({ ...l })),
+                    })
+                    .nodeLabel("label")
+                    .linkLabel("label")
+                    .linkDirectionalArrowLength(5)
+                    .linkDirectionalArrowRelPos(1)
+                    .nodeColor(n => NODE_COLOR[n.type] ?? "#444")
+                    .nodeCanvasObjectMode(() => "after")
+                    .nodeCanvasObject((node, ctx, scale) => {
+                        const fontSize = 11 / scale
+                        ctx.font = `${fontSize}px sans-serif`
+                        ctx.fillStyle = "#222"
+                        ctx.textAlign = "left"
+                        ctx.textBaseline = "middle"
+                        ctx.fillText(node.label ?? "", node.x + 7, node.y)
+                    })
+            }
+        </script>
+    </body>
+</html>
