@@ -194,7 +194,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         applyState()
     })
 
-    addTripleBtn.addEventListener("click", async () => {
+    addTripleBtn?.addEventListener("click", async () => {
         const input = window.prompt("Triple eingeben (Subjekt Prädikat Objekt, durch Leerzeichen getrennt).\nPräfixe sind möglich, z.B.: ex:alice ex:knows ex:bob",)
         if (!input) return
         const terms = input.trim().split(/\s+/)
@@ -211,7 +211,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         }
     })
 
-    downloadBtn.addEventListener("click", async () => {
+    downloadBtn?.addEventListener("click", async () => {
         try {
             await downloadProfile()
         } catch (err) {
@@ -219,7 +219,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         }
     })
 
-    clearBtn.addEventListener("click", async () => {
+    clearBtn?.addEventListener("click", async () => {
         if (!window.confirm("Wirklich alle Einträge im Profil löschen? Dies kann nicht rückgängig gemacht werden.")) return
         try {
             await clearStorage()
