@@ -54,6 +54,39 @@ function fieldSubfields(marc, tag, codes, sep = " ") {
         .filter(Boolean)
 }
 
+// Base URIs by source-vocabulary code carried in $2. Extend as new vocabularies appear.
+const AUTHORITY_BASES = {
+    gnd:  "https://d-nb.info/gnd/",
+    lcsh: "http://id.loc.gov/authorities/subjects/",
+    fast: "http://id.worldcat.org/fast/",
+}
+
+// Per datafield with one of `tags`, mint a resolvable authority IRI from $0 + $2.
+// $0 typically holds `(DE-XXX)…` where DE-XXX is the MARC organization code of the
+// authority maintaining the record; the prefix is dropped because the URI base
+// already identifies the authority. $2 names the vocabulary (gnd/lcsh/fast/…).
+// If $0 is already a full http(s) URI it passes through. MSB occasionally omits
+// $2 on 1xx/6xx but always uses (DE-588)…, so we infer GND from that prefix as a
+// dataset-specific fallback. Unresolvable entries are skipped rather than emitted
+// as opaque strings, so the field is a homogeneous list of dereferenceable IRIs.
+function authorityUris(marc, tags) {
+    const want = new Set(tags)
+    const out = []
+    for (const f of marc.datafield ?? []) {
+        if (!want.has(f["@_tag"])) continue
+        const subs = f.subfield ?? []
+        const raw0 = subs.find(s => s["@_code"] === "0")?.["#text"]
+        if (!raw0) continue
+        const v0 = String(raw0).trim()
+        if (/^https?:\/\//i.test(v0)) { out.push(v0); continue }
+        const vocab = String(subs.find(s => s["@_code"] === "2")?.["#text"] ?? "").trim().toLowerCase()
+        const base = AUTHORITY_BASES[vocab] ?? (v0.startsWith("(DE-588)") ? AUTHORITY_BASES.gnd : null)
+        if (!base) continue
+        out.push(base + v0.replace(/^\([^)]+\)/, ""))
+    }
+    return out
+}
+
 function first(arr) {
     return arr[0] ?? null
 }
@@ -112,9 +145,12 @@ function mapRecord(oaiRecord) {
         ],
 
         // Authors (VuFind: author=100abcqd, author2=700abcqd, author_corporate=110/111/710/711)
-        author:           fieldSubfields(marc, "100", "abcqd"),
-        author2:          fieldSubfields(marc, "700", "abcqd"),
-        author_corporate: allAlphaSubfields(marc, ["110", "111", "710", "711"]),
+        author:                      fieldSubfields(marc, "100", "abcqd"),
+        author2:                     fieldSubfields(marc, "700", "abcqd"),
+        author_corporate:            allAlphaSubfields(marc, ["110", "111", "710", "711"]),
+        author_uri_str_mv:           authorityUris(marc, ["100"]),
+        author2_uri_str_mv:          authorityUris(marc, ["700"]),
+        author_corporate_uri_str_mv: authorityUris(marc, ["110", "111", "710", "711"]),
 
         // Publication (VuFind: publisher, publishDate, publishDateSort, edition)
         publisher:        [
@@ -136,13 +172,23 @@ function mapRecord(oaiRecord) {
         language:         languageCodes(marc),
 
         // Subjects (VuFind: topic, genre, geographic, era as alpha-subfields)
-        topic:            allAlphaSubfields(marc, ["600", "610", "611", "630", "650", "653", "656"]),
-        genre:            allAlphaSubfields(marc, ["655"]),
-        geographic:       allAlphaSubfields(marc, ["651"]),
-        era:              allAlphaSubfields(marc, ["648"]),
+        topic:                 allAlphaSubfields(marc, ["600", "610", "611", "630", "650", "653", "656"]),
+        genre:                 allAlphaSubfields(marc, ["655"]),
+        geographic:            allAlphaSubfields(marc, ["651"]),
+        era:                   allAlphaSubfields(marc, ["648"]),
+        topic_uri_str_mv:      authorityUris(marc, ["600", "610", "611", "630", "650", "653", "656"]),
+        genre_uri_str_mv:      authorityUris(marc, ["655"]),
+        geographic_uri_str_mv: authorityUris(marc, ["651"]),
+        era_uri_str_mv:        authorityUris(marc, ["648"]),
 
-        // Series (VuFind: series=800abcdfpqt:830ap, series2=490a)
-        series:           allAlphaSubfields(marc, ["800", "830"]),
+        // Series (VuFind: series=800abcdfpqt:830ap, series2=490a).
+        // Cannot use allAlphaSubfields here: 800/830 carry $w (record control number
+        // of the linked series authority) which is alphabetic and would otherwise
+        // leak into the display string. MSB e.g. 830$w="(DE-M36)AK1120883".
+        series:           [
+            ...fieldSubfields(marc, "800", "abcdfpqt"),
+            ...fieldSubfields(marc, "830", "ap"),
+        ],
         series2:          subfields(marc, "490", "a"),
 
         // Misc (VuFind: contents=505a:505t, url=856u:555u)

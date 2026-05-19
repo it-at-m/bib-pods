@@ -58,5 +58,6 @@ async function clearIndex() {
     console.log("Index cleared.")
 }
 
+clearImportCursor({ targetUrl: SOLR_URL, dataDir: DATA_DIR })
 await runImport({ targetUrl: SOLR_URL, dataDir: DATA_DIR, limit: LIMIT, postBatch, postDeletes, finalize })
 // await clearIndex()
