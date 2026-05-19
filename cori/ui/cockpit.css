@@ -19,6 +19,8 @@
 .bp-badge[hidden] { display: none; }
 #bp-messages > summary { font-weight: bold; margin: 0.5rem 0; }
 #bp-msg-old-section { font-size: 0.85em; color: #666; }
+#bp-msg-new li, #bp-msg-old li { white-space: pre-line; margin-bottom: 0.4rem; }
+#bp-msg-new li::first-line, #bp-msg-old li::first-line { font-style: italic; }
 .bp-book-title {
     font-weight: bold;
     background: #f4f1ea;

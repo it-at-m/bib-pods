@@ -1,6 +1,7 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, isActivated, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, clearStorage, listMessages, markMessageRead, addInquiryFacts, addTestProfile, addTestMessages, PROFILE_SUBJECT } from "./storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, isActivated, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, clearStorage, listMessages, markMessageRead, addInquiryFacts, addMessage, addTestProfile, addTestMessages, PROFILE_SUBJECT } from "./storage/index.js"
 import { expandTerm, contractTerm, getLabel, getOne, fetchBook, getFollowUpsFor, BP, LOCAL, RDFS_LABEL, NO_IRI } from "./utils.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
+import { runRecommendations } from "./recommendations.js"
 import bookPromptHtml from "./ui/book-prompt.html?raw"
 import cockpitCss from "./ui/cockpit.css?raw"
 import entryHtml from "./ui/entry.html?raw"
@@ -149,6 +150,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     const addTripleBtn = dialog.querySelector("#bp-add-triple-btn")
     const downloadBtn = dialog.querySelector("#bp-download-btn")
     const clearBtn = dialog.querySelector("#bp-clear-btn")
+    const checkRecBtn = dialog.querySelector("#bp-check-recommendations-btn")
     const solidInput = dialog.querySelector("#bp-solid-input")
 
     SOLID_POD_SUGGESTIONS.forEach(({ url, label }) => {
@@ -335,6 +337,33 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         clearChoice()
         isInSolidSetup = false
         applyState()
+    })
+
+    checkRecBtn?.addEventListener("click", async () => {
+        if (!isStorageReady()) return
+        const originalText = checkRecBtn.textContent
+        checkRecBtn.disabled = true
+        checkRecBtn.textContent = "Lädt …"
+        try {
+            const profileStore = await loadStore()
+            const results = await runRecommendations(profileStore, PROFILE_SUBJECT, solrEndpointUrl)
+            let count = 0
+            for (const { strategy, docs } of results) {
+                for (const doc of docs) {
+                    const title = doc.title?.[0] ?? doc.id
+                    await addMessage(`${strategy.label}\n${title}`)
+                    count++
+                }
+            }
+            if (count === 0) window.alert("Keine Empfehlungen gefunden — vielleicht fehlen noch Profileinträge?")
+            applyState()
+        } catch (err) {
+            console.error("[bib-pods] recommendations failed:", err)
+            window.alert("Empfehlungen konnten nicht geladen werden:\n" + (err?.message ?? err))
+        } finally {
+            checkRecBtn.disabled = false
+            checkRecBtn.textContent = originalText
+        }
     })
 
     addTripleBtn?.addEventListener("click", async () => {

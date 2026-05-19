@@ -60,6 +60,32 @@ bp:followUpQuestion a rdf:Property ;
     rdfs:domain bp:UserAction ;
     rdfs:range rdf:Property .
 
+# ----- Recommendations -----
+
+bp:RecommendationStrategy a rdfs:Class .
+
+bp:usesProfileProperty a rdf:Property ;
+    rdfs:domain bp:RecommendationStrategy ;
+    rdfs:range rdf:Property .
+
+bp:combine a rdf:Property ;
+    rdfs:domain bp:RecommendationStrategy ;
+    rdfs:range bp:Combinator .
+
+bp:Combinator a rdfs:Class .
+bp:Or a bp:Combinator ; rdfs:label "OR" .
+bp:And a bp:Combinator ; rdfs:label "AND" .
+
+bp:authorMatch a bp:RecommendationStrategy ;
+    rdfs:label "Mehr von Lieblingsautor*in"@de ;
+    bp:usesProfileProperty bp:favoriteAuthor ;
+    bp:combine bp:Or .
+
+bp:authorAndTopic a bp:RecommendationStrategy ;
+    rdfs:label "Autor*in & Thema kombiniert"@de ;
+    bp:usesProfileProperty bp:favoriteAuthor, bp:interestedIn ;
+    bp:combine bp:And .
+
 # ----- Messages -----
 
 bp:Message a rdfs:Class ;
