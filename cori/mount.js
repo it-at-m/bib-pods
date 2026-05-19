@@ -204,9 +204,9 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         try {
             const store = await loadStore()
             // show only profile-triples
+            // subject column omitted — every row is PROFILE_SUBJECT (ex:me), self-evident from context
             for (const q of store.getQuads(PROFILE_SUBJECT, null, null, null)) {
                 const tr = profileDetails.insertRow()
-                tr.insertCell().textContent = contractTerm(q.subject.value)
                 tr.insertCell().textContent = getLabel(q.predicate.value) ?? contractTerm(q.predicate.value)
                 // IRI objects: prefer the locally stored and cleaned rdfs:label; literals pass through
                 tr.insertCell().textContent = q.object.termType === "NamedNode"
