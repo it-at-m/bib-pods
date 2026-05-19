@@ -19,6 +19,7 @@
 .bp-badge[hidden] { display: none; }
 #bp-messages > summary { font-weight: bold; margin: 0.5rem 0; }
 #bp-msg-old-section { font-size: 0.85em; color: #666; }
+#bp-msg-new, #bp-msg-old { list-style: disc outside; padding-left: 1.5rem; margin: 0.5rem 0; }
 #bp-msg-new li, #bp-msg-old li { white-space: pre-line; margin-bottom: 0.4rem; }
 #bp-msg-new li::first-line, #bp-msg-old li::first-line { font-style: italic; }
 .bp-book-title {
@@ -38,7 +39,7 @@
     border: none;
     border-radius: var(--border-radius, 12px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-    max-width: min(36rem, 92vw);
+    max-width: min(48rem, 92vw);
     max-height: 92vh;
     overflow: auto;
 }
@@ -46,13 +47,23 @@
     background: rgba(0, 0, 0, 0.4);
 }
 .bp-modal-content {
-    padding: 1.5rem;
+    padding: 2rem 2.5rem;
 }
 .bp-modal-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
 }
+/* Consistent vertical rhythm between the cockpit's stacked sections (storage info,
+   recommendations button, messages, profile, switch button), without targeting each one. */
+#bp-status > * + * { margin-top: 1.5rem; }
+/* TYPO3's stylesheet drops the default <details> disclosure marker entirely
+   (via `display: block` / `list-style: none` on summary). We render our own
+   so the affordance is host-independent. */
+.bp-modal summary { list-style: none; cursor: pointer; }
+.bp-modal summary::-webkit-details-marker { display: none; }
+.bp-modal details > summary::before { content: "▶ "; display: inline-block; margin-right: 0.25rem; font-size: 0.75em; color: #666; }
+.bp-modal details[open] > summary::before { content: "▼ "; }
 .bp-modal-header h3 { margin: 0; }
 .bp-info-details {
     color: #666;
