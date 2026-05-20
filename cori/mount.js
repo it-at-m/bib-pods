@@ -456,7 +456,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         if (!window.confirm("Wirklich alle Einträge im Profil löschen? Dies kann nicht rückgängig gemacht werden.")) return
         try {
             await clearStorage()
-            renderProfile()
+            applyState()
         } catch (err) {
             console.error("[bib-pods] clearStorage failed:", err)
         }
