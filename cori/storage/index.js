@@ -55,6 +55,10 @@ export async function getStorageInfo() {
     return await getStorage().getInfo()
 }
 
+export function getStorageEntryName() {
+    return getStorage().getEntryName()
+}
+
 // --- Reading ---
 
 export async function loadAsTurtle() {

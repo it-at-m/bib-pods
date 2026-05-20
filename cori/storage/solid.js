@@ -245,3 +245,7 @@ export async function getInfo() {
         Datei: fileUri,
     }
 }
+
+export function getEntryName() {
+    return BIB_PODS_FILENAME
+}

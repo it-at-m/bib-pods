@@ -29,3 +29,7 @@ export async function save(store) {
 export function getInfo() {
     return { Speicherung: "lokal in deinem Browser" }
 }
+
+export function getEntryName() {
+    return KEY
+}

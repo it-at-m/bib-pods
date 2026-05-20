@@ -1,4 +1,4 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, isActivated, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, clearStorage, listMessages, markMessageRead, addInquiryFacts, addMessage, addTestProfile, addTestMessages, PROFILE_SUBJECT } from "./storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, isActivated, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, getStorageEntryName, clearStorage, listMessages, markMessageRead, addInquiryFacts, addMessage, addTestProfile, addTestMessages, PROFILE_SUBJECT } from "./storage/index.js"
 import { expandTerm, contractTerm, getLabel, getOne, fetchBook, getFollowUpsFor, BP, LOCAL, RDFS_LABEL, NO_IRI } from "./utils.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
 import { runRecommendations } from "./recommendations.js"
@@ -30,6 +30,46 @@ function injectStyles() {
     document.head.appendChild(style)
 }
 
+// lazy CDN load of Prism
+let prismLoaded = null
+function ensurePrism() {
+    if (prismLoaded) return prismLoaded
+    prismLoaded = (async () => {
+        const css = document.createElement("link")
+        css.rel = "stylesheet"
+        css.href = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-okaidia.min.css"
+        document.head.appendChild(css)
+        await loadScript("https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js")
+        await loadScript("https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-turtle.min.js")
+    })()
+    return prismLoaded
+}
+
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const s = document.createElement("script")
+        s.src = src
+        s.onload = () => resolve()
+        s.onerror = reject
+        document.head.appendChild(s)
+    })
+}
+
+function buildTurtleDialog() {
+    const d = document.createElement("dialog")
+    d.className = "bp-modal bp-turtle-view"
+    d.innerHTML = `
+        <div class="bp-modal-content">
+            <div class="bp-modal-header">
+                <h3>Profil-Turtle</h3>
+                <button type="button" class="bp-modal-close">Schließen</button>
+            </div>
+            <pre style="margin: 0; max-height: 60vh; overflow: auto;"><code class="language-turtle"></code></pre>
+        </div>`
+    d.querySelector(".bp-modal-close").addEventListener("click", () => d.close())
+    d.addEventListener("click", (e) => { if (e.target === d) d.close() })
+    return d
+}
 
 export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     injectStyles()
@@ -151,7 +191,9 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     const downloadBtn = dialog.querySelector("#bp-download-btn")
     const clearBtn = dialog.querySelector("#bp-clear-btn")
     const checkRecBtn = dialog.querySelector("#bp-check-recommendations-btn")
+    const profileHeading = dialog.querySelector("#bp-profile-heading")
     const solidInput = dialog.querySelector("#bp-solid-input")
+    let turtleViewDialog = null
 
     SOLID_POD_SUGGESTIONS.forEach(({ url, label }) => {
         const li = document.createElement("li")
@@ -337,6 +379,25 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         clearChoice()
         isInSolidSetup = false
         applyState()
+    })
+
+    profileHeading?.addEventListener("click", async () => {
+        if (!isStorageReady()) return
+        try {
+            await ensurePrism()
+            const ttl = await loadAsTurtle()
+            if (!turtleViewDialog) {
+                turtleViewDialog = buildTurtleDialog()
+                root.appendChild(turtleViewDialog)
+            }
+            turtleViewDialog.querySelector("h3").textContent = getStorageEntryName()
+            const code = turtleViewDialog.querySelector("code")
+            code.textContent = ttl
+            window.Prism.highlightElement(code)
+            turtleViewDialog.showModal()
+        } catch (err) {
+            console.error("[bib-pods] profile turtle view failed:", err)
+        }
     })
 
     checkRecBtn?.addEventListener("click", async () => {
