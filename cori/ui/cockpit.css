@@ -56,7 +56,7 @@
 }
 /* Consistent vertical rhythm between the cockpit's stacked sections (storage info,
    recommendations button, messages, profile, switch button), without targeting each one. */
-#bp-status > * + * { margin-top: 1.5rem; }
+#bp-status > * + * { margin-top: 1.75rem; }
 /* TYPO3's stylesheet drops the default <details> disclosure marker entirely
    (via `display: block` / `list-style: none` on summary). We render our own
    so the affordance is host-independent. */
@@ -85,19 +85,28 @@
 }
 #bp-chooser[hidden] { display: none; }
 #bp-chooser .button { align-self: flex-start; }
-/* Action buttons in a stable single column — no flex-wrap means no row
-   re-shuffle on hover/transition width changes. */
+/* Admin/dev actions render as small inline links rather than pills — they're
+   secondary affordances and shouldn't compete visually with the primary buttons. */
 .bp-actions {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-    margin: 1rem 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.25rem;
+    font-size: 0.85em;
 }
+.bp-actions .button {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #555;
+    text-decoration: underline;
+    font-weight: normal;
+    cursor: pointer;
+}
+.bp-actions .button:hover { color: #222; background: none; }
 /* Override host's .button min-width: 12rem so pills fit our compact modal. */
 .bp-actions .button,
 .bp-open-btn,
 #bp-chooser .button {
     min-width: 0;
 }
-#bp-switch-btn { margin-top: 0.5rem; }
