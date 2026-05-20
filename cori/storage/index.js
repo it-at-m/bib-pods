@@ -12,6 +12,7 @@ const BACKENDS = { local: localBackend, solid: solidBackend }
 const MESSAGE_TYPE = BP + "Message"
 const CONTENT_PRED = BP + "content"
 const READ_PRED = BP + "read"
+const REFERS_TO_ENTITY_PRED = BP + "refersToEntity"
 export const PROFILE_SUBJECT = EX + "me"
 
 // --- Backend selection ---
@@ -85,11 +86,12 @@ export const clearStorage = () => getStorage().save(newStore())
 
 // --- Messages / recommendations ---
 
-export const addMessage = (content) => mutate(store => {
+export const addMessage = (content, refersTo = null) => mutate(store => {
     const uri = mintMessageUri()
     addTripleToStore(store, uri, RDF_TYPE, MESSAGE_TYPE)
     addTripleToStore(store, uri, CONTENT_PRED, content)
     addTripleToStore(store, uri, READ_PRED, "false")
+    if (refersTo) addTripleToStore(store, uri, REFERS_TO_ENTITY_PRED, refersTo)
 })
 
 export async function listMessages() {
@@ -98,6 +100,7 @@ export async function listMessages() {
         uri,
         content: getOne(store, uri, CONTENT_PRED),
         read:    getOne(store, uri, READ_PRED) === "true",
+        refersTo: getOne(store, uri, REFERS_TO_ENTITY_PRED),
     }))
 }
 

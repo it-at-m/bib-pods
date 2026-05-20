@@ -1,5 +1,5 @@
 import { getChoice, setChoice, clearChoice, isStorageReady, isActivated, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, getStorageEntryName, clearStorage, listMessages, markMessageRead, addInquiryFacts, addMessage, addTestProfile, addTestMessages, PROFILE_SUBJECT } from "./storage/index.js"
-import { expandTerm, contractTerm, getLabel, getOne, fetchBook, getFollowUpsFor, BP, LOCAL, RDFS_LABEL, NO_IRI } from "./utils.js"
+import { expandTerm, contractTerm, getLabel, getOne, fetchBook, sopacCatalogueUrl, getFollowUpsFor, BP, LOCAL, RDFS_LABEL, NO_IRI } from "./utils.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "./storage/solid.js"
 import { runRecommendations } from "./recommendations.js"
 import bookPromptHtml from "./ui/book-prompt.html?raw"
@@ -53,6 +53,32 @@ function loadScript(src) {
         s.onerror = reject
         document.head.appendChild(s)
     })
+}
+
+function renderMessageContent(m) {
+    const fragment = document.createDocumentFragment()
+    const nl = m.content.indexOf("\n")
+    const prefix = nl < 0 ? null : m.content.slice(0, nl)
+    const body = nl < 0 ? m.content : m.content.slice(nl + 1)
+    if (prefix !== null) {
+        const span = document.createElement("span")
+        span.className = "bp-msg-prefix"
+        span.textContent = prefix
+        fragment.appendChild(span)
+        fragment.appendChild(document.createElement("br"))
+    }
+    if (m.refersTo) {
+        const a = document.createElement("a")
+        a.href = sopacCatalogueUrl(m.refersTo)
+        a.target = "_blank"
+        a.rel = "noopener"
+        a.className = "bp-msg-link"
+        a.textContent = body
+        fragment.appendChild(a)
+    } else {
+        fragment.appendChild(document.createTextNode(body))
+    }
+    return fragment
 }
 
 function buildTurtleDialog() {
@@ -265,17 +291,24 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
         }
     }
 
-    async function renderMessages() {
-        msgNewList.innerHTML = ""
-        msgOldList.innerHTML = ""
+    function resetMessagesUI() {
+        msgNewList.replaceChildren()
+        msgOldList.replaceChildren()
         badge.hidden = true
         messagesSection.hidden = true
         msgNewSection.hidden = true
         msgOldSection.hidden = true
-        if (!isStorageReady()) return
+    }
+
+    async function renderMessages() {
+        if (!isStorageReady()) return resetMessagesUI()
         try {
             const messages = await listMessages()
-            if (messages.length === 0) return
+            if (messages.length === 0) return resetMessagesUI()
+            // Clear only after the load completes — keeps the old DOM visible during
+            // the await so re-renders (e.g. "mark as read") don't flash empty.
+            msgNewList.replaceChildren()
+            msgOldList.replaceChildren()
             messagesSection.hidden = false
             const unread = messages.filter(m => !m.read)
             const readMessages = messages.filter(m => m.read)
@@ -284,10 +317,13 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
             msgOldSection.hidden = readMessages.length === 0
             for (const m of unread) {
                 const li = document.createElement("li")
-                li.textContent = m.content
-                li.style.cursor = "pointer"
-                li.title = "Als gelesen markieren"
-                li.addEventListener("click", async () => {
+                li.appendChild(renderMessageContent(m))
+                const markLink = document.createElement("a")
+                markLink.href = "#"
+                markLink.className = "bp-mark-read"
+                markLink.textContent = "Als gelesen markieren"
+                markLink.addEventListener("click", async (e) => {
+                    e.preventDefault()
                     try {
                         await markMessageRead(m.uri)
                         renderMessages()
@@ -295,17 +331,17 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
                         console.error("[bib-pods] markMessageRead failed:", err)
                     }
                 })
+                li.appendChild(document.createElement("br"))
+                li.appendChild(markLink)
                 msgNewList.appendChild(li)
             }
             for (const m of readMessages) {
                 const li = document.createElement("li")
-                li.textContent = m.content
+                li.appendChild(renderMessageContent(m))
                 msgOldList.appendChild(li)
             }
-            if (unread.length > 0) {
-                badge.textContent = unread.length > 9 ? "9+" : String(unread.length)
-                badge.hidden = false
-            }
+            badge.hidden = unread.length === 0
+            badge.textContent = unread.length > 9 ? "9+" : String(unread.length)
         } catch (err) {
             console.error("[bib-pods] messages render failed:", err)
         }
@@ -412,7 +448,7 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
             for (const { strategy, docs } of results) {
                 for (const doc of docs) {
                     const title = doc.title?.[0] ?? doc.id
-                    await addMessage(`${strategy.label}\n${title}`)
+                    await addMessage(`${strategy.label}\n${title}`, doc.id)
                     count++
                 }
             }

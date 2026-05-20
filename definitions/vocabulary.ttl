@@ -101,3 +101,8 @@ bp:read a rdf:Property ;
     rdfs:label "read" ;
     rdfs:domain bp:Message ;
     rdfs:range xsd:boolean .
+
+bp:refersToEntity a rdf:Property ;
+    rdfs:label "refers to entity" ; # e.g. SOPAC id for books
+    rdfs:domain bp:Message ;
+    rdfs:range xsd:string .

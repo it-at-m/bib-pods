@@ -135,6 +135,13 @@ export async function fetchBook(endpoint, id) {
     return json.response.docs[0]
 }
 
+// SOPAC ids in our store are "AK" + digits (e.g. AK4298169); the Munich catalogue URL
+// expects "SAK" + 8-digit zero-padded form (e.g. SAK04298169).
+export function sopacCatalogueUrl(sopacId) {
+    const digits = sopacId.replace(/^AK/, "").padStart(8, "0")
+    return `https://ssl.muenchen.de/aDISWeb/app?service=direct/0/Home/$DirectLink&sp=SOPAC&sp=SAK${digits}`
+}
+
 export async function buildDemoTurtle() {
     const store = newStore()
     addTriple(store, EX + "alice", "http://xmlns.com/foaf/0.1/knows", EX + "bob")
