@@ -12,11 +12,6 @@ const SWITCH_LABELS = {
     solid: "Aus Pod abmelden",
 }
 
-const SOLID_POD_SUGGESTIONS = [
-    { url: "https://solidcommunity.net/", label: "solidcommunity.net" },
-    { url: "https://start.inrupt.com/profile", label: "Inrupt PodSpaces" },
-]
-
 // scoped styles injected once into <head>: both hosts (docs, TYPO3) get the same look without coordinating stylesheets
 const STYLE_ID = "bp-cori-styles"
 let solrEndpointUrl = null
@@ -203,7 +198,6 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     const closeBtn = dialog.querySelector(".bp-modal-close")
     const chooser = dialog.querySelector("#bp-chooser")
     const solidSetup = dialog.querySelector("#bp-solid-setup")
-    const suggestionsList = dialog.querySelector("#bp-solid-suggestions")
     const statusBox = dialog.querySelector("#bp-status")
     const switchBtn = dialog.querySelector("#bp-switch-btn")
     const infoDetails = dialog.querySelector("#bp-info-details")
@@ -220,17 +214,6 @@ export async function mount(root, { solrEndpoint, solidCallbackUrl } = {}) {
     const profileHeading = dialog.querySelector("#bp-profile-heading")
     const solidInput = dialog.querySelector("#bp-solid-input")
     let turtleViewDialog = null
-
-    SOLID_POD_SUGGESTIONS.forEach(({ url, label }) => {
-        const li = document.createElement("li")
-        const a = document.createElement("a")
-        a.href = url
-        a.target = "_blank"
-        a.rel = "noopener"
-        a.textContent = label
-        li.appendChild(a)
-        suggestionsList.appendChild(li)
-    })
 
     let isInSolidSetup = false
 

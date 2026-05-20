@@ -41,12 +41,16 @@
 .bp-book-section-heading { font-weight: bold; margin: 0.5rem 0 0.25rem; }
 .bp-book-option { display: block; cursor: pointer; padding: 0.15rem 0; }
 .bp-book-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
-.bp-modal {
+/* dialog.bp-modal (two selectors) outranks TYPO3's higher-specificity overrides that
+   constrained the modal narrower than expected. !important on both width properties
+   guards against host !important too. */
+dialog.bp-modal {
     padding: 0;
     border: none;
     border-radius: var(--border-radius, 12px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-    max-width: min(48rem, 92vw);
+    max-width: min(60rem, 92vw) !important;
+    width: min(60rem, 92vw) !important;
     max-height: 92vh;
     overflow: auto;
 }
@@ -84,6 +88,25 @@
     padding: 0.3rem 0.6rem;
     border: 1px solid #eee;
 }
+/* Solid connect row: URL input + "Verbinden" button side-by-side. Without the input
+   overrides TYPO3 styles the field as a pill with a thick orange border, which clashes
+   with the modal and pushes the button onto its own line. */
+.bp-solid-connect {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+    margin: 0.75rem 0;
+}
+.bp-modal input[type="url"] {
+    padding: 0.4rem 0.6rem !important;
+    border: 1px solid #ccc !important;
+    border-radius: 4px !important;
+    background: #fff !important;
+    color: inherit !important;
+    font: inherit !important;
+    box-shadow: none !important;
+}
+.bp-solid-connect input { flex: 1; min-width: 0; }
 /* Chooser buttons stack vertically; the <p> still stretches naturally. */
 #bp-chooser {
     display: flex;
@@ -93,7 +116,8 @@
 #bp-chooser[hidden] { display: none; }
 #bp-chooser .button { align-self: flex-start; }
 /* Admin/dev actions render as small inline links rather than pills — they're
-   secondary affordances and shouldn't compete visually with the primary buttons. */
+   secondary affordances and shouldn't compete visually with the primary buttons.
+   The HTML omits class="button" on these so the host's pill styling never applies. */
 .bp-actions {
     display: flex;
     flex-direction: row;
@@ -101,7 +125,7 @@
     gap: 0.4rem 1.25rem;
     font-size: 0.85em;
 }
-.bp-actions .button {
+.bp-actions button {
     background: none;
     border: none;
     padding: 0;
@@ -109,10 +133,10 @@
     text-decoration: underline;
     font-weight: normal;
     cursor: pointer;
+    font: inherit;
 }
-.bp-actions .button:hover { color: #222; background: none; }
+.bp-actions button:hover { color: #222; }
 /* Override host's .button min-width: 12rem so pills fit our compact modal. */
-.bp-actions .button,
 .bp-open-btn,
 #bp-chooser .button {
     min-width: 0;
