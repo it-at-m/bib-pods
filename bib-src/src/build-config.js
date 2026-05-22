@@ -1,4 +1,4 @@
-import { parser } from "@foerderfunke/sem-ops-utils"
+import { parser } from "@foerderfunke/sem-ops-utils/core"
 import { readFileSync } from "fs"
 
 const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"

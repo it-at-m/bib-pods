@@ -16,3 +16,5 @@ typo3/.syncdetails
 
 bundle.js
 RefreshWorker.js
+
+docs/dist/

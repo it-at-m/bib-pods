@@ -4,7 +4,7 @@
 // load, then ES module caching ensures it runs exactly once across the bundle.
 import { registerVocab, registerPrefix, getVocab, contractTerm, RDFS } from "cori-sdk/utils.js"
 import libraryVocabTtl from "../definitions/vocabulary.ttl?raw"
-import { sparqlSelect } from "@foerderfunke/sem-ops-utils"
+import { sparqlSelect } from "@foerderfunke/sem-ops-utils/sparql"
 
 export const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
 export const GND = "https://d-nb.info/gnd/"

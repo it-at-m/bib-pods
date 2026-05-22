@@ -1,4 +1,4 @@
-import { addTriple, storeToTurtle, storeFromTurtles } from "@foerderfunke/sem-ops-utils"
+import { addTriple, storeToTurtle, storeFromTurtles } from "@foerderfunke/sem-ops-utils/core"
 import coriVocabTtl from "./vocab.ttl?raw"
 
 export const RDFS = "http://www.w3.org/2000/01/rdf-schema#"

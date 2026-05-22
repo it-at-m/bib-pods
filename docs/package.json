@@ -3,14 +3,8 @@
     "type": "module",
     "scripts": {
         "dev": "serve .. -l 5173 --no-clipboard",
-        "build": "npm run build:plugin && npm run build:interactions && npm run build:recommendations",
-        "build:plugin": "vite build --config vite.plugin.config.js",
-        "build:interactions": "vite build --config vite.interactions.config.js",
-        "build:recommendations": "vite build --config vite.recommendations.config.js",
-        "build:watch": "npm run build:watch:plugin & npm run build:watch:interactions & npm run build:watch:recommendations & wait",
-        "build:watch:plugin": "vite build --config vite.plugin.config.js --watch",
-        "build:watch:interactions": "vite build --config vite.interactions.config.js --watch",
-        "build:watch:recommendations": "vite build --config vite.recommendations.config.js --watch"
+        "build": "vite build",
+        "build:watch": "vite build --watch"
     },
     "devDependencies": {
         "bib-src": "file:../bib-src",

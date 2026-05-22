@@ -2,7 +2,7 @@
 // each backend (local, solid, …) implements { isReady, warmup, load, save, getInfo }.
 // Adding a new backend means dropping in a new module here and wiring it in BACKENDS.
 import { serializeTurtle, mintMessageUri, subjectsOfType, getOne, replaceProperty, getProfileSubject, CORI, RDF_TYPE } from "../utils.js"
-import { addTriple as addTripleToStore, newStore } from "@foerderfunke/sem-ops-utils"
+import { addTriple as addTripleToStore, newStore } from "@foerderfunke/sem-ops-utils/core"
 import * as localBackend from "./local-storage.js"
 import * as solidBackend from "./solid.js"
 

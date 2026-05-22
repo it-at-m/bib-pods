@@ -2,7 +2,7 @@
     "name": "bib-src",
     "type": "module",
     "dependencies": {
-        "@foerderfunke/sem-ops-utils": "0.4.0",
+        "@foerderfunke/sem-ops-utils": "0.5.0",
         "cori-sdk": "file:../cori-sdk"
     }
 }
