@@ -1,5 +1,5 @@
 {
-    "name": "cori",
+    "name": "cori-sdk",
     "type": "module",
     "dependencies": {
         "@foerderfunke/sem-ops-utils": "0.4.0",

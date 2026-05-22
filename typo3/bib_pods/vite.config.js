@@ -1,5 +1,5 @@
-import { loadConfig } from "cori/build-config.js"
-import { emitRefreshWorker } from "cori/refresh-worker-plugin.js"
+import { loadConfig } from "bib-src/src/build-config.js"
+import { emitRefreshWorker } from "cori-sdk/refresh-worker-plugin.js"
 import { defineConfig } from "vite"
 
 const config = loadConfig()

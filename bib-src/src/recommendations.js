@@ -1,11 +1,5 @@
-import { parseTurtle, contractTerm, BP, RDF_TYPE, RDFS_LABEL } from "./utils.js"
-import vocabularyTtl from "../definitions/vocabulary.ttl?raw"
-
-let vocab = null
-function getVocab() {
-    if (!vocab) vocab = parseTurtle(vocabularyTtl)
-    return vocab
-}
+import { getVocab, contractTerm, RDF_TYPE, RDFS_LABEL } from "cori-sdk/utils.js"
+import { BP } from "./vocab.js"
 
 // Returns descriptors for every bp:RecommendationStrategy in the vocab:
 //   [{ iri, label, properties: [propUri], combine: "or"|"and" }]

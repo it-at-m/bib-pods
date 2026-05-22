@@ -6,7 +6,8 @@
     "build": "vite build"
   },
   "devDependencies": {
-    "cori": "file:../../cori",
+    "bib-src": "file:../../bib-src",
+    "cori-sdk": "file:../../cori-sdk",
     "vite": "7.3.3"
   }
 }

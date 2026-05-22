@@ -1,8 +1,11 @@
 @prefix bp:      <https://www.muenchner-stadtbibliothek.de/bib-pods#> .
+@prefix cori:    <https://cori.systems/core#> .
 @prefix bf:      <http://id.loc.gov/ontologies/bibframe/> . # https://id.loc.gov/ontologies/bibframe.html
 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+
+# Library-domain extensions to the cori meta-vocabulary (cori-sdk/vocab.ttl).
 
 # ----- Profile -----
 
@@ -48,17 +51,14 @@ bp:sourceLabel a rdf:Property . # on profile entries where an IRI isn't availabl
 
 # ----- Interactions -----
 
-bp:BookSelection a bp:UserAction ;
-    rdfs:label "user clicks on a book --> follow-up questions"@en, "Nutzer*in klickt auf ein Buch - Folgefragen"@de ;
-    bp:followUpQuestion bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn .
-
-bp:UserAction a rdfs:Class ;
-    rdfs:label "interaction pattern"@en, "Interaktionsmuster"@de .
-
 bp:followUpQuestion a rdf:Property ;
     rdfs:label "follow-up question"@en ;
-    rdfs:domain bp:UserAction ;
+    rdfs:domain cori:UserAction ;
     rdfs:range rdf:Property .
+
+bp:BookSelection a cori:UserAction ;
+    rdfs:label "user clicks on a book --> follow-up questions"@en, "Nutzer*in klickt auf ein Buch - Folgefragen"@de ;
+    bp:followUpQuestion bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn .
 
 # ----- Recommendations -----
 
@@ -85,24 +85,3 @@ bp:authorAndTopic a bp:RecommendationStrategy ;
     rdfs:label "Autor*in & Thema kombiniert"@de ;
     bp:usesProfileProperty bp:favoriteAuthor, bp:interestedIn ;
     bp:combine bp:And .
-
-# ----- Messages -----
-
-bp:Message a rdfs:Class ;
-    rdfs:label "message" ;
-    rdfs:comment "A recommendation or notification shown to the user in the cockpit." .
-
-bp:content a rdf:Property ;
-    rdfs:label "content" ;
-    rdfs:domain bp:Message ;
-    rdfs:range xsd:string .
-
-bp:read a rdf:Property ;
-    rdfs:label "read" ;
-    rdfs:domain bp:Message ;
-    rdfs:range xsd:boolean .
-
-bp:refersToEntity a rdf:Property ;
-    rdfs:label "refers to entity" ; # e.g. SOPAC id for books
-    rdfs:domain bp:Message ;
-    rdfs:range xsd:string .

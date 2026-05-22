@@ -1,2 +1,2 @@
-export { getStrategies } from "cori/recommendations.js"
-export { contractTerm } from "cori/utils.js"
+export { getStrategies } from "bib-src/src/recommendations.js"
+export { contractTerm } from "cori-sdk/utils.js"

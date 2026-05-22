@@ -1,9 +1,8 @@
-import { parseTurtle, contractTerm, BP, RDF_TYPE, RDFS_LABEL } from "./utils.js"
-import vocabularyTtl from "../definitions/vocabulary.ttl?raw"
+import { contractTerm, CORI, RDF_TYPE, RDFS_LABEL, getVocab } from "cori-sdk/utils.js"
+import { BP } from "./vocab.js"
 
-export function getUserActionGraphs() {
-    const store = parseTurtle(vocabularyTtl)
-    const subjects = store.getSubjects(RDF_TYPE, BP + "UserAction", null).map(t => t.value)
+export function getUserActionGraphs(store = getVocab()) {
+    const subjects = store.getSubjects(RDF_TYPE, CORI + "UserAction", null).map(t => t.value)
     return subjects.map(iri => buildGraph(store, iri))
 }
 

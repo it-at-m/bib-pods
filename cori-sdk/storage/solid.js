@@ -2,16 +2,14 @@
 import { getResource, parseToN3, createContainer, putResource, getContainerItems, getLinkHeader, SPACE, SOLID, RDF } from "@uvdsl/solid-requests"
 import { parseTurtle, serializeTurtle } from "../utils.js"
 import { Session } from "@uvdsl/solid-oidc-client-browser"
-import { setChoice } from "./index.js"
+import { setChoice, getStorageConfig } from "./index.js"
 
 const DEBUG = true
-const log = (...args) => DEBUG && console.log("[bib-pods]", ...args)
+const log = (...args) => DEBUG && console.log("[cori]", ...args)
 
-const CLIENT_NAME = "bib-pods"
-const RETURN_URL_KEY = "bib-pods.solid.return-url"
-const WEBID_KEY = "bib-pods.solid.webid"
 const CORI_CONTAINER_NAME = "cori"
-const BIB_PODS_FILENAME = "bib-pods.ttl"
+const returnUrlKey = () => `${getStorageConfig().appName}.solid.return-url`
+const profileFilename = () => getStorageConfig().profileFilename
 
 export const currentPageUrl = () => window.location.origin + window.location.pathname
 
@@ -34,36 +32,22 @@ const workerUrl = new URL(WORKER_FILENAME, import.meta.url).href
 export function initSession({ redirectUri }) {
     if (readyPromise) return readyPromise
     session = new Session(
-        { redirect_uris: [redirectUri], client_name: CLIENT_NAME },
+        { redirect_uris: [redirectUri], client_name: getStorageConfig().appName },
         { workerUrl },
     )
     const hasAuthCode = new URLSearchParams(window.location.search).has("code")
-    readyPromise = (hasAuthCode
+    readyPromise = hasAuthCode
         ? session.handleRedirectFromLogin()
         : session.restore().catch(() => {})
-    ).then(() => {
-        // webId is a public identifier; cache it so the UI can show it across navigations
-        // and reloads even when the live session can't be restored (e.g. refresh token
-        // gone or rejected). Live tokens for CRUD are a separate concern.
-        if (session.webId) localStorage.setItem(WEBID_KEY, session.webId)
-    })
     return readyPromise
-}
-
-export function getSession() {
-    return session
 }
 
 export function isLoggedIn() {
     return session?.isActive ?? false
 }
 
-export function getWebId() {
-    return session?.webId ?? localStorage.getItem(WEBID_KEY) ?? undefined
-}
-
 export async function login(oidcIssuer, { redirectUri, returnUrl } = {}) {
-    if (returnUrl) localStorage.setItem(RETURN_URL_KEY, returnUrl)
+    if (returnUrl) localStorage.setItem(returnUrlKey(), returnUrl)
     await session.login(oidcIssuer, redirectUri)
 }
 
@@ -74,14 +58,13 @@ export async function handleSolidCallback() {
     // never initiates a login itself, so this value is never read back.
     await initSession({ redirectUri: currentPageUrl() })
     if (session.isActive) setChoice("solid")
-    const returnUrl = localStorage.getItem(RETURN_URL_KEY) ?? (window.location.origin + "/")
-    localStorage.removeItem(RETURN_URL_KEY)
+    const returnUrl = localStorage.getItem(returnUrlKey()) ?? (window.location.origin + "/")
+    localStorage.removeItem(returnUrlKey())
     window.location.replace(returnUrl)
 }
 
 export async function logout() {
     await session.logout()
-    localStorage.removeItem(WEBID_KEY)
 }
 
 // --- Discovery ---
@@ -183,15 +166,16 @@ async function doEnsurePodSetup() {
         log("cori/ created, server response status =", resp.status)
     }
 
-    const fileUri = coriUri + BIB_PODS_FILENAME
+    const filename = profileFilename()
+    const fileUri = coriUri + filename
     const coriItems = await getContainerItems(coriUri, session)
     log("cori/ container items:", coriItems)
     if (coriItems.includes(fileUri)) {
-        log("bib-pods.ttl already exists:", fileUri)
+        log(`${filename} already exists:`, fileUri)
     } else {
-        log("creating bib-pods.ttl at", fileUri)
+        log(`creating ${filename} at`, fileUri)
         const resp = await putResource(fileUri, "", session)
-        log("bib-pods.ttl created, server response status =", resp.status)
+        log(`${filename} created, server response status =`, resp.status)
     }
     log("ensurePodSetup done, file URI =", fileUri)
     return fileUri
@@ -247,5 +231,5 @@ export async function getInfo() {
 }
 
 export function getEntryName() {
-    return BIB_PODS_FILENAME
+    return profileFilename()
 }

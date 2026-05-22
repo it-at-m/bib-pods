@@ -1,32 +1,47 @@
 // Storage abstraction. The app reads/writes an RDF graph via the active backend;
 // each backend (local, solid, …) implements { isReady, warmup, load, save, getInfo }.
 // Adding a new backend means dropping in a new module here and wiring it in BACKENDS.
-import { serializeTurtle, seedProfile, seedMessages, mintMessageUri, subjectsOfType, getOne, replaceProperty, EX, BP, RDF_TYPE } from "../utils.js"
+import { serializeTurtle, mintMessageUri, subjectsOfType, getOne, replaceProperty, getProfileSubject, CORI, RDF_TYPE } from "../utils.js"
 import { addTriple as addTripleToStore, newStore } from "@foerderfunke/sem-ops-utils"
 import * as localBackend from "./local-storage.js"
 import * as solidBackend from "./solid.js"
 
-const CHOICE_KEY = "bib-pods.storage"
 const BACKENDS = { local: localBackend, solid: solidBackend }
 
-const MESSAGE_TYPE = BP + "Message"
-const CONTENT_PRED = BP + "content"
-const READ_PRED = BP + "read"
-const REFERS_TO_ENTITY_PRED = BP + "refersToEntity"
-export const PROFILE_SUBJECT = EX + "me"
+const MESSAGE_TYPE = CORI + "Message"
+const CONTENT_PRED = CORI + "content"
+const READ_PRED = CORI + "read"
+const REFERS_TO_ENTITY_PRED = CORI + "refersToEntity"
+
+// --- App-level configuration ---
+// Generic defaults; apps call setStorageConfig() to overwrite
+const storageConfig = {
+    appName: "cori",                  // localStorage key prefix + Solid OIDC consent screen identity
+    profileFilename: "profile.ttl",   // filename used inside the user's pod
+}
+
+export function setStorageConfig(partial) {
+    Object.assign(storageConfig, partial)
+}
+
+export function getStorageConfig() {
+    return Object.freeze({ ...storageConfig })
+}
+
+const choiceKey = () => `${storageConfig.appName}.storage`
 
 // --- Backend selection ---
 
 export function getChoice() {
-    return localStorage.getItem(CHOICE_KEY)
+    return localStorage.getItem(choiceKey())
 }
 
 export function setChoice(choice) {
-    localStorage.setItem(CHOICE_KEY, choice)
+    localStorage.setItem(choiceKey(), choice)
 }
 
 export function clearChoice() {
-    localStorage.removeItem(CHOICE_KEY)
+    localStorage.removeItem(choiceKey())
 }
 
 export function isActivated() {
@@ -112,12 +127,8 @@ export async function markMessageRead(uri) {
 }
 
 export const addInquiryFacts = (facts) => mutate(store => {
+    const defaultSubject = getProfileSubject()
     for (const { subject, predicate, object } of facts) {
-        addTripleToStore(store, subject ?? PROFILE_SUBJECT, predicate, object)
+        addTripleToStore(store, subject ?? defaultSubject, predicate, object)
     }
 })
-
-// --- Dev helpers, exposed via window.bibPods.* in browser console ---
-
-export const addTestProfile = () => mutate(seedProfile)
-export const addTestMessages = () => mutate(seedMessages)

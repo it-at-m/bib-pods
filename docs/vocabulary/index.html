@@ -17,29 +17,55 @@
             <span class="spacer"></span>
             <a href="https://github.com/it-at-m/bib-pods">GitHub</a>
         </nav>
-        <main>
-            <p>Source: <a href="https://github.com/it-at-m/bib-pods/blob/main/definitions/vocabulary.ttl">vocabulary.ttl</a></p>
-            <pre><code id="ttl" class="language-turtle">Loading...</code></pre>
-        </main>
+        <main id="vocab-sections">Loading...</main>
         <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-turtle.min.js"></script>
         <script>
-            async function loadTurtle() {
-                const candidates = ["../definitions/vocabulary.ttl", "../../definitions/vocabulary.ttl"]
-                for (const url of candidates) {
-                    const r = await fetch(url)
-                    if (r.ok) return r.text()
+            // The dev server (`serve ..`) and likely the Pages deployment both serve from the repo root,
+            // so these paths reach up two levels out of /docs/vocabulary/.
+            const SOURCES = [
+                {
+                    label: "cori-sdk/vocab.ttl",
+                    url: "../../cori-sdk/vocab.ttl",
+                    repoHref: "https://github.com/it-at-m/bib-pods/blob/main/cori-sdk/vocab.ttl",
+                },
+                {
+                    label: "bib-src/definitions/vocabulary.ttl",
+                    url: "../../bib-src/definitions/vocabulary.ttl",
+                    repoHref: "https://github.com/it-at-m/bib-pods/blob/main/bib-src/definitions/vocabulary.ttl",
+                },
+            ]
+
+            async function renderAll() {
+                const main = document.getElementById("vocab-sections")
+                main.replaceChildren()
+                for (const { label, url, repoHref } of SOURCES) {
+                    const heading = document.createElement("h3")
+                    heading.style.marginTop = "2.5rem"
+                    const link = document.createElement("a")
+                    link.href = repoHref
+                    link.textContent = label
+                    heading.appendChild(link)
+                    main.appendChild(heading)
+
+                    const pre = document.createElement("pre")
+                    const code = document.createElement("code")
+                    code.className = "language-turtle"
+                    pre.appendChild(code)
+                    main.appendChild(pre)
+
+                    try {
+                        const r = await fetch(url)
+                        if (!r.ok) throw new Error(`${r.status}`)
+                        code.textContent = await r.text()
+                        Prism.highlightElement(code)
+                    } catch (err) {
+                        code.textContent = `Failed to load ${url}: ${err.message}`
+                    }
                 }
-                throw new Error("vocabulary.ttl not found at any known path")
             }
 
-            loadTurtle()
-                .then(text => {
-                    const el = document.getElementById("ttl")
-                    el.textContent = text
-                    Prism.highlightElement(el)
-                })
-                .catch(err => document.getElementById("ttl").textContent = "Failed to load: " + err.message)
+            renderAll()
         </script>
     </body>
 </html>

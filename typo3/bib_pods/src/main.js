@@ -1,6 +1,6 @@
-import { mount, decorateBooks } from "cori/mount.js"
-import { isActivated } from "cori/storage/index.js"
-import { handleSolidCallback } from "cori/storage/solid.js"
+import { handleSolidCallback } from "cori-sdk/storage/solid.js"
+import { isActivated } from "cori-sdk/storage/index.js"
+import { mount } from "bib-src/src/main.js"
 
 if (document.body.hasAttribute("data-bp-solid-callback")) {
     handleSolidCallback()
@@ -14,6 +14,5 @@ if (document.body.hasAttribute("data-bp-solid-callback")) {
             solrEndpoint: __SOLR_ENDPOINT__,
             solidCallbackUrl,
         })
-        decorateBooks()
     }
 }

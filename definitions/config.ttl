@@ -1,5 +1,0 @@
-@prefix bp: <https://www.muenchner-stadtbibliothek.de/bib-pods#> .
-
-bp:config
-    bp:solrEndpoint <https://bib-pods.ngrok.dev/solr/interim-index/select> ;
-    bp:mainPath "/bib-pods" .

@@ -1,0 +1,42 @@
+@prefix cori:    <https://cori.systems/core#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+
+# ----- Interactions -----
+
+cori:UserAction a rdfs:Class ;
+    rdfs:label "interaction pattern"@en, "Interaktionsmuster"@de .
+
+# ----- Messages -----
+
+cori:Message a rdfs:Class ;
+    rdfs:label "message" ;
+    rdfs:comment "A recommendation or notification shown to the user in the cockpit." .
+
+cori:content a rdf:Property ;
+    rdfs:label "content" ;
+    rdfs:domain cori:Message ;
+    rdfs:range xsd:string .
+
+cori:read a rdf:Property ;
+    rdfs:label "read" ;
+    rdfs:domain cori:Message ;
+    rdfs:range xsd:boolean .
+
+cori:refersToEntity a rdf:Property ;
+    rdfs:label "refers to entity" ;
+    rdfs:domain cori:Message ;
+    rdfs:range xsd:string .
+
+# ----- App configuration -----
+
+cori:appName a rdf:Property ;
+    rdfs:label "app name"@en ;
+    rdfs:comment "Identifies the consuming app: used as localStorage key prefix and as the OIDC client_name on the Solid consent screen." ;
+    rdfs:range xsd:string .
+
+cori:profileFilename a rdf:Property ;
+    rdfs:label "profile filename"@en ;
+    rdfs:comment "Filename used for the user's profile resource inside the cori/ container of their Solid pod." ;
+    rdfs:range xsd:string .

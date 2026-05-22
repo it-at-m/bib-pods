@@ -52,7 +52,7 @@
             const graphs = getUserActionGraphs()
             const host = document.getElementById("graphs")
             if (graphs.length === 0) {
-                host.innerHTML = "<p>No <code>bp:UserAction</code> instances found in the vocabulary.</p>"
+                host.innerHTML = "<p>No <code>cori:UserAction</code> instances found in the vocabulary.</p>"
             }
             for (const g of graphs) {
                 const card = document.createElement("div")
