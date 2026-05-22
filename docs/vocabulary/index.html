@@ -21,25 +21,31 @@
         <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-turtle.min.js"></script>
         <script>
-            // The dev server (`serve ..`) and likely the Pages deployment both serve from the repo root,
-            // so these paths reach up two levels out of /docs/vocabulary/.
             const SOURCES = [
                 {
                     label: "cori-sdk/vocab.ttl",
-                    url: "../../cori-sdk/vocab.ttl",
+                    candidates: ["../cori-sdk/vocab.ttl", "../../cori-sdk/vocab.ttl"],
                     repoHref: "https://github.com/it-at-m/bib-pods/blob/main/cori-sdk/vocab.ttl",
                 },
                 {
                     label: "bib-src/definitions/vocabulary.ttl",
-                    url: "../../bib-src/definitions/vocabulary.ttl",
+                    candidates: ["../bib-src/definitions/vocabulary.ttl", "../../bib-src/definitions/vocabulary.ttl"],
                     repoHref: "https://github.com/it-at-m/bib-pods/blob/main/bib-src/definitions/vocabulary.ttl",
                 },
             ]
 
+            async function fetchFirstOk(candidates) {
+                for (const url of candidates) {
+                    const r = await fetch(url)
+                    if (r.ok) return r.text()
+                }
+                throw new Error("not found at " + candidates.join(" or "))
+            }
+
             async function renderAll() {
                 const main = document.getElementById("vocab-sections")
                 main.replaceChildren()
-                for (const { label, url, repoHref } of SOURCES) {
+                for (const { label, candidates, repoHref } of SOURCES) {
                     const heading = document.createElement("h3")
                     heading.style.marginTop = "2.5rem"
                     const link = document.createElement("a")
@@ -55,12 +61,10 @@
                     main.appendChild(pre)
 
                     try {
-                        const r = await fetch(url)
-                        if (!r.ok) throw new Error(`${r.status}`)
-                        code.textContent = await r.text()
+                        code.textContent = await fetchFirstOk(candidates)
                         Prism.highlightElement(code)
                     } catch (err) {
-                        code.textContent = `Failed to load ${url}: ${err.message}`
+                        code.textContent = `Failed to load ${label}: ${err.message}`
                     }
                 }
             }
