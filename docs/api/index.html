@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>api — bib-pods</title>
+        <link rel="stylesheet" href="../styles.css">
+        <style>
+            .param-label {
+                flex: 0 0 8rem;
+                line-height: 2.2;
+                color: #555;
+            }
+            #profile {
+                min-height: 14rem;
+            }
+            #profile.dragover {
+                border-color: #07a;
+                background: #f0f8ff;
+            }
+            .hint {
+                font-size: 0.85rem;
+                color: #888;
+                margin: -0.4rem 0 0.75rem 8.5rem;
+            }
+            #output h3 {
+                margin: 1.5rem 0 0.5rem;
+                font-size: 1.05rem;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="top-menu">
+            <a href="../">home</a>
+            <a href="../vocabulary/">vocabulary</a>
+            <a href="../query/">query</a>
+            <a href="../plugin/">plugin</a>
+            <a href="../interactions/">interactions</a>
+            <a href="../recommendations/">recommendations</a>
+            <a class="brand" href="../api/">api</a>
+            <span class="spacer"></span>
+            <a href="https://github.com/it-at-m/bib-pods">GitHub</a>
+        </nav>
+        <main>
+            <form id="api-form">
+                <div class="field-row">
+                    <label class="param-label" for="endpoint">endpoint</label>
+                    <input id="endpoint" type="url" placeholder="http://localhost:8985/recommendations (saved in localStorage)">
+                </div>
+                <div class="field-row">
+                    <label class="param-label" for="profile">profile (Turtle)</label>
+                    <textarea id="profile" class="code-input" rows="12"></textarea>
+                </div>
+                <p class="hint">You can also drag &amp; drop a turtle file onto the field</p>
+                <div class="field-row actions">
+                    <button type="submit">get recommendations</button>
+                </div>
+            </form>
+            <div class="output" id="output">
+                <p class="results-meta">Submit a profile to see recommendations.</p>
+            </div>
+        </main>
+        <script>
+            const ENDPOINT_KEY = "bib-pods.api-endpoint"
+            const DEFAULT_ENDPOINT = "http://localhost:8985/recommendations"
+
+            const form = document.getElementById("api-form")
+            const endpointInput = document.getElementById("endpoint")
+            const profileInput = document.getElementById("profile")
+            const output = document.getElementById("output")
+
+            endpointInput.value = localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT
+            endpointInput.addEventListener("input", () => {
+                localStorage.setItem(ENDPOINT_KEY, endpointInput.value)
+            })
+
+            profileInput.value = `@prefix bp: <https://www.muenchner-stadtbibliothek.de/bib-pods#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix gnd: <https://d-nb.info/gnd/>.
+@prefix ex: <http://example.org/>.
+
+ex:me bp:favoriteAuthor gnd:1137965894 .
+gnd:1137965894 rdfs:label "Kübra Gümüşay".`
+
+            profileInput.addEventListener("dragover", (e) => {
+                e.preventDefault()
+                profileInput.classList.add("dragover")
+            })
+            profileInput.addEventListener("dragleave", () => {
+                profileInput.classList.remove("dragover")
+            })
+            profileInput.addEventListener("drop", async (e) => {
+                e.preventDefault()
+                profileInput.classList.remove("dragover")
+                const file = e.dataTransfer.files[0]
+                if (file) profileInput.value = await file.text()
+            })
+
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault()
+                const endpoint = endpointInput.value.trim()
+                if (!endpoint) return showMessage("Set an API endpoint first.")
+                showMessage("Loading…")
+                try {
+                    const r = await fetch(endpoint, {
+                        method: "POST",
+                        headers: { "content-type": "text/turtle" },
+                        body: profileInput.value,
+                    })
+                    const data = await r.json()
+                    if (!r.ok) return showMessage("API error: " + (data.error ?? r.status))
+                    renderResults(data.results ?? [])
+                } catch (err) {
+                    showMessage("Request failed: " + err.message)
+                }
+            })
+
+            function renderResults(results) {
+                output.innerHTML = ""
+                if (results.length === 0) return showMessage("No recommendations.")
+                for (const { strategy, docs } of results) {
+                    const heading = document.createElement("h3")
+                    heading.textContent = strategy.label
+                    output.appendChild(heading)
+                    if (docs.length === 0) {
+                        const note = document.createElement("p")
+                        note.className = "results-meta"
+                        note.textContent = "(no matches)"
+                        output.appendChild(note)
+                        continue
+                    }
+                    const table = document.createElement("table")
+                    table.className = "results-table"
+                    table.innerHTML = "<thead><tr><th>Title</th><th>Author</th><th>Year</th></tr></thead>"
+                    const tbody = document.createElement("tbody")
+                    for (const doc of docs) {
+                        const tr = document.createElement("tr")
+                        tr.appendChild(cell(first(doc.title) ?? doc.id))
+                        tr.appendChild(cell(first(doc.author) ?? first(doc.author2)))
+                        tr.appendChild(cell(first(doc.publishDate)))
+                        tbody.appendChild(tr)
+                    }
+                    table.appendChild(tbody)
+                    output.appendChild(table)
+                }
+            }
+
+            function first(v) {
+                return Array.isArray(v) ? v[0] : v
+            }
+
+            function cell(text) {
+                const td = document.createElement("td")
+                td.textContent = text ?? ""
+                return td
+            }
+
+            function showMessage(text) {
+                output.innerHTML = ""
+                const p = document.createElement("p")
+                p.className = "results-meta"
+                p.textContent = text
+                output.appendChild(p)
+            }
+        </script>
+    </body>
+</html>

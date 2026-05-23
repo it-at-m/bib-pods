@@ -27,6 +27,7 @@ http.createServer(async (req, res) => {
             if (!ttl.trim()) throw new Error("empty request body; expected a profile in Turtle")
             const store = parseTurtle(ttl)
             const results = await runRecommendations(store, getProfileSubject(), SOLR, 5)
+            // or should we return the same turtle messages as result?
             send(res, 200, {
                 results: results.map(({ strategy, docs }) => ({
                     strategy: { iri: strategy.iri, label: strategy.label },
