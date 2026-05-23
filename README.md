@@ -105,6 +105,34 @@ textNode["<div align='left'>
 ```
 
 
+## Repo-Struktur
+
+- **Bibliotheks-App**: die Funktionalität, mit der Nutzer*innen ihre Profile verwalten und personalisierte Empfehlungen erhalten. Aus einer gemeinsamen Codebasis über drei Auslieferungsziele bereitgestellt: die Demo-Seiten (`docs`), die in die Bibliotheksseite eingebundene TYPO3-Extension (`typo3/bib_pods`) und die HTTP-API (`api`). Aufgeteilt in fünf Schichten (siehe unten).
+- **`interim-index/`**: Übergangslösung: ein lokaler Solr-Index aus den OAI-Katalogdaten der Münchner Stadtbibliothek. Enthält den Importer und einen Allowlist-Proxy.
+- **`solid-server/`**: lokaler Community Solid Server.
+
+### Die Schichten der Bibliotheks-App
+
+```
+  cori-sdk/          ← generic integration SDK source
+  bib-src/           ← library-domain source
+  docs/              ← assembler #1
+  typo3/bib_pods/    ← assembler #2
+  api/               ← assembler #3
+```
+
+- **`cori-sdk/`**: headless Integration-SDK. Enthält die Storage-Abstraktion mit Backends für lokalen Browser-Speicher und Solid-Pods, das Meta-Vokabular (`UserAction`, `Message`) und RDF-Hilfsfunktionen.
+- **`bib-src/`**: bibliotheksspezifische Schicht. Baut auf cori-sdk auf und stellt das Cockpit, den Buch-Prompt (Folgefragen beim Klick auf ein Buch), die Buch-Dekoration auf Katalogseiten, die Solr-gestützten Empfehlungen sowie das domänenspezifische Vokabular (`favoriteAuthor`, `RecommendationStrategy`, …) bereit.
+- **`docs/`**: arbeitet Aspekte von `bib-src` über GitHub Pages heraus im Sinne einer Dokumentation + Demo + selber experimentieren.
+- **`typo3/bib_pods/`**: bündelt `bib-src` zur TYPO3-Extension, die in der lokalen Instanz und auf der Webseite der Münchner Stadtbibliothek eingebunden wird.
+- **`api/`**: minimaler HTTP-Server, der `bib-src` headless einbindet: Nutzer*innen senden ihr Profil-Turtle und erhalten Empfehlungen als JSON zurück. Dieselbe Empfehlungslogik wie im Plugin, nur anders ausgeliefert.
+
+### Hilfsskripte
+
+- **`repo.sh {install|build|clean}`**: Sammelaktion über alle npm-Pakete im Repo: `cori-sdk`, `bib-src`, `docs`, `typo3/bib_pods`, `api`, `solid-server`, `interim-index`.
+- **`typo3/script.sh {setup|start|stop|flush}`**: lokales TYPO3-Setup via DDEV. `setup` baut eine frische TYPO3-Installation auf, mountet `bib_pods` als Extension und startet Frontend + Backend.
+- **`typo3/sync.sh {pull|push|diff}`** — spiegelt `typo3/bib_pods` zu/von einem entfernten SFTP-Pfad (für Deployments auf den TYPO3-Server der Bibliothek). Zugangsdaten kommen aus `.syncdetails` neben dem Skript.
+
 ## Contributing
 
 Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
