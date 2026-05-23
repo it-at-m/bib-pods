@@ -1,5 +1,5 @@
 import { addTriple, storeToTurtle, storeFromTurtles } from "@foerderfunke/sem-ops-utils/core"
-import coriVocabTtl from "./vocab.ttl?raw"
+import coriVocabTtl from "./vocab.ttl.js"
 
 export const RDFS = "http://www.w3.org/2000/01/rdf-schema#"
 export const RDFS_LABEL = RDFS + "label"

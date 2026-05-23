@@ -1,6 +1,13 @@
 {
     "name": "cori-sdk",
     "type": "module",
+    "bin": {
+        "ttl-to-js": "ttl-to-js.js"
+    },
+    "scripts": {
+        "ttl-to-js": "node ttl-to-js.js vocab.ttl",
+        "prepare": "npm run ttl-to-js"
+    },
     "dependencies": {
         "@foerderfunke/sem-ops-utils": "0.5.0",
         "@uvdsl/solid-oidc-client-browser": "0.2.2",

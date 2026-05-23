@@ -1,7 +1,7 @@
 // Thin composer: wires the cockpit and the book-prompt dialog together and configures
 // cori-sdk with the app's identifying strings.
 import { setStorageConfig } from "cori-sdk/storage/index.js"
-import configTtl from "../definitions/config.ttl?raw"
+import configTtl from "../definitions/config.ttl.js"
 import { CORI, parseTurtle } from "cori-sdk/utils.js"
 import { installBookPrompt } from "./book-prompt.js"
 import { installCockpit } from "./cockpit.js"

@@ -1,6 +1,10 @@
 {
     "name": "bib-src",
     "type": "module",
+    "scripts": {
+        "ttl-to-js": "node node_modules/cori-sdk/ttl-to-js.js definitions/vocabulary.ttl definitions/config.ttl",
+        "prepare": "npm run ttl-to-js"
+    },
     "dependencies": {
         "@foerderfunke/sem-ops-utils": "0.5.0",
         "cori-sdk": "file:../cori-sdk"

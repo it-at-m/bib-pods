@@ -18,6 +18,10 @@ case "${1:-}" in
         ;;
     build)
         for pkg in "${PKGS[@]}"; do
+            echo "==> npm run ttl-to-js --if-present in $pkg"
+            (cd "$SCRIPT_DIR/$pkg" && npm run ttl-to-js --if-present)
+        done
+        for pkg in "${PKGS[@]}"; do
             echo "==> npm run build --if-present in $pkg"
             (cd "$SCRIPT_DIR/$pkg" && npm run build --if-present)
         done
@@ -27,6 +31,8 @@ case "${1:-}" in
             echo "==> removing node_modules and package-lock.json in $pkg"
             rm -rf "$SCRIPT_DIR/$pkg/node_modules" "$SCRIPT_DIR/$pkg/package-lock.json"
         done
+        echo "==> removing generated *.ttl.js files"
+        find "$SCRIPT_DIR" -name node_modules -prune -o -name '*.ttl.js' -delete
         ;;
     *)
         cat <<HELP >&2
