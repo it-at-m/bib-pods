@@ -1,0 +1,11 @@
+{
+    "name": "bib-api",
+    "type": "module",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "bib-src": "file:../bib-src",
+        "cori-sdk": "file:../cori-sdk"
+    }
+}

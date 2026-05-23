@@ -2,12 +2,12 @@
 # Usage: ./repo.sh {install|build|clean}
 #
 # Operates on the npm packages in this repo:
-#   cori-sdk, bib-src, docs, typo3/bib_pods, solid-server, interim-index
+#   cori-sdk, bib-src, docs, typo3/bib_pods, api, solid-server, interim-index
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PKGS=(cori-sdk bib-src docs typo3/bib_pods solid-server interim-index)
+PKGS=(cori-sdk bib-src docs typo3/bib_pods api solid-server interim-index)
 
 case "${1:-}" in
     install)
