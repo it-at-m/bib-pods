@@ -6,7 +6,7 @@
         "prepare": "npm run ttl-to-js"
     },
     "dependencies": {
-        "@foerderfunke/sem-ops-utils": "0.5.0",
+        "@foerderfunke/sem-ops-utils": "0.5.1",
         "cori-sdk": "file:../cori-sdk"
     }
 }
