@@ -63,13 +63,15 @@ dialog.bp-modal {
 .bp-modal details > summary::before { content: "▶ "; display: inline-block; margin-right: 0.25rem; font-size: 0.75em; color: #666; }
 .bp-modal details[open] > summary::before { content: "▼ "; }
 .bp-modal-header h3 { margin: 0; }
-.bp-info-details {
+.bp-info-details,
+cori-profile .cori-profile-table {
     color: #666;
     font-size: 0.85em;
     margin: 0.5rem 0 1rem 0;
     border-collapse: collapse;
 }
-.bp-info-details td {
+.bp-info-details td,
+cori-profile .cori-profile-table td {
     vertical-align: top;
     word-break: break-all;
     padding: 0.3rem 0.6rem;
@@ -104,15 +106,18 @@ dialog.bp-modal {
 #bp-chooser .button { align-self: flex-start; }
 /* Admin/dev actions render as small inline links rather than pills — they're
    secondary affordances and shouldn't compete visually with the primary buttons.
-   The HTML omits class="button" on these so the host's pill styling never applies. */
-.bp-actions {
+   The buttons omit class="button" so the host's pill styling never applies (the
+   <cori-profile> primitive's action buttons share this treatment). */
+.bp-actions,
+cori-profile .cori-profile-actions {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
     gap: 0.4rem 1.25rem;
     font-size: 0.85em;
 }
-.bp-actions button {
+.bp-actions button,
+cori-profile .cori-profile-actions button {
     background: none;
     border: none;
     padding: 0;
@@ -122,7 +127,8 @@ dialog.bp-modal {
     cursor: pointer;
     font: inherit;
 }
-.bp-actions button:hover { color: #222; }
+.bp-actions button:hover,
+cori-profile .cori-profile-actions button:hover { color: #222; }
 /* Override host's .button min-width: 12rem so pills fit our compact modal. */
 .bp-open-btn,
 #bp-chooser .button {
@@ -198,3 +204,23 @@ dialog.bp-modal {
 /* The activation button sits between the top blocks and the activated-only ones.
    .bp-entry defaults to right-aligned (compact embed); left reads better here. */
 .bp-landing .bp-entry { text-align: left; }
+
+/* <cori-profile> is a cori-sdk light-DOM primitive — the app owns its layout/look.
+   Custom elements are inline by default, so make it a block; its table and action
+   buttons reuse the shared styles above. */
+cori-profile { display: block; }
+cori-profile .cori-profile-heading { margin-top: 0; cursor: pointer; }
+
+/* <cori-profile>'s Turtle inspector dialog — structure + Prism theme come from the
+   SDK; the app frames it to match the cockpit modal. */
+dialog.cori-turtle-view {
+    padding: 1.5rem 2rem;
+    border: none;
+    border-radius: var(--border-radius, 12px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    max-width: min(60rem, 92vw);
+    max-height: 92vh;
+}
+dialog.cori-turtle-view::backdrop { background: rgba(0, 0, 0, 0.4); }
+.cori-turtle-view-header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
+.cori-turtle-view-header h3 { margin: 0; }

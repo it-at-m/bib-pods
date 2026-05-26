@@ -1,6 +1,7 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, addTriple, loadAsTurtle, loadStore, getStorageInfo, getStorageEntryName, clearStorage, listMessages, markMessageRead, addMessage } from "cori-sdk/storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, loadStore, getStorageInfo, listMessages, markMessageRead, addMessage } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
-import { expandTerm, contractTerm, getLabel, getOne, getProfileSubject, RDFS_LABEL } from "cori-sdk/utils.js"
+import { getProfileSubject } from "cori-sdk/utils.js"
+import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateBooks, undecorateBooks } from "./decorate-books.js"
 import { runRecommendations } from "./recommendations.js"
 import { sopacCatalogueUrl } from "./catalogue.js"
@@ -23,31 +24,6 @@ function injectStyles() {
     style.id = STYLE_ID
     style.textContent = styleCss
     document.head.appendChild(style)
-}
-
-// lazy CDN load of Prism
-let prismLoaded = null
-function ensurePrism() {
-    if (prismLoaded) return prismLoaded
-    prismLoaded = (async () => {
-        const css = document.createElement("link")
-        css.rel = "stylesheet"
-        css.href = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-okaidia.min.css"
-        document.head.appendChild(css)
-        await loadScript("https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js")
-        await loadScript("https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-turtle.min.js")
-    })()
-    return prismLoaded
-}
-
-function loadScript(src) {
-    return new Promise((resolve, reject) => {
-        const s = document.createElement("script")
-        s.src = src
-        s.onload = () => resolve()
-        s.onerror = reject
-        document.head.appendChild(s)
-    })
 }
 
 function renderMessageContent(m) {
@@ -74,22 +50,6 @@ function renderMessageContent(m) {
         fragment.appendChild(document.createTextNode(body))
     }
     return fragment
-}
-
-function buildTurtleDialog() {
-    const d = document.createElement("dialog")
-    d.className = "bp-modal bp-turtle-view"
-    d.innerHTML = `
-        <div class="bp-modal-content">
-            <div class="bp-modal-header">
-                <h3>Profil-Turtle</h3>
-                <button type="button" class="bp-modal-close">Schließen</button>
-            </div>
-            <pre style="margin: 0; max-height: 60vh; overflow: auto;"><code class="language-turtle"></code></pre>
-        </div>`
-    d.querySelector(".bp-modal-close").addEventListener("click", () => d.close())
-    d.addEventListener("click", (e) => { if (e.target === d) d.close() })
-    return d
 }
 
 export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, openBookPrompt, landing = false, mainHref } = {}) {
@@ -138,10 +98,10 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     const statusBox = dialog.querySelector("#bp-status")
     const switchBtn = dialog.querySelector("#bp-switch-btn")
     const infoDetails = dialog.querySelector("#bp-info-details")
-    // The profile section and the recommendations list ("Empfehlungen") live in
-    // the landing page (landing embed only). The modal keeps the storage info,
-    // the "prüfen" button, and a link sending users to the main page.
-    const profileDetails = root.querySelector("#bp-profile-details")
+    // The profile (a cori-sdk primitive) and the recommendations list both live on
+    // the landing page (landing embed only); null in the compact embed. The modal
+    // keeps storage info, the "prüfen" button, and the link to the main page.
+    const profileEl = root.querySelector("cori-profile")
     const messagesSection = root.querySelector("#bp-messages")
     const msgOldSection = root.querySelector("#bp-msg-old-section")
     const msgNewList = root.querySelector("#bp-msg-new")
@@ -158,12 +118,7 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
         // to the main page when off it, or just scrolling to the showcase if here.
         link.addEventListener("click", () => dialog.close())
     }
-    const addTripleBtn = root.querySelector("#bp-add-triple-btn")
-    const downloadBtn = root.querySelector("#bp-download-btn")
-    const clearBtn = root.querySelector("#bp-clear-btn")
-    const profileHeading = root.querySelector("#bp-profile-heading")
     const solidInput = dialog.querySelector("#bp-solid-input")
-    let turtleViewDialog = null
 
     let isInSolidSetup = false
     // Tracks the last activation state applied to the landing's top blocks, so we
@@ -178,7 +133,7 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
         if (isChosen) {
             switchBtn.textContent = SWITCH_LABELS[choice]
             renderInfo()
-            renderProfile()
+            profileEl?.refresh()
             renderMessages()
             decorateBooks({ solrEndpoint, onBookClick: openBookPrompt })
         } else {
@@ -215,27 +170,6 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
             }
         } catch (err) {
             console.error("[bib-pods] info render failed:", err)
-        }
-    }
-
-    async function renderProfile() {
-        if (!profileDetails) return
-        profileDetails.innerHTML = ""
-        if (!isStorageReady()) return
-        try {
-            const store = await loadStore()
-            // show only profile-triples
-            // subject column omitted — every row is the default profile subject (ex:me), self-evident from context
-            for (const q of store.getQuads(getProfileSubject(), null, null, null)) {
-                const tr = profileDetails.insertRow()
-                tr.insertCell().textContent = getLabel(q.predicate.value) ?? contractTerm(q.predicate.value)
-                // IRI objects: prefer the locally stored and cleaned rdfs:label; literals pass through
-                tr.insertCell().textContent = q.object.termType === "NamedNode"
-                    ? (getOne(store, q.object.value, RDFS_LABEL) ?? contractTerm(q.object.value))
-                    : q.object.value
-            }
-        } catch (err) {
-            console.error("[bib-pods] profile render failed:", err)
         }
     }
 
@@ -309,17 +243,6 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
         }
     }
 
-    async function downloadProfile() {
-        const ttl = await loadAsTurtle()
-        const blob = new Blob([ttl], { type: "text/turtle" })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = "bib-pods.ttl"
-        a.click()
-        URL.revokeObjectURL(url)
-    }
-
     function openModal() {
         applyState()
         dialog.showModal()
@@ -379,24 +302,9 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
         applyState()
     })
 
-    profileHeading?.addEventListener("click", async () => {
-        if (!isStorageReady()) return
-        try {
-            await ensurePrism()
-            const ttl = await loadAsTurtle()
-            if (!turtleViewDialog) {
-                turtleViewDialog = buildTurtleDialog()
-                root.appendChild(turtleViewDialog)
-            }
-            turtleViewDialog.querySelector("h3").textContent = getStorageEntryName()
-            const code = turtleViewDialog.querySelector("code")
-            code.textContent = ttl
-            window.Prism.highlightElement(code)
-            turtleViewDialog.showModal()
-        } catch (err) {
-            console.error("[bib-pods] profile turtle view failed:", err)
-        }
-    })
+    // A profile mutation (add / clear) can affect more than the profile table —
+    // clearing wipes the whole store — so re-run our broader state on change.
+    profileEl?.addEventListener("cori-profile:change", () => applyState())
 
     // Triggered from the modal button and the Schaufenster link. Guards against
     // concurrent runs and shows a loading label on whichever triggers exist.
@@ -432,41 +340,6 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     }
     checkRecBtn?.addEventListener("click", () => checkRecommendations())
     checkRecLink?.addEventListener("click", (e) => { e.preventDefault(); checkRecommendations() })
-
-    addTripleBtn?.addEventListener("click", async () => {
-        const input = window.prompt("Triple eingeben (Subjekt Prädikat Objekt, durch Leerzeichen getrennt).\nPräfixe sind möglich, z.B.: ex:alice ex:knows ex:bob",)
-        if (!input) return
-        const terms = input.trim().split(/\s+/)
-        if (terms.length !== 3) {
-            console.error(`[bib-pods] expected 3 tokens (subject predicate object), got ${terms.length}:`, terms)
-            return
-        }
-        const [s, p, o] = terms.map(expandTerm)
-        try {
-            await addTriple(s, p, o)
-            renderProfile()
-        } catch (err) {
-            console.error("[bib-pods] addTriple failed:", err)
-        }
-    })
-
-    downloadBtn?.addEventListener("click", async () => {
-        try {
-            await downloadProfile()
-        } catch (err) {
-            console.error("[bib-pods] download failed:", err)
-        }
-    })
-
-    clearBtn?.addEventListener("click", async () => {
-        if (!window.confirm("Wirklich alle Einträge im Profil löschen? Dies kann nicht rückgängig gemacht werden.")) return
-        try {
-            await clearStorage()
-            applyState()
-        } catch (err) {
-            console.error("[bib-pods] clearStorage failed:", err)
-        }
-    })
 
     applyState()
 
