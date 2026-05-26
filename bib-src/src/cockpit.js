@@ -6,6 +6,7 @@ import { runRecommendations } from "./recommendations.js"
 import { sopacCatalogueUrl } from "./catalogue.js"
 import styleCss from "./ui/style.css?raw"
 import entryHtml from "./ui/entry.html?raw"
+import landingHtml from "./ui/landing.html?raw"
 import modalHtml from "./ui/modal.html?raw"
 
 const SWITCH_LABELS = {
@@ -91,7 +92,7 @@ function buildTurtleDialog() {
     return d
 }
 
-export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, openBookPrompt } = {}) {
+export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, openBookPrompt, landing = false, mainHref } = {}) {
     injectStyles()
     // Host's .button pill styling is scoped to .maincontents. On pages where
     // TYPO3 places #bp-root outside that scope (e.g. homepage header), reparent
@@ -103,7 +104,14 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     }
     // Append (don't overwrite) so siblings already attached to root — notably the
     // book-prompt dialog installed in main.js before installCockpit — survive.
-    root.insertAdjacentHTML("beforeend", entryHtml)
+    // On the main page render the full landing page and drop the open button into
+    // its activation slot; elsewhere render just the compact button.
+    if (landing) {
+        root.insertAdjacentHTML("beforeend", landingHtml)
+        root.querySelector(".bp-entry-mount").insertAdjacentHTML("beforeend", entryHtml)
+    } else {
+        root.insertAdjacentHTML("beforeend", entryHtml)
+    }
 
     // Native <dialog> opened via showModal() renders in the browser's top layer,
     // so parent overflow/z-index can't clip it regardless of DOM position. We
@@ -118,6 +126,11 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     const openBtn = root.querySelector(".bp-open-btn")
     const openBtnLabel = root.querySelector(".bp-open-btn-label")
     const badge = root.querySelector(".bp-badge")
+    // Landing-page blocks revealed only after a storage choice is made; empty in
+    // the compact embed, so the toggle below is a no-op there.
+    const activatedBlocks = root.querySelectorAll(".bp-when-activated")
+    // Present only in the landing embed (null otherwise).
+    const landingRoot = root.querySelector(".bp-landing")
 
     const closeBtn = dialog.querySelector(".bp-modal-close")
     const chooser = dialog.querySelector("#bp-chooser")
@@ -125,21 +138,37 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     const statusBox = dialog.querySelector("#bp-status")
     const switchBtn = dialog.querySelector("#bp-switch-btn")
     const infoDetails = dialog.querySelector("#bp-info-details")
-    const profileDetails = dialog.querySelector("#bp-profile-details")
-    const messagesSection = dialog.querySelector("#bp-messages")
-    const msgNewSection = dialog.querySelector("#bp-msg-new-section")
-    const msgOldSection = dialog.querySelector("#bp-msg-old-section")
-    const msgNewList = dialog.querySelector("#bp-msg-new")
-    const msgOldList = dialog.querySelector("#bp-msg-old")
+    // The profile section and the recommendations list ("Empfehlungen") live in
+    // the landing page (landing embed only). The modal keeps the storage info,
+    // the "prüfen" button, and a link sending users to the main page.
+    const profileDetails = root.querySelector("#bp-profile-details")
+    const messagesSection = root.querySelector("#bp-messages")
+    const msgOldSection = root.querySelector("#bp-msg-old-section")
+    const msgNewList = root.querySelector("#bp-msg-new")
+    const msgOldList = root.querySelector("#bp-msg-old")
     const checkRecBtn = dialog.querySelector("#bp-check-recommendations-btn")
-    const addTripleBtn = dialog.querySelector("#bp-add-triple-btn")
-    const downloadBtn = dialog.querySelector("#bp-download-btn")
-    const clearBtn = dialog.querySelector("#bp-clear-btn")
-    const profileHeading = dialog.querySelector("#bp-profile-heading")
+    const checkRecLink = root.querySelector("#bp-check-recommendations-link")
+    const recommendationsLink = dialog.querySelector("#bp-recommendations-link")
+    if (recommendationsLink) {
+        const link = recommendationsLink.querySelector("a")
+        // mainHref is absent in single-page embeds (e.g. the docs demo); the anchor
+        // alone then scrolls within the current page.
+        link.href = (mainHref ?? "") + "#bp-showcase"
+        // Close the modal first, then let the browser follow the href — navigating
+        // to the main page when off it, or just scrolling to the showcase if here.
+        link.addEventListener("click", () => dialog.close())
+    }
+    const addTripleBtn = root.querySelector("#bp-add-triple-btn")
+    const downloadBtn = root.querySelector("#bp-download-btn")
+    const clearBtn = root.querySelector("#bp-clear-btn")
+    const profileHeading = root.querySelector("#bp-profile-heading")
     const solidInput = dialog.querySelector("#bp-solid-input")
     let turtleViewDialog = null
 
     let isInSolidSetup = false
+    // Tracks the last activation state applied to the landing's top blocks, so we
+    // only collapse/expand them on the transition — not on every re-render.
+    let lastLandingActivation = null
 
     function applyState() {
         const choice = getChoice()
@@ -161,6 +190,18 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
         chooser.hidden = isChosen || isInSolidSetup
         solidSetup.hidden = isChosen || !isInSolidSetup
         statusBox.hidden = !isChosen
+        for (const block of activatedBlocks) block.hidden = !isChosen
+
+        if (landingRoot) {
+            landingRoot.classList.toggle("is-activated", isChosen)
+            // Collapse the top blocks to links on activation, expand them on
+            // deactivation — only on the transition, so a manually expanded block
+            // survives later re-renders (e.g. closing the modal).
+            if (isChosen !== lastLandingActivation) {
+                for (const d of landingRoot.querySelectorAll(".bp-collapsible")) d.open = !isChosen
+                lastLandingActivation = isChosen
+            }
+        }
     }
 
     async function renderInfo() {
@@ -178,6 +219,7 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     }
 
     async function renderProfile() {
+        if (!profileDetails) return
         profileDetails.innerHTML = ""
         if (!isStorageReady()) return
         try {
@@ -198,12 +240,12 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     }
 
     function resetMessagesUI() {
-        msgNewList.replaceChildren()
-        msgOldList.replaceChildren()
+        msgNewList?.replaceChildren()
+        msgOldList?.replaceChildren()
         badge.hidden = true
-        messagesSection.hidden = true
-        msgNewSection.hidden = true
-        msgOldSection.hidden = true
+        if (messagesSection) messagesSection.hidden = true
+        if (msgOldSection) msgOldSection.hidden = true
+        if (recommendationsLink) recommendationsLink.hidden = true
     }
 
     async function renderMessages() {
@@ -211,15 +253,31 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
         try {
             const messages = await listMessages()
             if (messages.length === 0) return resetMessagesUI()
+            const unread = messages.filter(m => !m.read)
+            const readMessages = messages.filter(m => m.read)
+
+            badge.hidden = unread.length === 0
+            badge.textContent = unread.length > 9 ? "9+" : String(unread.length)
+
+            // Modal link to the main page (where the list lives), shown whenever
+            // there are unread recommendations.
+            if (recommendationsLink) {
+                const showLink = unread.length > 0
+                recommendationsLink.hidden = !showLink
+                if (showLink) {
+                    recommendationsLink.querySelector("a").textContent =
+                        `${unread.length} neue Empfehlung${unread.length === 1 ? "" : "en"} ansehen`
+                }
+            }
+
+            // The list itself only exists in the landing embed.
+            if (!messagesSection) return
+
             // Clear only after the load completes — keeps the old DOM visible during
             // the await so re-renders (e.g. "mark as read") don't flash empty.
             msgNewList.replaceChildren()
             msgOldList.replaceChildren()
             messagesSection.hidden = false
-            const unread = messages.filter(m => !m.read)
-            const readMessages = messages.filter(m => m.read)
-            messagesSection.open = unread.length > 0
-            msgNewSection.hidden = unread.length === 0
             msgOldSection.hidden = readMessages.length === 0
             for (const m of unread) {
                 const li = document.createElement("li")
@@ -246,8 +304,6 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
                 li.appendChild(renderMessageContent(m))
                 msgOldList.appendChild(li)
             }
-            badge.hidden = unread.length === 0
-            badge.textContent = unread.length > 9 ? "9+" : String(unread.length)
         } catch (err) {
             console.error("[bib-pods] messages render failed:", err)
         }
@@ -342,11 +398,15 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
         }
     })
 
-    checkRecBtn?.addEventListener("click", async () => {
-        if (!isStorageReady()) return
-        const original = checkRecBtn.textContent
-        checkRecBtn.disabled = true
-        checkRecBtn.textContent = "Lädt …"
+    // Triggered from the modal button and the Schaufenster link. Guards against
+    // concurrent runs and shows a loading label on whichever triggers exist.
+    let recCheckBusy = false
+    async function checkRecommendations() {
+        if (!isStorageReady() || recCheckBusy) return
+        recCheckBusy = true
+        const triggers = [checkRecBtn, checkRecLink].filter(Boolean)
+        const labels = triggers.map(t => t.textContent)
+        triggers.forEach(t => { t.textContent = "Lädt …"; if ("disabled" in t) t.disabled = true })
         try {
             const profileStore = await loadStore()
             const results = await runRecommendations(profileStore, getProfileSubject(), solrEndpoint)
@@ -366,10 +426,12 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
             console.error("[bib-pods] recommendations failed:", err)
             window.alert("Empfehlungen konnten nicht geladen werden:\n" + (err?.message ?? err))
         } finally {
-            checkRecBtn.disabled = false
-            checkRecBtn.textContent = original
+            triggers.forEach((t, i) => { t.textContent = labels[i]; if ("disabled" in t) t.disabled = false })
+            recCheckBusy = false
         }
-    })
+    }
+    checkRecBtn?.addEventListener("click", () => checkRecommendations())
+    checkRecLink?.addEventListener("click", (e) => { e.preventDefault(); checkRecommendations() })
 
     addTripleBtn?.addEventListener("click", async () => {
         const input = window.prompt("Triple eingeben (Subjekt Prädikat Objekt, durch Leerzeichen getrennt).\nPräfixe sind möglich, z.B.: ex:alice ex:knows ex:bob",)
@@ -407,6 +469,13 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     })
 
     applyState()
+
+    // Arriving via the modal's recommendations link (#bp-showcase): the landing
+    // content mounts asynchronously, so the browser's on-load fragment jump can
+    // miss it — scroll once it's in place. applyState has just revealed the block.
+    if (landing && location.hash === "#bp-showcase") {
+        root.querySelector("#bp-showcase")?.scrollIntoView()
+    }
 
     return { applyState }
 }

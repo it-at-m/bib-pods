@@ -13,6 +13,8 @@ if (document.body.hasAttribute("data-bp-solid-callback")) {
         mount(document.getElementById("bp-root"), {
             solrEndpoint: __SOLR_ENDPOINT__,
             solidCallbackUrl,
+            landing: isMainPage,
+            mainHref: __MAIN_PATH__
         })
     }
 }

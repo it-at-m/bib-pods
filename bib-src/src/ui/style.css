@@ -17,7 +17,6 @@
     box-shadow: 0 0 0 2px #fff;
 }
 .bp-badge[hidden] { display: none; }
-#bp-messages > summary { font-weight: bold; margin: 0.5rem 0; }
 #bp-msg-old-section { font-size: 0.85em; color: #666; }
 #bp-msg-new, #bp-msg-old { list-style: disc outside; padding-left: 1.5rem; margin: 0.5rem 0; }
 #bp-msg-new li, #bp-msg-old li { margin-bottom: 0.4rem; }
@@ -144,3 +143,58 @@ dialog.bp-modal {
 .bp-book-section-heading { font-weight: bold; margin: 0.5rem 0 0.25rem; }
 .bp-book-option { display: block; cursor: pointer; padding: 0.15rem 0; }
 .bp-book-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+
+/* ----- Landing page ----- */
+
+/* The landing page fills the host's content column (TYPO3 .maincontents / the
+   docs <main>), which already constrains width — so we only own vertical rhythm. */
+.bp-landing { display: flex; flex-direction: column; gap: 1.5rem; }
+
+/* The landing's outlined boxes (intro, how-to, privacy, showcase, profile), per
+   the sketch. min-height gives the still-placeholder boxes a consistent presence. */
+.bp-block {
+    padding: 1.25rem 1.5rem;
+    min-height: 6rem;
+    border: 1px solid #e4e0d7;
+    border-radius: var(--border-radius, 12px);
+    background: #fff;
+}
+.bp-block > :first-child { margin-top: 0; }
+.bp-block > :last-child { margin-bottom: 0; }
+
+/* #bp-showcase is the scroll anchor for the modal's recommendations link; the
+   margin keeps it off the very top edge (clear of any host header) when scrolled to. */
+.bp-showcase { scroll-margin-top: 1rem; }
+
+/* Top blocks (intro / how-to / privacy): stacked while inactive, with their
+   <summary> acting as a plain, non-interactive heading. */
+.bp-top-blocks { display: flex; flex-direction: column; gap: 1.5rem; }
+.bp-collapsible > summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 1.17em;
+    font-weight: bold;
+}
+.bp-collapsible > summary::-webkit-details-marker { display: none; }
+.bp-landing:not(.is-activated) .bp-collapsible > summary { pointer-events: none; }
+
+/* Once activated the top blocks collapse to a row of links. A block the user
+   expands breaks onto its own full-width row and regains the box styling. */
+.bp-landing.is-activated .bp-top-blocks { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 1rem; }
+.bp-landing.is-activated .bp-collapsible:not([open]) {
+    min-height: 0;
+    padding: 0;
+    border: none;
+    background: none;
+}
+.bp-landing.is-activated .bp-collapsible:not([open]) > summary {
+    font-size: 1em;
+    font-weight: normal;
+    color: var(--contrastcolor, #d14900);
+    text-decoration: underline;
+}
+.bp-landing.is-activated .bp-collapsible[open] { flex: 1 0 100%; }
+
+/* The activation button sits between the top blocks and the activated-only ones.
+   .bp-entry defaults to right-aligned (compact embed); left reads better here. */
+.bp-landing .bp-entry { text-align: left; }
