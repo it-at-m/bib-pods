@@ -3,7 +3,6 @@ import { getProfileSubject, getLabel, getOne, contractTerm, expandTerm, RDFS_LAB
 
 // <cori-profile> — a light-DOM UI primitive. Renders the user's profile triples as
 // a table plus profile-actions, wired straight to cori-sdk storage.
-// Clicking the heading opens a raw-Turtle inspector.
 // No shadow root, no bundled styles.
 // Call refresh() to re-render after the profile changes elsewhere.
 // Bubbling event:
@@ -53,22 +52,19 @@ export class CoriProfile extends HTMLElement {
     connectedCallback() {
         if (this._table) return // render once; connect may fire again if moved in the DOM
         this.innerHTML = `
-            <h3 class="cori-profile-heading" role="button" tabindex="0">Profil</h3>
+            <h3 class="cori-profile-heading">Profil</h3>
             <table class="cori-profile-table"></table>
             <div class="cori-profile-actions">
-                <button type="button" data-action="add">Eintrag manuell hinzufügen</button>
+                <button type="button" data-action="inspect">Als Turtle anzeigen</button>
+                <button type="button" data-action="add">Eintrag hinzufügen</button>
                 <button type="button" data-action="download">Profil herunterladen</button>
                 <button type="button" data-action="clear">Profil leeren</button>
             </div>`
         this._table = this.querySelector(".cori-profile-table")
 
-        const heading = this.querySelector(".cori-profile-heading")
-        heading.addEventListener("click", () => this._inspect())
-        heading.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._inspect() }
-        })
         this.querySelector('[data-action="add"]').addEventListener("click", () => this._add())
         this.querySelector('[data-action="download"]').addEventListener("click", () => this._download())
+        this.querySelector('[data-action="inspect"]').addEventListener("click", () => this._inspect())
         this.querySelector('[data-action="clear"]').addEventListener("click", () => this._clear())
 
         this.refresh()
@@ -82,7 +78,12 @@ export class CoriProfile extends HTMLElement {
             const store = await loadStore()
             for (const q of store.getQuads(getProfileSubject(), null, null, null)) {
                 const tr = this._table.insertRow()
-                tr.insertCell().textContent = getLabel(q.predicate.value) ?? contractTerm(q.predicate.value)
+                // Predicate column shows a human label; its title surfaces the
+                // prefixed IRI (e.g. ex:knows) on hover.
+                const prefixed = contractTerm(q.predicate.value)
+                const predCell = tr.insertCell()
+                predCell.textContent = getLabel(q.predicate.value) ?? prefixed
+                predCell.title = prefixed
                 // IRI objects: prefer a locally stored rdfs:label; literals pass through.
                 tr.insertCell().textContent = q.object.termType === "NamedNode"
                     ? (getOne(store, q.object.value, RDFS_LABEL) ?? contractTerm(q.object.value))

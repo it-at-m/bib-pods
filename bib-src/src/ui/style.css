@@ -209,7 +209,7 @@ cori-profile .cori-profile-actions button:hover { color: #222; }
    Custom elements are inline by default, so make it a block; its table and action
    buttons reuse the shared styles above. */
 cori-profile { display: block; }
-cori-profile .cori-profile-heading { margin-top: 0; cursor: pointer; }
+cori-profile .cori-profile-heading { margin-top: 0; }
 
 /* <cori-profile>'s Turtle inspector dialog — structure + Prism theme come from the
    SDK; the app frames it to match the cockpit modal. */
