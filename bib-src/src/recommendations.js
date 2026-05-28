@@ -44,13 +44,21 @@ export function buildQuery(strategy, profileStore, profileSubject) {
     return { q, fq: savedIds.map(id => `-id:"${escapeSolr(id)}"`) }
 }
 
-// runs every strategy against Solr and returns: [{ strategy, docs: [...] }]
+// runs every strategy against Solr and returns:
+//   { results: [{ strategy, docs: [...] }], serverUnreachable: bool }
 // strategies that yield no clauses (profile lacks the necessary predicates) are skipped.
+// serverUnreachable lets callers tell "index down" apart from "reached Solr, but nothing
+// matched the profile": it's true when no strategy query reached Solr. When the profile
+// produced no queries at all we never touched Solr, so probe it directly — otherwise an
+// unreachable index would be indistinguishable from an empty profile.
 export async function runRecommendations(profileStore, profileSubject, solrEndpoint, limit = 3) {
-    const out = []
+    const results = []
+    let attempted = 0
+    let reached = 0
     for (const strategy of getStrategies()) {
         const query = buildQuery(strategy, profileStore, profileSubject)
         if (!query) continue
+        attempted++
         const url = solrUrl(solrEndpoint, query, limit)
         console.log(`[bib-pods] ${strategy.label}: ${url}`)
         try {
@@ -59,13 +67,29 @@ export async function runRecommendations(profileStore, profileSubject, solrEndpo
                 console.warn(`[bib-pods] ${strategy.label}: Solr ${res.status}`)
                 continue
             }
+            reached++
             const json = await res.json()
-            out.push({ strategy, docs: json.response?.docs ?? [] })
+            results.push({ strategy, docs: json.response?.docs ?? [] })
         } catch (err) {
             console.error(`[bib-pods] ${strategy.label} failed:`, err)
         }
     }
-    return out
+    const serverUnreachable = attempted > 0 ? reached === 0 : !(await solrReachable(solrEndpoint))
+    return { results, serverUnreachable }
+}
+
+// Cheap liveness check: a match-all query asking for zero rows. true only on a
+// successful (2xx) Solr response; a thrown fetch or non-OK status means unreachable.
+async function solrReachable(solrEndpoint) {
+    const url = solrUrl(solrEndpoint, { q: "*:*", fq: [] }, 0)
+    try {
+        const res = await fetch(url)
+        if (!res.ok) console.warn(`[bib-pods] Solr reachability probe: ${res.status}`)
+        return res.ok
+    } catch (err) {
+        console.error("[bib-pods] Solr reachability probe failed:", err)
+        return false
+    }
 }
 
 function getLinkedIndices(v, prop) {

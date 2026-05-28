@@ -324,7 +324,7 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
         triggers.forEach(t => { t.textContent = "Lädt …"; if ("disabled" in t) t.disabled = true })
         try {
             const profileStore = await loadStore()
-            const results = await runRecommendations(profileStore, getProfileSubject(), solrEndpoint)
+            const { results, serverUnreachable } = await runRecommendations(profileStore, getProfileSubject(), solrEndpoint)
             let count = 0
             for (const { strategy, docs } of results) {
                 for (const doc of docs) {
@@ -334,7 +334,9 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
                 }
             }
             if (count === 0) {
-                window.alert("Keine Empfehlungen gefunden — vielleicht fehlen noch Profileinträge?")
+                window.alert(serverUnreachable
+                    ? "Der Empfehlungsdienst ist zurzeit nicht erreichbar. Bitte versuche es später erneut."
+                    : "Keine Empfehlungen gefunden — vielleicht fehlen noch Profileinträge?")
             }
             applyState()
         } catch (err) {
