@@ -4,9 +4,10 @@
 import { serializeTurtle, mintMessageUri, subjectsOfType, getOne, replaceProperty, getProfileSubject, CORI, RDF_TYPE } from "../utils.js"
 import { addTriple as addTripleToStore, newStore } from "@foerderfunke/sem-ops-utils/core"
 import * as localBackend from "./local-storage.js"
+import * as sessionBackend from "./session-storage.js"
 import * as solidBackend from "./solid.js"
 
-const BACKENDS = { local: localBackend, solid: solidBackend }
+const BACKENDS = { local: localBackend, session: sessionBackend, solid: solidBackend }
 
 const MESSAGE_TYPE = CORI + "Message"
 const CONTENT_PRED = CORI + "content"
@@ -33,20 +34,25 @@ const choiceKey = () => `${storageConfig.appName}.storage`
 // --- Backend selection ---
 
 export function getChoice() {
-    return localStorage.getItem(choiceKey())
+    return sessionStorage.getItem(choiceKey()) ?? localStorage.getItem(choiceKey())
 }
 
 export function setChoice(choice) {
-    localStorage.setItem(choiceKey(), choice)
+    // "session" is itself session-scoped: closing the tab drops both the choice
+    // and the data, so the user returns to the chooser next visit. The other
+    // backends persist the choice across sessions via localStorage.
+    const [target, other] = choice === "session" ? [sessionStorage, localStorage] : [localStorage, sessionStorage]
+    other.removeItem(choiceKey())
+    target.setItem(choiceKey(), choice)
 }
 
 export function clearChoice() {
     localStorage.removeItem(choiceKey())
+    sessionStorage.removeItem(choiceKey())
 }
 
 export function isActivated() {
-    const choice = getChoice()
-    return choice === "local" || choice === "solid"
+    return Boolean(BACKENDS[getChoice()])
 }
 
 export function getStorage() {

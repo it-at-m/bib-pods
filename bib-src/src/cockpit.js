@@ -12,6 +12,7 @@ import modalHtml from "./ui/modal.html?raw"
 
 const SWITCH_LABELS = {
     local: "Speicherort wechseln",
+    session: "Speicherort wechseln",
     solid: "Aus Pod abmelden",
 }
 
@@ -127,7 +128,7 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
 
     function applyState() {
         const choice = getChoice()
-        const isChosen = choice === "local" || choice === "solid"
+        const isChosen = choice === "local" || choice === "session" || choice === "solid"
 
         openBtnLabel.textContent = isChosen ? "Bibliotheks-Pods Cockpit" : "Bibliotheks-Pods aktivieren"
         if (isChosen) {
@@ -274,6 +275,12 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     dialog.querySelector("#bp-choose-solid-btn").addEventListener("click", () => {
         isInSolidSetup = true
         applyState()
+    })
+
+    dialog.querySelector("#bp-choose-session-btn").addEventListener("click", () => {
+        setChoice("session")
+        applyState()
+        warmupStorage().catch(err => console.error("Storage warmup failed:", err))
     })
 
     dialog.querySelector("#bp-solid-cancel-btn").addEventListener("click", () => {
