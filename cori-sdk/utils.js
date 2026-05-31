@@ -1,18 +1,17 @@
 import { addTriple, storeToTurtle, storeFromTurtles } from "@foerderfunke/sem-ops-utils/core"
-import coriVocabTtl from "./vocab.ttl.js"
+import coriVocabTtl from "./definitions/vocabulary.ttl.js"
 
 export const RDFS = "http://www.w3.org/2000/01/rdf-schema#"
 export const RDFS_LABEL = RDFS + "label"
-export const EX = "http://example.org/"
 export const CORI = "https://cori.systems/core#"
 export const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 
 export function getProfileSubject() {
-    return EX + "me" // apps might want to overwrite this
+    return CORI + "defaultProfile" // apps might want to overwrite this
 }
 
 export const PREFIXES = {
-    ex: EX, cori: CORI, rdfs: RDFS,
+    cori: CORI, rdfs: RDFS,
     rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
     xsd: "http://www.w3.org/2001/XMLSchema#"
 }
@@ -54,7 +53,7 @@ export function getLabel(uri) {
 }
 
 export function mintMessageUri() {
-    return EX + "msg-" + Math.random().toString(36).slice(2, 7)
+    return CORI + "msg-" + Math.random().toString(36).slice(2, 7)
 }
 
 // --- Graph helpers ---

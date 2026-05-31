@@ -5,7 +5,7 @@
         "ttl-to-js": "ttl-to-js.js"
     },
     "scripts": {
-        "ttl-to-js": "node ttl-to-js.js vocab.ttl",
+        "ttl-to-js": "node ttl-to-js.js definitions/vocabulary.ttl",
         "prepare": "npm run ttl-to-js"
     },
     "dependencies": {

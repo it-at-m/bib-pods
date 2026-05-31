@@ -5,9 +5,11 @@
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
 
-# Library-domain extensions to the cori meta-vocabulary (cori-sdk/vocab.ttl).
+# Library-domain extensions to the cori meta-vocabulary
 
-# ----- Profile -----
+# =================================================================================
+# Profile — terms stored in a user's profile graph, validated by profile.shapes.ttl
+# =================================================================================
 
 bp:favoriteWork a rdf:Property ;
     rdfs:label "favorite work"@en, "Lieblingsbuch"@de ;
@@ -44,10 +46,13 @@ bp:savedBook a rdf:Property ; # SOPAC identifier
     rdfs:label "saved book"@en, "Gemerktes Buch"@de ;
     rdfs:range xsd:string .
 
+bp:sourceLabel a rdf:Property .
+
+# ----- Index mapping -----
+
 bp:linkedToIndex a rdf:Property .
 bp:labelField a rdf:Property .
 bp:iriField a rdf:Property .
-bp:sourceLabel a rdf:Property . # on profile entries where an IRI isn't available, this anchors it at least back to what's bp:labelField pointing to in the index
 
 # ----- Interactions -----
 

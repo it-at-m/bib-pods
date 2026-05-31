@@ -8,7 +8,22 @@
 cori:UserAction a rdfs:Class ;
     rdfs:label "interaction pattern"@en, "Interaktionsmuster"@de .
 
-# ----- Messages -----
+# =================================================================================
+# Profile — terms stored in a user's profile graph, validated by profile.shapes.ttl
+# =================================================================================
+
+cori:Profile a rdfs:Class ;
+    rdfs:label "profile"@en, "Profil"@de .
+
+cori:username a rdf:Property ;
+    rdfs:label "username"@en, "Benutzername"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range xsd:string .
+
+cori:comment a rdf:Property ;
+    rdfs:label "comment"@en, "Kommentar"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range xsd:string .
 
 cori:Message a rdfs:Class ;
     rdfs:label "message" ;

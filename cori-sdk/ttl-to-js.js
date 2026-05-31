@@ -2,7 +2,7 @@
 // Converts each given .ttl into a sibling <name>.ttl.js
 // Exposed as a `bin`, so any package depending on cori-sdk gets a `ttl-to-js` command:
 //
-//   ttl-to-js vocab.ttl definitions/config.ttl
+//   ttl-to-js definitions/vocabulary.ttl definitions/config.ttl
 //
 // Dev note: a running `vite build --watch` tracks the generated .ttl.js, not the
 // source .ttl. After editing a .ttl, re-run `npm run ttl-to-js`

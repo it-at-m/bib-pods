@@ -4,9 +4,9 @@ const profile = `
 @prefix bp: <https://www.muenchner-stadtbibliothek.de/bib-pods#>.
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 @prefix gnd: <https://d-nb.info/gnd/>.
-@prefix ex: <http://example.org/>.
+@prefix cori: <https://cori.systems/core#>.
 
-ex:me bp:favoriteAuthor gnd:1137965894 .
+cori:defaultProfile bp:favoriteAuthor gnd:1137965894 .
 gnd:1137965894 rdfs:label "Kübra Gümüşay".`
 
 const res = await fetch(ENDPOINT, {
