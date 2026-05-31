@@ -1,5 +1,9 @@
 import { loadStore, loadAsTurtle, addTriple, clearStorage, isStorageReady, getStorageEntryName } from "../storage/index.js"
-import { getProfileSubject, getLabel, getOne, contractTerm, expandTerm, RDFS_LABEL } from "../utils.js"
+import { getProfileSubject, getLabel, getOne, contractTerm, expandTerm, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
+import { validateProfile } from "../shacl.js"
+import { datasetToTurtle } from "@foerderfunke/sem-ops-utils/core"
+
+const PROFILE_TYPE = CORI + "Profile"
 
 // <cori-profile> — a light-DOM UI primitive. Renders the user's profile triples as
 // a table plus profile-actions, wired straight to cori-sdk storage.
@@ -34,15 +38,17 @@ function loadScript(src) {
     })
 }
 
-function buildTurtleDialog() {
+function buildTurtleDialog(onValidate) {
     const d = document.createElement("dialog")
     d.className = "cori-turtle-view"
     d.innerHTML = `
         <div class="cori-turtle-view-header">
             <h3 class="cori-turtle-view-title"></h3>
+            <a href="#" class="cori-turtle-view-validate">Profil validieren</a>
             <button type="button" class="cori-turtle-view-close">Schließen</button>
         </div>
         <pre class="cori-turtle-view-body" style="margin: 0; max-height: 60vh; overflow: auto;"><code class="language-turtle"></code></pre>`
+    d.querySelector(".cori-turtle-view-validate").addEventListener("click", (e) => { e.preventDefault(); onValidate() })
     d.querySelector(".cori-turtle-view-close").addEventListener("click", () => d.close())
     d.addEventListener("click", (e) => { if (e.target === d) d.close() })
     return d
@@ -77,6 +83,8 @@ export class CoriProfile extends HTMLElement {
         try {
             const store = await loadStore()
             for (const q of store.getQuads(getProfileSubject(), null, null, null)) {
+                // the structural `a cori:Profile` base triple isn't a profile fact — skip it
+                if (q.predicate.value === RDF_TYPE && q.object.value === PROFILE_TYPE) continue
                 const tr = this._table.insertRow()
                 // Predicate column shows a human label; its title surfaces the
                 // prefixed IRI (e.g. ex:knows) on hover.
@@ -100,7 +108,7 @@ export class CoriProfile extends HTMLElement {
             await ensurePrism()
             const ttl = await loadAsTurtle()
             if (!this._turtleDialog) {
-                this._turtleDialog = buildTurtleDialog()
+                this._turtleDialog = buildTurtleDialog(() => this._validate())
                 this.appendChild(this._turtleDialog)
             }
             this._turtleDialog.querySelector(".cori-turtle-view-title").textContent = getStorageEntryName()
@@ -110,6 +118,16 @@ export class CoriProfile extends HTMLElement {
             this._turtleDialog.showModal()
         } catch (err) {
             console.error("[cori-profile] turtle view failed:", err)
+        }
+    }
+
+    async _validate() {
+        if (!isStorageReady()) return
+        try {
+            const report = await validateProfile(await loadStore())
+            console.log("[cori-profile] SHACL validation report:\n" + await datasetToTurtle(report.dataset))
+        } catch (err) {
+            console.error("[cori-profile] validation failed:", err)
         }
     }
 

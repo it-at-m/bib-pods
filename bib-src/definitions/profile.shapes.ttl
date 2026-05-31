@@ -1,0 +1,46 @@
+@prefix bp:   <https://www.muenchner-stadtbibliothek.de/bib-pods#> .
+@prefix cori: <https://cori.systems/core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Library-domain profile shapes. Registered onto cori's base profile shapes via
+# registerProfileShapes(); validateProfile() validates a profile against both.
+
+bp:ProfileShape
+    a sh:NodeShape ;
+    sh:targetClass cori:Profile ;
+    sh:property [
+        sh:path bp:favoriteWork ;
+        sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )
+    ] ;
+    sh:property [
+        sh:path bp:favoriteAuthor ;
+        sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )
+    ] ;
+    sh:property [
+        sh:path bp:favoriteGenre ;
+        sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )
+    ] ;
+    sh:property [
+        sh:path bp:interestedIn ;
+        sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )
+    ] ;
+    sh:property [
+        sh:path bp:savedBook ;
+        sh:datatype xsd:string
+    ] .
+
+bp:ProfileEntityShape
+    a sh:NodeShape ;
+    sh:targetObjectsOf bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn, bp:favoriteWork ;
+    sh:property [
+        sh:path rdfs:label ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string
+    ] ;
+    sh:property [
+        sh:path bp:sourceLabel ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string
+    ] .

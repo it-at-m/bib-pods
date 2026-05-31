@@ -2,7 +2,7 @@
     "name": "bib-src",
     "type": "module",
     "scripts": {
-        "ttl-to-js": "ttl-to-js definitions/vocabulary.ttl definitions/config.ttl",
+        "ttl-to-js": "ttl-to-js definitions/vocabulary.ttl definitions/config.ttl definitions/profile.shapes.ttl",
         "prepare": "npm run ttl-to-js"
     },
     "dependencies": {

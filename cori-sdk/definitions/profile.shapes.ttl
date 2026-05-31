@@ -1,0 +1,42 @@
+@prefix cori: <https://cori.systems/core#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Base profile shapes for the parts of a profile the cori meta-vocabulary defines.
+# Library- or app-specific predicates (e.g. bp:favoriteAuthor) live in shapes that
+# the consuming app registers via registerProfileShapes(); validateProfile() fuses
+# them onto this base. A profile is a shared graph that multiple apps may extend.
+
+cori:ProfileShape
+    a sh:NodeShape ;
+    sh:targetClass cori:Profile ;
+    sh:property [
+        sh:path cori:username ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string
+    ] ;
+    sh:property [
+        sh:path cori:comment ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string
+    ] .
+
+cori:MessageShape
+    a sh:NodeShape ;
+    sh:targetClass cori:Message ;
+    sh:property [
+        sh:path cori:content ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string
+    ] ;
+    sh:property [
+        sh:path cori:read ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:boolean
+    ] ;
+    sh:property [
+        sh:path cori:refersToEntity ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string
+    ] .

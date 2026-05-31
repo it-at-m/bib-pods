@@ -9,6 +9,7 @@ import * as solidBackend from "./solid.js"
 
 const BACKENDS = { local: localBackend, session: sessionBackend, solid: solidBackend }
 
+const PROFILE_TYPE = CORI + "Profile"
 const MESSAGE_TYPE = CORI + "Message"
 const CONTENT_PRED = CORI + "content"
 const READ_PRED = CORI + "read"
@@ -97,13 +98,28 @@ export async function loadStore() {
 async function mutate(fn) {
     const store = await getStorage().load()
     await fn(store)
+    ensureProfileTyped(store)
     await getStorage().save(store)
+}
+
+// Otherwise the SHACL-shapes won't work
+function ensureProfileTyped(store) {
+    const subject = getProfileSubject()
+    if (store.getQuads(subject, null, null, null).length > 0) {
+        addTripleToStore(store, subject, RDF_TYPE, PROFILE_TYPE)
+    }
 }
 
 export const addTriple = (subject, predicate, object) =>
     mutate(store => addTripleToStore(store, subject, predicate, object))
 
-export const clearStorage = () => getStorage().save(newStore())
+export const clearStorage = () => getStorage().save(baseProfileStore())
+
+function baseProfileStore() {
+    const store = newStore()
+    addTripleToStore(store, getProfileSubject(), RDF_TYPE, PROFILE_TYPE)
+    return store
+}
 
 // --- Messages / recommendations ---
 

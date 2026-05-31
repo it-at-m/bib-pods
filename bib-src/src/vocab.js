@@ -3,7 +3,9 @@
 // to cori-sdk's getVocab() / contractTerm() — registration happens at top-level on first
 // load, then ES module caching ensures it runs exactly once across the bundle.
 import { registerVocab, registerPrefix, getVocab, contractTerm, RDFS } from "cori-sdk/utils.js"
+import { registerProfileShapes } from "cori-sdk/shacl.js"
 import libraryVocabTtl from "../definitions/vocabulary.ttl.js"
+import libraryProfileShapesTtl from "../definitions/profile.shapes.ttl.js"
 import { sparqlSelect } from "@foerderfunke/sem-ops-utils/sparql"
 
 export const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
@@ -20,6 +22,7 @@ export const NO_IRI = "https://unknown.invalid/"
 registerPrefix("bp", BP)
 registerPrefix("gnd", GND)
 registerVocab(libraryVocabTtl)
+registerProfileShapes(libraryProfileShapesTtl)
 
 // collects the follow-up questions declared on a cori:UserAction in the vocabulary
 export async function getFollowUpsFor(actionUri) {

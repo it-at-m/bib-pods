@@ -223,4 +223,5 @@ dialog.cori-turtle-view {
 }
 dialog.cori-turtle-view::backdrop { background: rgba(0, 0, 0, 0.4); }
 .cori-turtle-view-header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
-.cori-turtle-view-header h3 { margin: 0; }
+.cori-turtle-view-header h3 { margin: 0; margin-right: auto; }
+.cori-turtle-view-validate { font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
