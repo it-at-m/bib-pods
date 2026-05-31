@@ -111,7 +111,7 @@ export const addMessage = (content, refersTo = null) => mutate(store => {
     const uri = mintMessageUri()
     addTripleToStore(store, uri, RDF_TYPE, MESSAGE_TYPE)
     addTripleToStore(store, uri, CONTENT_PRED, content)
-    addTripleToStore(store, uri, READ_PRED, "false")
+    addTripleToStore(store, uri, READ_PRED, false)
     if (refersTo) addTripleToStore(store, uri, REFERS_TO_ENTITY_PRED, refersTo)
 })
 
@@ -128,7 +128,7 @@ export async function listMessages() {
 export async function markMessageRead(uri) {
     const store = await getStorage().load()
     if (getOne(store, uri, READ_PRED) === "true") return
-    replaceProperty(store, uri, READ_PRED, "true")
+    replaceProperty(store, uri, READ_PRED, true)
     await getStorage().save(store)
 }
 
