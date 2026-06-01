@@ -1,6 +1,8 @@
 {
   "type": "module",
   "scripts": {
+    "oai:harvest-all":         "node oai/harvest-all.js",
+    "oai:harvest-incremental": "node oai/harvest-incremental.js",
     "solr:up":                 "cd solr && docker compose up -d --build",
     "solr:down":               "cd solr && docker compose down",
     "solr:reset":              "cd solr && docker compose down -v",
