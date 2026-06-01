@@ -72,8 +72,9 @@ const NO_IRI = "https://unknown.invalid/"
 // authority maintaining the record; the prefix is dropped because the URI base
 // already identifies the authority. $2 names the vocabulary (gnd/lcsh/fast/…).
 // If $0 is already a full http(s) URI it passes through. MSB occasionally omits
-// $2 on 1xx/6xx but always uses (DE-588)…, so we infer GND from that prefix as a
-// dataset-specific fallback. Unresolvable entries become NO_IRI so the array stays
+// $2 on 1xx/6xx but always uses (DE-588)… — DE-588 is the MARC organization code
+// (ISIL) of the GND, the Deutsche Nationalbibliothek's authority file — so we infer
+// GND from that prefix as a dataset-specific fallback. Unresolvable entries become NO_IRI so the array stays
 // position-aligned with the parallel label array (e.g. author2_uri_str_mv[i] is
 // always about author2[i]); consumers treat NO_IRI as "no IRI for this entry".
 function authorityUris(marc, tags) {
