@@ -4,6 +4,7 @@ import fs from "fs"
 const DEFAULT_BASE_URL = "https://data-bib.muenchen.de/oai-pmh"
 const DEFAULT_SET = "DE-M36"
 const DEFAULT_METADATA_PREFIX = "marc_xml"
+const INCLUDE_DIGITAL_OFFERINGS = true
 
 export function extractResumptionToken(xml) {
     const m = xml.match(/<resumptionToken[^>]*>([^<]+)<\/resumptionToken>/)
@@ -87,7 +88,7 @@ export async function harvest({
     do {
         const url = token
             ? `${baseUrl}?verb=ListRecords&resumptionToken=${encodeURIComponent(token)}`
-            : `${baseUrl}?verb=ListRecords&metadataPrefix=${metadataPrefix}&set=${set}${from ? `&from=${from}` : ""}`
+            : `${baseUrl}?verb=ListRecords&metadataPrefix=${metadataPrefix}&set=${set}${from ? `&from=${from}` : ""}${INCLUDE_DIGITAL_OFFERINGS ? "&complete=true" : ""}`
         const xml = await fetchPage(url)
         totalBytesDownloaded += Buffer.byteLength(xml, "utf8")
 
