@@ -83,12 +83,15 @@ export async function harvest({
     let estimatedTotalBytes = null
     const startedAt = Date.now()
 
-    console.log(`Downloading OAI-PMH catalog: set=${set}, format=${metadataPrefix}${from ? `, from=${from}` : ""}`)
+    const initialUrl = `${baseUrl}?verb=ListRecords&metadataPrefix=${metadataPrefix}&set=${set}${from ? `&from=${from}` : ""}${INCLUDE_DIGITAL_OFFERINGS ? "&complete=true" : ""}`
+
+    console.log(`Downloading OAI-PMH catalog: set=${set}, format=${metadataPrefix}${from ? `, from=${from}` : ""}, digitalOfferings=${INCLUDE_DIGITAL_OFFERINGS}`)
+    console.log(`  Initial request: ${initialUrl}`)
 
     do {
         const url = token
             ? `${baseUrl}?verb=ListRecords&resumptionToken=${encodeURIComponent(token)}`
-            : `${baseUrl}?verb=ListRecords&metadataPrefix=${metadataPrefix}&set=${set}${from ? `&from=${from}` : ""}${INCLUDE_DIGITAL_OFFERINGS ? "&complete=true" : ""}`
+            : initialUrl
         const xml = await fetchPage(url)
         totalBytesDownloaded += Buffer.byteLength(xml, "utf8")
 
