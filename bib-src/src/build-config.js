@@ -2,7 +2,7 @@ import { parser } from "@foerderfunke/sem-ops-utils/core"
 import { readFileSync } from "fs"
 
 const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
-const DEV = true
+const DEV = false
 
 export function loadConfig() {
     const ttl = readFileSync(new URL("../definitions/config.ttl", import.meta.url), "utf8")
