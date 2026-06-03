@@ -128,6 +128,34 @@ function getDates(marc) {
     return years
 }
 
+// Münchner Stadtbibliothek records the medium as an RDA carrier type in 338:
+// $b = a 2-letter code, $2 = "rdacarrier". cr = Online-Ressource is the online
+// digital offering (the material complete=true pulls in); cd = CD-ROM and
+// cb = cartridge are offline digital media; the rest is non-digital (nc volume,
+// sd audio disc, vd videodisc, ss cassette, …).
+// https://id.loc.gov/vocabulary/carriers.html
+function rdaCarrierCodes(marc) {
+    return (marc.datafield ?? [])
+        .filter(f => f["@_tag"] === "338"
+            && String((f.subfield ?? []).find(s => s["@_code"] === "2")?.["#text"] ?? "") === "rdacarrier")
+        .map(f => String((f.subfield ?? []).find(s => s["@_code"] === "b")?.["#text"] ?? "").trim())
+        .filter(code => /^[a-z]{2}$/.test(code))
+}
+
+// Resolvable LoC IRI per RDA carrier code (id.loc.gov 303-redirects each, e.g.
+// cr → online resource). Mirrors authorityUris: mint IRIs at index time rather
+// than pushing bare codes onto consumers.
+const RDA_CARRIER_BASE = "https://id.loc.gov/vocabulary/carriers/"
+
+// Münchner Stadtbibliothek's own human-readable medium designator from 245$h,
+// e.g. "E-Paper", "Druckschrift", "CD", "Buch + CD". The square brackets are the
+// GMD/ISBD convention; strip them for a clean display/facet value. This is the
+// readable counterpart to the machine-readable carrier IRI in format_uri_str_mv.
+function mediumLabel(marc) {
+    const h = first(subfields(marc, "245", "h"))
+    return h ? (h.replace(/^\s*\[|\]\s*$/g, "").trim() || null) : null
+}
+
 // https://www.loc.gov/marc/bibliographic
 function mapRecord(oaiRecord) {
     const marc = oaiRecord.metadata.record[0]
@@ -137,6 +165,7 @@ function mapRecord(oaiRecord) {
     const title       = [title_short, title_sub].filter(Boolean).join(" : ") || null
 
     const dates = getDates(marc)
+    const carriers = rdaCarrierCodes(marc)
 
     return {
         id:               controlField(marc, "001"),
@@ -171,6 +200,14 @@ function mapRecord(oaiRecord) {
 
         // Physical (VuFind: physical=300abcefg)
         physical:         fieldSubfields(marc, "300", "abcefg"),
+
+        // Medium: MSB's readable 245$h label, plus the RDA carrier (338) as a
+        // resolvable IRI and an electronic flag. electronic = online resource (cr);
+        // physical carriers — incl. offline digital media like CD/DVD-ROM (cd) and
+        // cartridges (cb) — stay false.
+        format:            mediumLabel(marc),
+        format_uri_str_mv: carriers.map(c => RDA_CARRIER_BASE + c),
+        electronic:        carriers.includes("cr"),
 
         // Identifiers (VuFind: isbn=020a:773z, issn=022a)
         isbn:             [...subfields(marc, "020", "a"), ...subfields(marc, "773", "z")],
