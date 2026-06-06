@@ -15,8 +15,8 @@ setStorageConfig({
 })
 
 export async function mount(root, { solrEndpoint, solidCallbackUrl, landing, mainHref } = {}) {
-    // book-prompt must exist before the cockpit's applyState first decorates books,
-    // since decorate-books calls openBookPrompt on user click.
+    // book-prompt must exist before the cockpit's applyState first decorates cards,
+    // since decorate-cards calls openBookPrompt on user click.
     let applyState = () => {}
     const openBookPrompt = installBookPrompt(root, { onSaved: () => applyState() })
     const cockpit = await installCockpit(root, { solrEndpoint, solidCallbackUrl, openBookPrompt, landing, mainHref })

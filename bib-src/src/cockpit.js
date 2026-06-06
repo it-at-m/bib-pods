@@ -2,7 +2,7 @@ import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, loadS
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
 import { getProfileSubject } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
-import { decorateBooks, undecorateBooks } from "./decorate-books.js"
+import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations } from "./recommendations.js"
 import { sopacCatalogueUrl } from "./catalogue.js"
 import styleCss from "./ui/style.css?raw"
@@ -136,11 +136,11 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
             renderInfo()
             profileEl?.refresh()
             renderMessages()
-            decorateBooks({ solrEndpoint, onBookClick: openBookPrompt })
+            decorateCards({ solrEndpoint, onBookClick: openBookPrompt })
         } else {
             badge.hidden = true
             messagesSection.hidden = true
-            undecorateBooks()
+            undecorateCards()
         }
 
         chooser.hidden = isChosen || isInSolidSetup
