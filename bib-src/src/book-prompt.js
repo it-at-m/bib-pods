@@ -1,7 +1,7 @@
 import { BP, getFollowUpsFor, LOCAL, NO_IRI } from "./vocab.js"
 import { addInquiryFacts } from "cori-sdk/storage/index.js"
 import bookPromptHtml from "./ui/book-prompt.html?raw"
-import { RDFS_LABEL } from "cori-sdk/utils.js"
+import { RDFS_LABEL, storageErrorMessage } from "cori-sdk/utils.js"
 
 export function installBookPrompt(root, { onSaved } = {}) {
     const bookHost = document.createElement("div")
@@ -56,6 +56,7 @@ export function installBookPrompt(root, { onSaved } = {}) {
             onSaved?.()
         } catch (err) {
             console.error("[bib-pods] addInquiryFacts failed:", err)
+            window.alert("Speichern fehlgeschlagen:\n" + storageErrorMessage(err))
         }
     })
 

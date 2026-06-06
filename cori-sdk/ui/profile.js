@@ -1,5 +1,5 @@
 import { loadStore, loadAsTurtle, addTriple, clearStorage, isStorageReady, getStorageEntryName } from "../storage/index.js"
-import { getProfileSubject, getLabel, getOne, contractTerm, expandTerm, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
+import { getProfileSubject, getLabel, getOne, contractTerm, expandTerm, storageErrorMessage, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
 import { validateProfile } from "../shacl.js"
 import { datasetToTurtle } from "@foerderfunke/sem-ops-utils/core"
 
@@ -76,10 +76,18 @@ export class CoriProfile extends HTMLElement {
         this.refresh()
     }
 
+    // An empty table would read as "no profile entries" — when the storage is
+    // not connected or fails to load, say so instead.
+    _renderNotice(text) {
+        const cell = this._table.insertRow().insertCell()
+        cell.colSpan = 2
+        cell.textContent = text
+    }
+
     async refresh() {
         if (!this._table) return
         this._table.replaceChildren()
-        if (!isStorageReady()) return
+        if (!isStorageReady()) return this._renderNotice("Keine Verbindung zum Speicherort.")
         try {
             const store = await loadStore()
             for (const q of store.getQuads(getProfileSubject(), null, null, null)) {
@@ -99,11 +107,12 @@ export class CoriProfile extends HTMLElement {
             }
         } catch (err) {
             console.error("[cori-profile] render failed:", err)
+            this._renderNotice("Daten konnten gerade nicht geladen werden.")
         }
     }
 
     async _inspect() {
-        if (!isStorageReady()) return
+        if (!isStorageReady()) return window.alert("Keine Verbindung zum Speicherort.")
         try {
             await ensurePrism()
             const ttl = await loadAsTurtle()
@@ -122,7 +131,7 @@ export class CoriProfile extends HTMLElement {
     }
 
     async _validate() {
-        if (!isStorageReady()) return
+        if (!isStorageReady()) return window.alert("Keine Verbindung zum Speicherort.")
         try {
             const report = await validateProfile(await loadStore())
             console.log("[cori-profile] SHACL validation report:\n" + await datasetToTurtle(report.dataset))
@@ -146,6 +155,7 @@ export class CoriProfile extends HTMLElement {
             this._emitChange()
         } catch (err) {
             console.error("[cori-profile] addTriple failed:", err)
+            window.alert("Eintrag konnte nicht gespeichert werden:\n" + storageErrorMessage(err))
         }
     }
 
@@ -159,6 +169,7 @@ export class CoriProfile extends HTMLElement {
             URL.revokeObjectURL(url)
         } catch (err) {
             console.error("[cori-profile] download failed:", err)
+            window.alert("Profil konnte nicht heruntergeladen werden:\n" + storageErrorMessage(err))
         }
     }
 
@@ -170,6 +181,7 @@ export class CoriProfile extends HTMLElement {
             this._emitChange()
         } catch (err) {
             console.error("[cori-profile] clearStorage failed:", err)
+            window.alert("Profil konnte nicht geleert werden:\n" + storageErrorMessage(err))
         }
     }
 

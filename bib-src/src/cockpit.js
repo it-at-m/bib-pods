@@ -1,6 +1,6 @@
 import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, loadStore, getStorageInfo, listMessages, markMessageRead, addMessage } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
-import { getProfileSubject } from "cori-sdk/utils.js"
+import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations } from "./recommendations.js"
@@ -241,6 +241,7 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
             }
         } catch (err) {
             console.error("[bib-pods] messages render failed:", err)
+            resetMessagesUI()
         }
     }
 
@@ -317,7 +318,13 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     // concurrent runs and shows a loading label on whichever triggers exist.
     let recCheckBusy = false
     async function checkRecommendations() {
-        if (!isStorageReady() || recCheckBusy) return
+        if (recCheckBusy) return
+        if (!isStorageReady()) {
+            // Only the solid backend can be not-ready: the choice is persisted
+            // but the session couldn't be restored (pod offline or session expired).
+            window.alert("Keine Verbindung zum Pod. Lade die Seite neu, sobald dein Pod wieder erreichbar ist.")
+            return
+        }
         recCheckBusy = true
         const triggers = [checkRecBtn, checkRecLink].filter(Boolean)
         const labels = triggers.map(t => t.textContent)
@@ -341,7 +348,7 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
             applyState()
         } catch (err) {
             console.error("[bib-pods] recommendations failed:", err)
-            window.alert("Empfehlungen konnten nicht geladen werden:\n" + (err?.message ?? err))
+            window.alert("Empfehlungen konnten nicht geladen werden:\n" + storageErrorMessage(err))
         } finally {
             triggers.forEach((t, i) => { t.textContent = labels[i]; if ("disabled" in t) t.disabled = false })
             recCheckBusy = false

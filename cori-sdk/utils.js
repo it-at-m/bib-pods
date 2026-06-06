@@ -56,6 +56,14 @@ export function mintMessageUri() {
     return CORI + "msg-" + Math.random().toString(36).slice(2, 7)
 }
 
+// User-facing message for a failed storage operation. fetch rejects with
+// TypeError on network-level failure, i.e. the storage backend (e.g. the
+// user's pod server) is unreachable — application-level errors carry a
+// meaningful message of their own.
+export function storageErrorMessage(err) {
+    return err instanceof TypeError ? "Der Speicherort ist gerade nicht erreichbar." : (err?.message ?? String(err))
+}
+
 // --- Graph helpers ---
 
 export function subjectsOfType(store, typeIri) {

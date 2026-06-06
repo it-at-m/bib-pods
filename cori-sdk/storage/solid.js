@@ -147,7 +147,9 @@ async function discoverStorageRoot(webId) {
 // --- Pod setup ---
 
 async function doEnsurePodSetup() {
-    if (!session?.webId) throw new Error("Solid session has no webId")
+    // Surfaces to users via storageErrorMessage when a write is attempted
+    // without a restored session — keep the wording user-appropriate.
+    if (!session?.webId) throw new Error("Keine Verbindung zum Pod (Sitzung nicht aktiv)")
     const webId = session.webId
     log("ensurePodSetup: webId =", webId)
 
@@ -221,12 +223,32 @@ export async function save(store) {
 
 export async function getInfo() {
     const base = { Speicherung: "in deinem Solid Pod" }
-    if (!session?.webId) return base
-    const fileUri = await ensurePodSetup()
-    return {
-        ...base,
-        WebID: session.webId,
-        Datei: fileUri,
+    if (!session?.webId) {
+        // The storage choice is persisted but the session couldn't be restored —
+        // pod offline at page load, or the session expired. A reload re-attempts
+        // the restore from the stored refresh token.
+        return {
+            ...base,
+            Status: "nicht verbunden — Pod offline oder Sitzung abgelaufen",
+            Hinweis: "Lade die Seite neu, sobald der Pod wieder erreichbar ist.",
+        }
+    }
+    try {
+        const fileUri = await ensurePodSetup()
+        return {
+            ...base,
+            WebID: session.webId,
+            Datei: fileUri,
+        }
+    } catch (err) {
+        // The session can be active (a client-side token claim) while the pod
+        // server itself is down — fetch then rejects with a TypeError.
+        log("getInfo: pod access failed:", err)
+        return {
+            ...base,
+            WebID: session.webId,
+            Status: err instanceof TypeError ? "Pod nicht erreichbar" : "Pod-Zugriff fehlgeschlagen",
+        }
     }
 }
 
