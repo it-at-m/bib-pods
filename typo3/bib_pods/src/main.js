@@ -2,6 +2,15 @@ import { handleSolidCallback } from "cori-sdk/storage/solid.js"
 import { isActivated } from "cori-sdk/storage/index.js"
 import { mount } from "bib-src/src/main.js"
 
+// Test aid on the main page: quick links to the other pages with the plugin activated.
+function mountPluginPagesNav(root) {
+    const nav = document.createElement("p")
+    nav.style.cssText = "font-size: 0.6em; margin: 1.5em 0 0; text-align: right; color: #aaa;"
+    nav.innerHTML = ["/", "/film-kino", "/jung-erwachsen", "/nachhaltigkeit"]
+        .map(p => `<a href="${p}" style="color: inherit;">${p === "/" ? "startseite" : p.slice(1)}</a>`).join(" · ")
+    root.append(nav)
+}
+
 if (document.body.hasAttribute("data-bp-solid-callback")) {
     handleSolidCallback()
 } else {
@@ -15,6 +24,8 @@ if (document.body.hasAttribute("data-bp-solid-callback")) {
             solidCallbackUrl,
             landing: isMainPage,
             mainHref: __MAIN_PATH__
+        }).then(() => {
+            if (isMainPage) mountPluginPagesNav(document.getElementById("bp-root"))
         })
     }
 }
