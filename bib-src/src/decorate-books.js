@@ -6,15 +6,27 @@ import { fetchBook } from "./catalogue.js"
 // bare MARC 001 (e.g. "AK4250109"), so strip both.
 const SOPAC_RE = /[?&]sp=S(AK)0*(\d+)/
 
+// Onleihe mediaInfo URLs carry the divibib media id as the third dash-segment
+// after the comma; the surrounding segments are navigation/view state and vary
+// between pages, so only the media id is a stable key.
+const ONLEIHE_RE = /onleihe\.de\/.+\/mediaInfo,\d+-\d+-(\d+)-/
+
 export function decorateBooks({ solrEndpoint, onBookClick } = {}) {
     if (!isActivated()) return
     document.querySelectorAll('a[href*="sp=SAK"]').forEach(link => {
         const match = link.href.match(SOPAC_RE)
         if (match) decorateBookCard(link, match[1] + match[2], { solrEndpoint, onBookClick })
     })
-    // Pseudo books carry the already-clean id directly; used for dev/testing.
+    document.querySelectorAll('a[href*="onleihe.de"]').forEach(link => {
+        const match = link.href.match(ONLEIHE_RE)
+        if (match) decorateOnlineCard(link, match[1])
+    })
+    // Pseudo entities carry the already-clean id directly; used for dev/testing.
     document.querySelectorAll("[data-sopac-id]").forEach(el => {
         decorateBookCard(el, el.dataset.sopacId, { solrEndpoint, onBookClick })
+    })
+    document.querySelectorAll("[data-onleihe-id]").forEach(el => {
+        decorateOnlineCard(el, el.dataset.onleiheId)
     })
 }
 
@@ -24,14 +36,41 @@ export function undecorateBooks() {
 }
 
 function decorateBookCard(target, sopacId, { solrEndpoint, onBookClick }) {
-    if (target.dataset.bpDecorated) return
+    const btn = mountDecoration(target)
+    if (!btn) return
+    btn.addEventListener("click", async () => {
+        let book = null
+        try {
+            book = await fetchBook(solrEndpoint, sopacId)
+            console.log("[bib-pods] fetched book:", book)
+        } catch (err) {
+            console.error("[bib-pods] fetchBook failed:", err)
+        }
+        onBookClick?.(sopacId, book)
+    })
+}
+
+// Onleihe media get the same button, but the click only logs the divibib media
+// id — resolving it to its catalogue record in Solr is not wired up.
+function decorateOnlineCard(target, mediaId) {
+    const btn = mountDecoration(target)
+    if (!btn) return
+    btn.addEventListener("click", () => {
+        console.log("[bib-pods] divibib media id:", mediaId)
+    })
+}
+
+// Mounts the "+" button on a card and returns it; null when the card is
+// already decorated.
+function mountDecoration(target) {
+    if (target.dataset.bpDecorated) return null
     target.dataset.bpDecorated = "true"
     // msbWrap is the MSB carousel's .linkify-active wrapper around a real
-    // book — truthy means we're on production HTML, null means we're decorating
-    // a dev pseudo book (just a [data-sopac-id] element). For real books we
-    // must mount the button *outside* this wrapper (linkify can listen capture-
-    // phase / at document level, so stopPropagation isn't enough); for pseudo
-    // books we mount directly on the target.
+    // item — truthy means we're on production HTML, null means we're decorating
+    // a dev pseudo entity (just a [data-sopac-id]/[data-onleihe-id] element).
+    // For real items we must mount the button *outside* this wrapper (linkify
+    // can listen capture-phase / at document level, so stopPropagation isn't
+    // enough); for pseudo entities we mount directly on the target.
     const msbWrap = target.closest(".coverflow__wrap")
     const host = msbWrap?.parentElement ?? target
 
@@ -45,16 +84,6 @@ function decorateBookCard(target, sopacId, { solrEndpoint, onBookClick }) {
         : "margin-left: 0.5em; cursor: pointer;"
 
     if (msbWrap && getComputedStyle(host).position === "static") host.style.position = "relative"
-    btn.addEventListener("click", async () => {
-        let book = null
-        try {
-            book = await fetchBook(solrEndpoint, sopacId)
-            console.log("[bib-pods] fetched book:", book)
-        } catch (err) {
-            console.error("[bib-pods] fetchBook failed:", err)
-        }
-        onBookClick?.(sopacId, book)
-    })
     host.appendChild(btn)
 
     // For carousel books, anchor the button's center to the cover image's
@@ -72,4 +101,5 @@ function decorateBookCard(target, sopacId, { solrEndpoint, onBookClick }) {
         anchor()
         if (!img.complete) img.addEventListener("load", anchor, { once: true })
     }
+    return btn
 }
