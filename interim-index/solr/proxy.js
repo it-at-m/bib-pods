@@ -31,8 +31,14 @@ http.createServer((req, res) => {
     }
     const endpoint = req.url.match(/\/solr\/[^/]+\/(select|get)\b/)?.[1] ?? "?"
     console.log(`${ts} PASS  ${req.method} ${endpoint}`)
-    const up = http.request(UPSTREAM + req.url, {
+    // Host/port are hardcoded constants; only the path comes from the request.
+    // Even if the allowlist above is ever loosened, the upstream target stays
+    // pinned to Solr and cannot be redirected to another host.
+    const up = http.request({
+        host: UPSTREAM_HOST.split(":")[0],
+        port: UPSTREAM_HOST.split(":")[1],
         method: req.method,
+        path: req.url,
         headers: { ...req.headers, host: UPSTREAM_HOST },
     }, upRes => {
         res.writeHead(upRes.statusCode, {
