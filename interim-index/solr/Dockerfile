@@ -1,1 +1,1 @@
-FROM solr@sha256:2690f8b9bd9afe9f0b10ea5c292118aaac39419beba934a6461fe5ca559a7087
+FROM solr@sha256:79b08a5fabda917e6d840c384485a7c5d0dcfe3a0ebcb5bf65c30278c3b53ade
