@@ -5,6 +5,7 @@ import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations } from "./recommendations.js"
 import { sopacCatalogueUrl } from "./catalogue.js"
+import { installInterestPicker } from "./interests.js"
 import styleCss from "./ui/style.css?raw"
 import entryHtml from "./ui/entry.html?raw"
 import landingHtml from "./ui/landing.html?raw"
@@ -103,6 +104,8 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     // the landing page (landing embed only); null in the compact embed. The modal
     // keeps storage info, the "prüfen" button, and the link to the main page.
     const profileEl = root.querySelector("cori-profile")
+    // The "add interest" picker sits directly below the profile (landing embed only).
+    if (profileEl) installInterestPicker(profileEl, { onAdded: () => applyState() })
     const messagesSection = root.querySelector("#bp-messages")
     const msgOldSection = root.querySelector("#bp-msg-old-section")
     const msgNewList = root.querySelector("#bp-msg-new")
