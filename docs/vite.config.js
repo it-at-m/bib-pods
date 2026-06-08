@@ -17,6 +17,7 @@ export default defineConfig({
                 plugin: "plugin/src/main.js",
                 recommendations: "recommendations/src/main.js",
                 interactions: "interactions/src/main.js",
+                search: "search/src/main.js",
             },
             // Keep re-exports from recommendations/interactions entries —
             // their index.html scripts import named bindings off the bundle.

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>search — bib-pods</title>
+        <link rel="stylesheet" href="../styles.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/react-querybuilder@7.7.1/dist/query-builder.css">
+        <script src="../top-menu.js"></script>
+        <script src="../solr-results.js"></script>
+        <style>
+            main { max-width: 1500px; }
+
+            .status-bar {
+                position: sticky;
+                top: 0;
+                z-index: 50;
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                background: #fff;
+                border: 1px solid #e5e5e5;
+                border-radius: 6px;
+                padding: 0.7rem 1rem;
+                margin: 1rem 0 1.5rem;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            }
+            .examples-select { margin-left: auto; font-size: 0.9rem; padding: 0.25rem 0.4rem; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
+            .status-count { background: #fff8c5; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; }
+            .status-count:hover { background: #fdeea0; }
+            .status-count strong { font-size: 1.05rem; }
+            .status-bar details { font-size: 0.85rem; color: #888; }
+            .status-bar details input { width: 26rem; max-width: 60vw; font-size: 0.85rem; }
+
+            .panel-grid {
+                display: flex;
+                align-items: flex-start;
+                gap: 1.5rem;
+            }
+            .panel-col {
+                flex: 1;
+                min-width: 0; /* let panels shrink instead of overflowing the column */
+                display: flex;
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+            @media (max-width: 1100px) {
+                .panel-grid { flex-direction: column; }
+            }
+
+            .panel {
+                background: #fff;
+                border: 1px solid #e5e5e5;
+                border-radius: 6px;
+                padding: 1rem 1.2rem 1.2rem;
+            }
+            .panel h2 { margin: 0 0 0.3rem; font-size: 1.15rem; }
+            .panel-desc { margin: 0 0 0.8rem; font-size: 0.88rem; color: #777; }
+            .panel-status {
+                font-size: 0.8rem;
+                font-weight: 400;
+                color: #c33;
+                margin-left: 0.6rem;
+            }
+
+            /* solr panel */
+            #panel-solr .CodeMirror {
+                height: auto;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: 0.95rem;
+                padding: 0.3rem;
+            }
+            #panel-solr .CodeMirror-focused { border-color: #888; }
+            .cm-s-default .cm-field { color: #07a; }
+            .cm-s-default .cm-string { color: inherit; }
+
+            /* natural language panel */
+            #panel-nl textarea { width: 100%; box-sizing: border-box; font-size: 0.95rem; }
+            #panel-nl .grammar-hint { font-size: 0.8rem; color: #999; margin: 0.4rem 0 0; }
+
+            /* chips panel */
+            .chips-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; min-height: 2.2rem; }
+            .chip-group {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.3rem;
+                background: #f4f7fa;
+                border: 1px solid #d8e2ec;
+                border-radius: 16px;
+                padding: 0.25rem 0.6rem;
+            }
+            .chip-field { font-size: 0.8rem; color: #577; font-weight: 600; }
+            .chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.25rem;
+                background: #fff;
+                border: 1px solid #bcd;
+                border-radius: 12px;
+                padding: 0.1rem 0.5rem;
+                font-size: 0.85rem;
+            }
+            .chip button, .chip-group > button {
+                border: none;
+                background: none;
+                cursor: pointer;
+                color: #999;
+                font-size: 0.85rem;
+                padding: 0 0.1rem;
+            }
+            .chip button:hover, .chip-group > button:hover { color: #c33; }
+            .chip-group > button:hover { color: #07a; }
+            .chip-or { font-size: 0.75rem; color: #999; font-style: italic; }
+            .chip-andsep { font-size: 0.75rem; color: #bbb; font-weight: 700; }
+            .chips-row input, .chips-row select { font-size: 0.85rem; padding: 0.15rem 0.4rem; }
+            .chips-unrepresentable { color: #a66; font-size: 0.9rem; padding: 0.4rem 0; }
+
+            /* react-querybuilder */
+            #panel-rqb .queryBuilder { font-size: 0.9rem; }
+            #panel-rqb .ruleGroup { background: #f9fafb; border-color: #e0e6ec; }
+
+            /* blockly */
+            #blockly-div { height: 420px; border: 1px solid #e0e6ec; border-radius: 4px; }
+
+            /* force graph */
+            #graph-div { height: 420px; border: 1px solid #e0e6ec; border-radius: 4px; overflow: hidden; }
+
+            /* run section */
+            .run-section { margin-top: 4rem; text-align: center; scroll-margin-top: 4.5rem; }
+            .run-section h3 {
+                width: fit-content;
+                margin: 0 auto 1.2rem;
+                background: #fff8c5;
+                padding: 0.3rem 1.1rem;
+                border-radius: 6px;
+            }
+            .final-query {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+                margin-bottom: 1.2rem;
+            }
+            .final-query code {
+                max-width: 100%;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: 0.92rem;
+                background: #f4f4f4;
+                border: 1px solid #e0e0e0;
+                border-radius: 4px;
+                padding: 0.5rem 0.7rem;
+                word-break: break-all;
+            }
+            .final-query button:hover { background: #069; }
+            .results-stale { font-size: 0.85rem; color: #a6701f; margin: 0 0 0.8rem; }
+            #results.stale { opacity: 0.5; }
+        </style>
+    </head>
+    <body>
+        <top-menu current="search"></top-menu>
+        <main>
+            <h4>
+                Experimental showcase: the same Solr query expressed through different visual concepts.
+                All panels use the same internal model - edit any panel and the others follow.
+            </h4>
+
+            <div class="status-bar">
+                <span class="status-count" id="status-count" title="jump to results"></span>
+                <select id="examples" class="examples-select">
+                    <option value="">— load an example —</option>
+                </select>
+                <details>
+                    <summary>endpoint</summary>
+                    <input id="endpoint" type="url" placeholder="Solr endpoint">
+                </details>
+            </div>
+
+            <!-- Two independent columns rather than a row-aligned grid, so a
+                 short panel paired against a tall one doesn't leave a gap —
+                 each column packs its panels tightly. -->
+            <div class="panel-grid">
+            <div class="panel-col">
+            <section class="panel" id="panel-solr">
+                <h2>Solr query <span class="panel-status"></span></h2>
+                <p class="panel-desc">The ground truth, this will be sent to the server.</p>
+                <div class="panel-body"></div>
+            </section>
+
+            <section class="panel" id="panel-nl">
+                <h2>Natural language <span class="panel-status"></span></h2>
+                <p class="panel-desc">A controlled natural language - deterministic in both directions.</p>
+                <div class="panel-body">
+                    <textarea rows="2"></textarea>
+                    <p class="grammar-hint">Pattern: <code>field is [not] value</code>, alternatives via <code>author is Bach or Telemann</code>, combined with <code>and</code>/<code>or</code> and parentheses. Fields: author, title, genre, topic, publishDate.</p>
+                </div>
+            </section>
+
+            <section class="panel" id="panel-chips">
+                <h2>Filter chips <span class="panel-status"></span></h2>
+                <p class="panel-desc">Limited to flat AND-of-ORs. When the query nests deeper or uses NOT, chips can't express it.</p>
+                <div class="panel-body"></div>
+            </section>
+
+            <section class="panel" id="panel-blockly">
+                <h2>Blockly <span class="panel-status"></span></h2>
+                <p class="panel-desc">Scratch-style blocks: drag conditions into AND/OR groups. Pull new blocks in from the left.</p>
+                <div class="panel-body"><div id="blockly-div"></div></div>
+            </section>
+            </div>
+
+            <div class="panel-col">
+            <section class="panel" id="panel-rqb">
+                <h2>react-querybuilder <span class="panel-status"></span></h2>
+                <p class="panel-desc">A nested rule builder - inspired by the meanwhile dated jQuery QueryBuilder.</p>
+                <div class="panel-body"><div id="rqb-root"></div></div>
+            </section>
+
+            <section class="panel" id="panel-graph">
+                <h2>Force graph (view only) <span class="panel-status"></span></h2>
+                <p class="panel-desc">The internal model graph, rendered as-is.</p>
+                <div class="panel-body">
+                    <div id="graph-div"></div>
+                </div>
+            </section>
+            </div>
+            </div>
+
+            <section class="run-section">
+                <h3>Run it</h3>
+                <div class="final-query">
+                    <code id="final-query"></code>
+                    <button id="submit-query">search</button>
+                </div>
+                <p id="results-stale" class="results-stale" hidden>Query changed since the last search — press search to refresh the table.</p>
+                <solr-results id="results"></solr-results>
+            </section>
+        </main>
+
+        <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/solr/solr.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/blockly.min.js"></script>
+        <script type="module" src="src/app.js"></script>
+    </body>
+</html>

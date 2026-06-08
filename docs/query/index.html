@@ -110,6 +110,7 @@
             }
         </style>
         <script src="../top-menu.js"></script>
+        <script src="../solr-results.js"></script>
     </head>
     <body>
         <top-menu current="query"></top-menu>
@@ -156,16 +157,7 @@
                 <pre><code id="result" class="language-json">Enter a Solr query above.</code></pre>
             </div>
             <div class="output hidden" data-mode="table">
-                <p class="results-meta" id="table-meta">Run a query first.</p>
-                <table class="results-table">
-                    <thead id="table-head"></thead>
-                    <tbody id="table-body"></tbody>
-                </table>
-            </div>
-            <div class="pagination" id="pagination" hidden>
-                <button type="button" id="prev-page">← prev</button>
-                <span id="page-info"></span>
-                <button type="button" id="next-page">next →</button>
+                <solr-results id="table-results" placeholder="Run a query first."></solr-results>
             </div>
         </main>
         <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
@@ -331,13 +323,7 @@
             const rowsInput = document.getElementById("rows")
             const paramsTextarea = document.getElementById("params")
             const result = document.getElementById("result")
-            const tableMeta = document.getElementById("table-meta")
-            const tableHead = document.getElementById("table-head")
-            const tableBody = document.getElementById("table-body")
-            const pagination = document.getElementById("pagination")
-            const pageInfo = document.getElementById("page-info")
-            const prevBtn = document.getElementById("prev-page")
-            const nextBtn = document.getElementById("next-page")
+            const tableResults = document.getElementById("table-results")
             const timing = document.getElementById("timing")
 
             const DEFAULT_ROWS = 10
@@ -394,64 +380,6 @@
                 })
             })
 
-            function renderTable(data) {
-                const docs = data && data.response && data.response.docs ? data.response.docs : []
-                const numFound = data && data.response ? data.response.numFound : 0
-                tableHead.innerHTML = ""
-                tableBody.innerHTML = ""
-                if (!docs.length) {
-                    tableMeta.textContent = `No documents in response (${numFound} results). Try the raw view.`
-                    return
-                }
-                const HIDDEN = new Set(["_version_", "_root_"])
-                const keys = []
-                for (const d of docs) for (const k of Object.keys(d)) if (!HIDDEN.has(k) && !keys.includes(k)) keys.push(k)
-                tableMeta.textContent = `${numFound} results · showing ${docs.length}`
-                const headRow = document.createElement("tr")
-                for (const k of keys) {
-                    const th = document.createElement("th")
-                    th.textContent = k
-                    headRow.appendChild(th)
-                }
-                tableHead.appendChild(headRow)
-                for (const d of docs) {
-                    const tr = document.createElement("tr")
-                    for (const k of keys) {
-                        const td = document.createElement("td")
-                        const full = formatCell(d[k])
-                        if (full.length > 200) {
-                            td.textContent = full.slice(0, 200) + "…"
-                            td.title = full
-                        } else {
-                            td.textContent = full
-                        }
-                        tr.appendChild(td)
-                    }
-                    tableBody.appendChild(tr)
-                }
-            }
-
-            function formatCell(v) {
-                if (v == null) return ""
-                if (Array.isArray(v)) return v.join(", ")
-                if (typeof v === "object") return JSON.stringify(v)
-                return String(v)
-            }
-
-            function updatePagination(data) {
-                const numFound = data && data.response ? data.response.numFound : 0
-                if (numFound <= currentRows) {
-                    pagination.hidden = true
-                    return
-                }
-                const from = currentStart + 1
-                const to = Math.min(currentStart + currentRows, numFound)
-                pageInfo.textContent = `${from}–${to} of ${numFound} results`
-                prevBtn.disabled = currentStart === 0
-                nextBtn.disabled = to >= numFound
-                pagination.hidden = false
-            }
-
             async function runQuery() {
                 const endpoint = endpointInput.value.trim()
                 if (!endpoint) {
@@ -480,10 +408,7 @@
                 }
                 const url = `${endpoint}?${params.toString()}`
                 result.textContent = "Loading…"
-                tableMeta.textContent = "Loading…"
-                tableHead.innerHTML = ""
-                tableBody.innerHTML = ""
-                pagination.hidden = true
+                tableResults.message("Loading…")
                 timing.textContent = "…"
                 const requestStart = performance.now()
                 try {
@@ -498,27 +423,21 @@
                         result.textContent = text
                     }
                     if (parsed) {
-                        renderTable(parsed)
-                        updatePagination(parsed)
+                        tableResults.render(parsed)
                     } else {
-                        tableMeta.textContent = "Response is not JSON. Try the raw view."
+                        tableResults.message("Response is not JSON. Try the raw view.")
                     }
                 } catch (err) {
                     result.textContent = "Request failed: " + err.message
-                    tableMeta.textContent = "Request failed."
+                    tableResults.message("Request failed.")
                 } finally {
                     const ms = performance.now() - requestStart
                     timing.textContent = ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`
                 }
             }
 
-            prevBtn.addEventListener("click", () => {
-                currentStart = Math.max(0, currentStart - currentRows)
-                runQuery()
-            })
-
-            nextBtn.addEventListener("click", () => {
-                currentStart = currentStart + currentRows
+            tableResults.addEventListener("page", (e) => {
+                currentStart = e.detail.start
                 runQuery()
             })
 
@@ -624,14 +543,9 @@
                 try { parsed = JSON.parse(t.rawResult) } catch {}
                 if (parsed) {
                     try { Prism.highlightElement(result) } catch {}
-                    renderTable(parsed)
-                    updatePagination(parsed)
+                    tableResults.render(parsed)
                 } else {
-                    tableMeta.textContent = "Run a query first."
-                    tableHead.innerHTML = ""
-                    tableBody.innerHTML = ""
-                    pagination.hidden = true
-                    pageInfo.textContent = ""
+                    tableResults.message("Run a query first.")
                 }
                 document.querySelectorAll(".tab").forEach(x => {
                     x.classList.toggle("active", x.dataset.mode === t.outputMode)

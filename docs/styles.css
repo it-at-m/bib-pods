@@ -172,6 +172,11 @@ button:hover {
     margin: 1rem 0;
 }
 
+/* the explicit display would otherwise override the hidden attribute */
+.pagination[hidden] {
+    display: none;
+}
+
 .pagination button {
     min-width: auto;
     padding: 0.3rem 0.8rem;
