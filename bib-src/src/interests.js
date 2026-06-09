@@ -53,10 +53,6 @@ export async function installInterestPicker(profileEl, { onAdded } = {}) {
     const wrap = document.createElement("div")
     wrap.className = "bp-add-interest"
 
-    const label = document.createElement("label")
-    label.htmlFor = "bp-interest-select"
-    label.textContent = "Interesse hinzufügen"
-
     const select = document.createElement("select")
     select.id = "bp-interest-select"
     select.add(placeholderOption("Lädt …"))
@@ -84,12 +80,12 @@ export async function installInterestPicker(profileEl, { onAdded } = {}) {
         }
     })
 
-    wrap.append(label, select)
+    wrap.append(select)
     profileEl.insertAdjacentElement("afterend", wrap)
 
     try {
         const categories = await loadCategories()
-        select.replaceChildren(placeholderOption("Kategorie auswählen …"))
+        select.replaceChildren(placeholderOption("Interesse hinzufügen"))
         for (const c of categories) select.add(new Option(c.label, c.iri))
     } catch (err) {
         console.error("[bib-pods] interest categories failed to load:", err)
