@@ -141,6 +141,20 @@ export async function listMessages() {
     }))
 }
 
+// Add a message unless an identical one already exists (same content AND refersTo,
+// regardless of read state) — so re-running recommendations never duplicates a card.
+export const addMessageIfNew = (content, refersTo = null) => mutate(store => {
+    const exists = subjectsOfType(store, MESSAGE_TYPE).some(uri =>
+        getOne(store, uri, CONTENT_PRED) === content &&
+        (getOne(store, uri, REFERS_TO_ENTITY_PRED) ?? null) === refersTo)
+    if (exists) return
+    const uri = mintMessageUri()
+    addTripleToStore(store, uri, RDF_TYPE, MESSAGE_TYPE)
+    addTripleToStore(store, uri, CONTENT_PRED, content)
+    addTripleToStore(store, uri, READ_PRED, false)
+    if (refersTo) addTripleToStore(store, uri, REFERS_TO_ENTITY_PRED, refersTo)
+})
+
 export async function markMessageRead(uri) {
     const store = await getStorage().load()
     if (getOne(store, uri, READ_PRED) === "true") return

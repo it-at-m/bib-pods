@@ -19,9 +19,10 @@ export function readDisabledStrategies(profileStore) {
 }
 
 // Returns descriptors for every bp:RecommendationStrategy in the vocab:
-//   [{ iri, label, comment, engine, properties: [propUri], combine: "or"|"and" }]
+//   [{ iri, label, comment, engine, properties: [propUri], combine }]
 // engine defaults to the Solr backend when unspecified; comment is the strategy's
-// rdfs:comment (e.g. a note about external network traffic) or null.
+// rdfs:comment (e.g. a note about external network traffic) or null; combine is the
+// combinator descriptor { iri, label, space } or null (see combinatorOf).
 export function getStrategies() {
     const v = getVocab()
     return v.getSubjects(RDF_TYPE, BP + "RecommendationStrategy", null).map(t => {
@@ -32,9 +33,20 @@ export function getStrategies() {
             comment: germanText(v, iri, RDFS + "comment"),
             engine: v.getObjects(iri, BP + "engine", null)[0]?.value ?? BP + "SolrEngine",
             properties: v.getObjects(iri, BP + "usesProfileProperty", null).map(o => o.value),
-            combine: v.getObjects(iri, BP + "combine", null)[0]?.value === BP + "And" ? "and" : "or",
+            combine: combinatorOf(v, iri),
         }
     })
+}
+
+// The strategy's bp:combine value as { iri, label, space }, or null if unset. `space` is
+// the combinator kind's label ("logisch" for Boolean joins, "Vektorraum" for embedding
+// aggregation) — so callers can show that the linkage isn't symbolic but vector-space.
+function combinatorOf(v, iri) {
+    const c = v.getObjects(iri, BP + "combine", null)[0]?.value
+    if (!c) return null
+    const kind = v.getObjects(c, RDF_TYPE, null).map(o => o.value)
+        .find(t => t === BP + "VectorCombinator" || t === BP + "LogicalCombinator")
+    return { iri: c, label: labelOf(v, c), space: kind ? labelOf(v, kind) : null }
 }
 
 // Builds the Solr query for a strategy from the user's profile store.
@@ -59,7 +71,7 @@ export function buildQuery(strategy, profileStore, profileSubject) {
         }
     }
     if (factGroups.length === 0) return null
-    const op = strategy.combine === "and" ? " AND " : " OR "
+    const op = strategy.combine?.iri === BP + "And" ? " AND " : " OR "
     const q = factGroups.length === 1 ? factGroups[0] : `(${factGroups.join(op)})`
     const savedIds = profileStore.getObjects(profileSubject, BP + "savedBook", null).map(o => o.value)
     return { q, fq: savedIds.map(id => `-id:"${escapeSolr(id)}"`) }
@@ -97,7 +109,12 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
                 console.log(`[bib-pods] ${strategy.label}: ${basedOn.length}/${savedIds.length} gemerkte Bücher genutzt`, { basedOn, notInCollection })
                 const docs = points.map(p => {
                     const meta = p.payload?.metadata ?? {}
-                    return { id: meta.akkey ? "AK" + meta.akkey : p.id, title: meta.title ? [meta.title] : undefined }
+                    return {
+                        id: meta.akkey ? "AK" + meta.akkey : p.id,
+                        title: meta.title ? [meta.title] : undefined,
+                        author: meta.author ? [meta.author] : undefined,
+                        isbn: meta.isbn ? [meta.isbn] : undefined,
+                    }
                 })
                 results.push({ strategy, docs })
             } catch (err) {

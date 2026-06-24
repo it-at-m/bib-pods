@@ -17,17 +17,29 @@
     box-shadow: 0 0 0 2px #fff;
 }
 .bp-badge[hidden] { display: none; }
-#bp-msg-old-section { font-size: 0.85em; color: #666; }
-#bp-msg-new, #bp-msg-old { list-style: disc outside; padding-left: 1.5rem; margin: 0.5rem 0; }
-#bp-msg-new li, #bp-msg-old li { margin-bottom: 0.4rem; }
-/* Strategy label rendered above the book title: gray + italic, not clickable. */
-.bp-msg-prefix { color: #666; font-style: italic; }
-/* Message body links to the catalogue inherit the surrounding text style — only the
-   hover state hints they're clickable. */
-.bp-msg-link { color: inherit; text-decoration: none; }
-.bp-msg-link:hover { text-decoration: underline; }
-.bp-mark-read { font-size: 0.85em; color: #888; text-decoration: underline; }
-.bp-mark-read:hover { color: #555; }
+
+/* ----- Schaufenster lanes (one carousel per recommendation strategy) ----- */
+/* Lanes stack vertically and scroll within the Schaufenster if they overflow; each
+   lane's cards scroll horizontally. Cover images are placeholders for now. */
+#bp-lanes { display: flex; flex-direction: column; gap: 1.6rem; max-height: 70vh; overflow-y: auto; }
+#bp-lanes[hidden] { display: none; }
+.bp-lane-title { margin: 0 0 0.6rem; font-size: 0.95em; }
+/* vertical padding gives the covers' drop shadows room (the track clips its overflow) */
+.bp-lane-track { display: flex; gap: 0.9rem; overflow-x: auto; padding: 0.4rem 0.2rem 1rem; scroll-snap-type: x proximity; }
+.bp-card { position: relative; flex: 0 0 5.5rem; width: 5.5rem; scroll-snap-align: start; }
+.bp-card-cover { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background: #e7e7e7;
+    border-radius: 6px; margin-bottom: 0.5rem; box-shadow: 0 3px 9px rgba(0, 0, 0, 0.32); transition: box-shadow 0.15s ease; }
+.bp-card:hover .bp-card-cover { box-shadow: 0 7px 20px rgba(0, 0, 0, 0.45); }
+/* "seen" control over the cover's top-right corner; subtle until hovered */
+.bp-card-dismiss { position: absolute; top: 0.35rem; right: 0.35rem; width: 1.1rem; height: 1.1rem; padding: 0;
+    display: flex; align-items: center; justify-content: center; border: none; border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5); color: #fff; font-size: 0.65rem; line-height: 1; cursor: pointer; opacity: 0.55; }
+.bp-card-dismiss:hover, .bp-card-dismiss:focus { opacity: 1; }
+/* clamp the title to keep cards short */
+.bp-card-title { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    font-weight: 600; font-size: 0.72em; line-height: 1.3; color: inherit; text-decoration: none; }
+.bp-card-title:hover { text-decoration: underline; }
+.bp-card-author { font-size: 0.68em; color: #555; margin-top: 0.2rem; }
 /* dialog.bp-modal (two selectors) outranks TYPO3's higher-specificity overrides that
    constrained the modal narrower than expected. !important on both width properties
    guards against host !important too. */

@@ -33,6 +33,10 @@
                 font-size: 0.85em;
                 color: #555;
             }
+            .combine-space {
+                font-family: system-ui, sans-serif;
+                color: #999;
+            }
         </style>
         <script src="../top-menu.js"></script>
     </head>
@@ -81,7 +85,17 @@
 
                 const combineCell = document.createElement("td")
                 combineCell.className = "combine"
-                combineCell.textContent = s.combine.toUpperCase()
+                if (s.combine) {
+                    combineCell.textContent = s.combine.label
+                    if (s.combine.space) {
+                        const space = document.createElement("span")
+                        space.className = "combine-space"
+                        space.textContent = ` (${s.combine.space})`
+                        combineCell.appendChild(space)
+                    }
+                } else {
+                    combineCell.textContent = "—"
+                }
                 tr.appendChild(combineCell)
 
                 tbody.appendChild(tr)

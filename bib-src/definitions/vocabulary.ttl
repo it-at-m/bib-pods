@@ -87,9 +87,15 @@ bp:SolrEngine a bp:RecommendationEngine ; # Lucene query over the interim index,
 bp:InspiraEngine a bp:RecommendationEngine ; # inspira_BIB embeddings recommender (Qdrant), seeded from the Merkliste
     rdfs:label "inspira_BIB" .
 
+# How a strategy combines its several profile inputs into one query. Two kinds:
+# logical (Boolean join of Solr clauses) vs vector (embedding-space aggregation).
 bp:Combinator a rdfs:Class .
-bp:Or a bp:Combinator ; rdfs:label "OR" .
-bp:And a bp:Combinator ; rdfs:label "AND" .
+bp:LogicalCombinator rdfs:subClassOf bp:Combinator ; rdfs:label "logisch" .
+bp:VectorCombinator rdfs:subClassOf bp:Combinator ; rdfs:label "Vektorraum" .
+
+bp:Or a bp:LogicalCombinator ; rdfs:label "OR" .
+bp:And a bp:LogicalCombinator ; rdfs:label "AND" .
+bp:AverageVector a bp:VectorCombinator ; rdfs:label "average_vector" . # Qdrant: averages the example vectors into one query
 
 # Opt-out flag in a user's profile: a strategy runs unless its IRI is listed here
 bp:disabledStrategy a rdf:Property ;
@@ -110,4 +116,6 @@ bp:authorAndTopic a bp:RecommendationStrategy ;
 bp:savedBookSimilarity a bp:RecommendationStrategy ;
     rdfs:label "Ähnlich zu gemerkten Büchern"@de ;
     rdfs:comment "Sendet deine Merkliste an einen weiteren Server der Stadt München (inspira_BIB), um ähnliche Titel zu finden."@de ;
-    bp:engine bp:InspiraEngine .
+    bp:engine bp:InspiraEngine ;
+    bp:usesProfileProperty bp:savedBook ;
+    bp:combine bp:AverageVector .

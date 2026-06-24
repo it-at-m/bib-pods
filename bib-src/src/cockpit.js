@@ -1,4 +1,4 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, loadStore, getStorageInfo, listMessages, markMessageRead, addMessage, replaceSubjectObjects } from "cori-sdk/storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, loadStore, getStorageInfo, listMessages, markMessageRead, addMessageIfNew, replaceSubjectObjects } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
 import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
@@ -28,30 +28,62 @@ function injectStyles() {
     document.head.appendChild(style)
 }
 
-function renderMessageContent(m) {
-    const fragment = document.createDocumentFragment()
-    const nl = m.content.indexOf("\n")
-    const prefix = nl < 0 ? null : m.content.slice(0, nl)
-    const body = nl < 0 ? m.content : m.content.slice(nl + 1)
-    if (prefix !== null) {
-        const span = document.createElement("span")
-        span.className = "bp-msg-prefix"
-        span.textContent = prefix
-        fragment.appendChild(span)
-        fragment.appendChild(document.createElement("br"))
-    }
-    if (m.refersTo) {
-        const a = document.createElement("a")
-        a.href = sopacCatalogueUrl(m.refersTo)
-        a.target = "_blank"
-        a.rel = "noopener"
-        a.className = "bp-msg-link"
-        a.textContent = body
-        fragment.appendChild(a)
+// A labelled lane = a strategy heading + a horizontally scrolling track of book cards.
+function buildLane(label, items, onDismiss) {
+    const lane = document.createElement("div")
+    lane.className = "bp-lane"
+    const heading = document.createElement("h4")
+    heading.className = "bp-lane-title"
+    heading.textContent = label
+    lane.appendChild(heading)
+    const track = document.createElement("div")
+    track.className = "bp-lane-track"
+    for (const item of items) track.appendChild(buildCard(item, onDismiss))
+    lane.appendChild(track)
+    return lane
+}
+
+// One book card: a cover placeholder (real images come later), a "seen" control to
+// dismiss it, the title (linked to the catalogue when we have a SOPAC id), and the author.
+function buildCard({ uri, title, author, sopacId, coverUrl }, onDismiss) {
+    const card = document.createElement("article")
+    card.className = "bp-card"
+    let cover
+    if (coverUrl) {
+        cover = document.createElement("img")
+        cover.src = coverUrl
+        cover.alt = ""           // decorative; the title sits right below
+        cover.loading = "lazy"
     } else {
-        fragment.appendChild(document.createTextNode(body))
+        cover = document.createElement("div")
+        cover.setAttribute("aria-hidden", "true")
     }
-    return fragment
+    cover.className = "bp-card-cover"
+    card.appendChild(cover)
+    const dismiss = document.createElement("button")
+    dismiss.type = "button"
+    dismiss.className = "bp-card-dismiss"
+    dismiss.textContent = "✕"
+    dismiss.title = "Als gesehen markieren"
+    dismiss.setAttribute("aria-label", "Als gesehen markieren")
+    dismiss.addEventListener("click", () => onDismiss(uri))
+    card.appendChild(dismiss)
+    const titleEl = document.createElement(sopacId ? "a" : "div")
+    titleEl.className = "bp-card-title"
+    titleEl.textContent = title || sopacId || ""
+    if (sopacId) {
+        titleEl.href = sopacCatalogueUrl(sopacId)
+        titleEl.target = "_blank"
+        titleEl.rel = "noopener"
+    }
+    card.appendChild(titleEl)
+    if (author) {
+        const authorEl = document.createElement("div")
+        authorEl.className = "bp-card-author"
+        authorEl.textContent = author
+        card.appendChild(authorEl)
+    }
+    return card
 }
 
 export async function installCockpit(root, { solrEndpoint, qdrantEndpoint, solidCallbackUrl, openBookPrompt, landing = false, mainHref } = {}) {
@@ -106,10 +138,11 @@ export async function installCockpit(root, { solrEndpoint, qdrantEndpoint, solid
     const profileEl = root.querySelector("cori-profile")
     // The "add interest" picker sits directly below the profile (landing embed only).
     if (profileEl) installInterestPicker(profileEl, { onAdded: () => applyState() })
-    const messagesSection = root.querySelector("#bp-messages")
-    const msgOldSection = root.querySelector("#bp-msg-old-section")
-    const msgNewList = root.querySelector("#bp-msg-new")
-    const msgOldList = root.querySelector("#bp-msg-old")
+    const lanes = root.querySelector("#bp-lanes")
+    // Book covers come from the inspira service's open /image/{isbn} route, same origin as
+    // the recommend endpoint (VLB is 403-locked, Onleihe URLs need an underivable hash).
+    // null if no qdrant endpoint is configured → cards fall back to the grey placeholder.
+    const coverBase = qdrantEndpoint ? new URL("/image/", qdrantEndpoint).href : null
     const checkRecBtn = dialog.querySelector("#bp-check-recommendations-btn")
     const checkRecLink = root.querySelector("#bp-check-recommendations-link")
     const strategyToggles = dialog.querySelector("#bp-strategy-toggles")
@@ -139,12 +172,12 @@ export async function installCockpit(root, { solrEndpoint, qdrantEndpoint, solid
             switchBtn.textContent = SWITCH_LABELS[choice]
             renderInfo()
             profileEl?.refresh()
-            renderMessages()
+            renderShowcase()
             renderStrategyToggles()
             decorateCards({ solrEndpoint, onBookClick: openBookPrompt })
         } else {
             badge.hidden = true
-            messagesSection.hidden = true
+            if (lanes) lanes.hidden = true
             undecorateCards()
         }
 
@@ -179,74 +212,60 @@ export async function installCockpit(root, { solrEndpoint, qdrantEndpoint, solid
         }
     }
 
-    function resetMessagesUI() {
-        msgNewList?.replaceChildren()
-        msgOldList?.replaceChildren()
+    function resetShowcase() {
+        if (lanes) { lanes.replaceChildren(); lanes.hidden = true }
         badge.hidden = true
-        if (messagesSection) messagesSection.hidden = true
-        if (msgOldSection) msgOldSection.hidden = true
         if (recommendationsLink) recommendationsLink.hidden = true
     }
 
-    async function renderMessages() {
-        if (!isStorageReady()) return resetMessagesUI()
+    // Renders the unread recommendations as the Schaufenster: one lane per strategy, each
+    // a horizontal carousel of book cards. Seen (read) recommendations are hidden, so a
+    // strategy whose cards are all seen drops out. The badge + modal link reflect the count.
+    async function renderShowcase() {
+        if (!isStorageReady()) return resetShowcase()
         try {
-            const messages = await listMessages()
-            if (messages.length === 0) return resetMessagesUI()
-            const unread = messages.filter(m => !m.read)
-            const readMessages = messages.filter(m => m.read)
+            const unread = (await listMessages()).filter(m => !m.read)
+            if (unread.length === 0) return resetShowcase()
 
-            badge.hidden = unread.length === 0
+            badge.hidden = false
             badge.textContent = unread.length > 9 ? "9+" : String(unread.length)
-
-            // Modal link to the main page (where the list lives), shown whenever
-            // there are unread recommendations.
             if (recommendationsLink) {
-                const showLink = unread.length > 0
-                recommendationsLink.hidden = !showLink
-                if (showLink) {
-                    recommendationsLink.querySelector("a").textContent =
-                        `${unread.length} neue Empfehlung${unread.length === 1 ? "" : "en"} ansehen`
-                }
+                recommendationsLink.hidden = false
+                recommendationsLink.querySelector("a").textContent =
+                    `${unread.length} Empfehlung${unread.length === 1 ? "" : "en"} ansehen`
             }
 
-            // The list itself only exists in the landing embed.
-            if (!messagesSection) return
+            // The lanes themselves only exist in the landing embed.
+            if (!lanes) return
 
-            // Clear only after the load completes — keeps the old DOM visible during
-            // the await so re-renders (e.g. "mark as read") don't flash empty.
-            msgNewList.replaceChildren()
-            msgOldList.replaceChildren()
-            messagesSection.hidden = false
-            msgOldSection.hidden = readMessages.length === 0
+            // Group the unread recommendations into one lane per strategy. Message content
+            // is "label\ntitle\nauthor" (see checkRecommendations); refersTo is the SOPAC id.
+            // Lanes with no unread items simply aren't built.
+            const byStrategy = new Map()
             for (const m of unread) {
-                const li = document.createElement("li")
-                li.appendChild(renderMessageContent(m))
-                const markLink = document.createElement("a")
-                markLink.href = "#"
-                markLink.className = "bp-mark-read"
-                markLink.textContent = "Als gelesen markieren"
-                markLink.addEventListener("click", async (e) => {
-                    e.preventDefault()
-                    try {
-                        await markMessageRead(m.uri)
-                        renderMessages()
-                    } catch (err) {
-                        console.error("[bib-pods] markMessageRead failed:", err)
-                    }
-                })
-                li.appendChild(document.createElement("br"))
-                li.appendChild(markLink)
-                msgNewList.appendChild(li)
+                const [label, title, author, isbn] = m.content.split("\n")
+                if (!byStrategy.has(label)) byStrategy.set(label, [])
+                const coverUrl = isbn && coverBase ? coverBase + encodeURIComponent(isbn) : null
+                byStrategy.get(label).push({ uri: m.uri, title, author, sopacId: m.refersTo, coverUrl })
             }
-            for (const m of readMessages) {
-                const li = document.createElement("li")
-                li.appendChild(renderMessageContent(m))
-                msgOldList.appendChild(li)
-            }
+            const frag = document.createDocumentFragment()
+            for (const [label, items] of byStrategy) frag.appendChild(buildLane(label, items, dismissCard))
+            lanes.replaceChildren(frag)
+            lanes.hidden = false
         } catch (err) {
-            console.error("[bib-pods] messages render failed:", err)
-            resetMessagesUI()
+            console.error("[bib-pods] showcase render failed:", err)
+            resetShowcase()
+        }
+    }
+
+    // Mark a recommendation seen: it disappears from its lane, and the lane disappears too
+    // once it has no unread cards left.
+    async function dismissCard(uri) {
+        try {
+            await markMessageRead(uri)
+            renderShowcase()
+        } catch (err) {
+            console.error("[bib-pods] markMessageRead failed:", err)
         }
     }
 
@@ -337,18 +356,20 @@ export async function installCockpit(root, { solrEndpoint, qdrantEndpoint, solid
         try {
             const profileStore = await loadStore()
             const { results, serverUnreachable } = await runRecommendations(profileStore, getProfileSubject(), { solrEndpoint, qdrantEndpoint })
-            let count = 0
-            for (const { strategy, docs } of results) {
-                for (const doc of docs) {
-                    const title = doc.title?.[0] ?? doc.id
-                    await addMessage(`${strategy.label}\n${title}`, doc.id)
-                    count++
-                }
-            }
-            if (count === 0) {
+            const items = results.flatMap(({ strategy, docs }) => docs.map(doc => ({ strategy, doc })))
+            if (items.length === 0) {
                 window.alert(serverUnreachable
                     ? "Der Empfehlungsdienst ist zurzeit nicht erreichbar. Bitte versuche es später erneut."
                     : "Keine Empfehlungen gefunden — vielleicht fehlen noch Profileinträge?")
+            } else {
+                // Identical recommendations (same strategy + book) aren't added twice —
+                // whether already seen or still unread, they're skipped (see addMessageIfNew).
+                for (const { strategy, doc } of items) {
+                    const title = doc.title?.[0] ?? doc.id
+                    const author = doc.author?.[0] ?? ""
+                    const isbn = doc.isbn?.[0] ?? ""
+                    await addMessageIfNew(`${strategy.label}\n${title}\n${author}\n${isbn}`, doc.id)
+                }
             }
             applyState()
         } catch (err) {
