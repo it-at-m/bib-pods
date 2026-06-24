@@ -27,8 +27,10 @@
 /* vertical padding gives the covers' drop shadows room (the track clips its overflow) */
 .bp-lane-track { display: flex; gap: 0.9rem; overflow-x: auto; padding: 0.4rem 0.2rem 1rem; scroll-snap-type: x proximity; }
 .bp-card { position: relative; flex: 0 0 5.5rem; width: 5.5rem; scroll-snap-align: start; }
+/* No border-radius on our side: sharp where the host doesn't round (docs), rounded where
+   the host theme already rounds <img> (TYPO3 staging) — both look fine. */
 .bp-card-cover { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background: #e7e7e7;
-    border-radius: 6px; margin-bottom: 0.5rem; box-shadow: 0 3px 9px rgba(0, 0, 0, 0.32); transition: box-shadow 0.15s ease; }
+    margin-bottom: 0.5rem; box-shadow: 0 3px 9px rgba(0, 0, 0, 0.32); transition: box-shadow 0.15s ease; }
 .bp-card:hover .bp-card-cover { box-shadow: 0 7px 20px rgba(0, 0, 0, 0.45); }
 /* "seen" control over the cover's top-right corner; subtle until hovered */
 .bp-card-dismiss { position: absolute; top: 0.35rem; right: 0.35rem; width: 1.1rem; height: 1.1rem; padding: 0;
@@ -41,8 +43,8 @@
 .bp-card-title:hover { text-decoration: underline; }
 .bp-card-author { font-size: 0.68em; color: #555; margin-top: 0.2rem; }
 /* "why recommended" tooltip (fixed-position, set inline by JS) */
-.bp-tip { position: fixed; z-index: 10000; max-width: 15rem; padding: 0.45rem 0.65rem; border-radius: 6px;
-    background: #222; color: #fff; font-size: 0.78rem; line-height: 1.35; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+.bp-tip { position: fixed; z-index: 10000; max-width: 18rem; padding: 0.55rem 0.8rem; border-radius: 6px;
+    background: #222; color: #fff; font-size: 0.95rem; line-height: 1.4; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
     pointer-events: none; }
 .bp-tip[hidden] { display: none; }
 .bp-tip strong { font-weight: 700; }
