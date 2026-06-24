@@ -3,7 +3,7 @@ import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk
 import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
-import { runRecommendations, getStrategies, readDisabledStrategies, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
+import { runRecommendations, getStrategies, readDisabledStrategies, explainStrategy, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl } from "./catalogue.js"
 import { installInterestPicker } from "./interests.js"
 import styleCss from "./ui/style.css?raw"
@@ -29,7 +29,8 @@ function injectStyles() {
 }
 
 // A labelled lane = a strategy heading + a horizontally scrolling track of book cards.
-function buildLane(label, items, onDismiss) {
+// ctx carries { onDismiss, tip, explanation } shared by every card in the lane.
+function buildLane(label, items, ctx) {
     const lane = document.createElement("div")
     lane.className = "bp-lane"
     const heading = document.createElement("h4")
@@ -38,16 +39,21 @@ function buildLane(label, items, onDismiss) {
     lane.appendChild(heading)
     const track = document.createElement("div")
     track.className = "bp-lane-track"
-    for (const item of items) track.appendChild(buildCard(item, onDismiss))
+    for (const item of items) track.appendChild(buildCard(item, ctx))
     lane.appendChild(track)
     return lane
 }
 
 // One book card: a cover placeholder (real images come later), a "seen" control to
 // dismiss it, the title (linked to the catalogue when we have a SOPAC id), and the author.
-function buildCard({ uri, title, author, sopacId, coverUrl }, onDismiss) {
+// On hover it shows the lane's "why recommended" tooltip.
+function buildCard({ uri, title, author, sopacId, coverUrl }, { onDismiss, tip, explanation }) {
     const card = document.createElement("article")
     card.className = "bp-card"
+    if (explanation) {
+        card.addEventListener("mouseenter", () => tip.schedule(explanation, card))
+        card.addEventListener("mouseleave", () => tip.hide())
+    }
     let cover
     if (coverUrl) {
         cover = document.createElement("img")
@@ -143,6 +149,32 @@ export async function installCockpit(root, { solrEndpoint, qdrantEndpoint, solid
     // the recommend endpoint (VLB is 403-locked, Onleihe URLs need an underivable hash).
     // null if no qdrant endpoint is configured → cards fall back to the grey placeholder.
     const coverBase = qdrantEndpoint ? new URL("/image/", qdrantEndpoint).href : null
+    // Shared "why recommended" tooltip — fixed-position so the lane's overflow can't clip
+    // it; sits above the hovered card, flipping below near the top edge.
+    const tipEl = document.createElement("div")
+    tipEl.className = "bp-tip"
+    tipEl.hidden = true
+    root.appendChild(tipEl)
+    let tipTimer = 0
+    const tip = {
+        // Hover briefly before showing, so sweeping across cards doesn't flash tooltips.
+        schedule(html, anchor) {
+            clearTimeout(tipTimer)
+            tipTimer = setTimeout(() => tip.show(html, anchor), 600)
+        },
+        show(html, anchor) {
+            if (!html) return
+            tipEl.innerHTML = html
+            tipEl.hidden = false
+            const a = anchor.getBoundingClientRect()
+            const t = tipEl.getBoundingClientRect()
+            const left = Math.max(8, Math.min(a.left + a.width / 2 - t.width / 2, window.innerWidth - t.width - 8))
+            const top = a.top - t.height - 8
+            tipEl.style.left = `${left}px`
+            tipEl.style.top = `${top < 8 ? a.bottom + 8 : top}px`
+        },
+        hide() { clearTimeout(tipTimer); tipEl.hidden = true },
+    }
     const checkRecBtn = dialog.querySelector("#bp-check-recommendations-btn")
     const checkRecLink = root.querySelector("#bp-check-recommendations-link")
     const strategyToggles = dialog.querySelector("#bp-strategy-toggles")
@@ -238,9 +270,13 @@ export async function installCockpit(root, { solrEndpoint, qdrantEndpoint, solid
             // The lanes themselves only exist in the landing embed.
             if (!lanes) return
 
+            const profileStore = await loadStore()
+            const profileSubject = getProfileSubject()
+            const strategyByLabel = new Map(getStrategies().map(s => [s.label, s]))
+
             // Group the unread recommendations into one lane per strategy. Message content
-            // is "label\ntitle\nauthor" (see checkRecommendations); refersTo is the SOPAC id.
-            // Lanes with no unread items simply aren't built.
+            // is "label\ntitle\nauthor\nisbn" (see checkRecommendations); refersTo is the
+            // SOPAC id. Lanes with no unread items simply aren't built.
             const byStrategy = new Map()
             for (const m of unread) {
                 const [label, title, author, isbn] = m.content.split("\n")
@@ -248,8 +284,13 @@ export async function installCockpit(root, { solrEndpoint, qdrantEndpoint, solid
                 const coverUrl = isbn && coverBase ? coverBase + encodeURIComponent(isbn) : null
                 byStrategy.get(label).push({ uri: m.uri, title, author, sopacId: m.refersTo, coverUrl })
             }
+            // One "why recommended" explanation per strategy, shared by its cards.
             const frag = document.createDocumentFragment()
-            for (const [label, items] of byStrategy) frag.appendChild(buildLane(label, items, dismissCard))
+            for (const [label, items] of byStrategy) {
+                const strategy = strategyByLabel.get(label)
+                const explanation = strategy ? await explainStrategy(strategy, profileStore, profileSubject) : null
+                frag.appendChild(buildLane(label, items, { onDismiss: dismissCard, tip, explanation }))
+            }
             lanes.replaceChildren(frag)
             lanes.hidden = false
         } catch (err) {

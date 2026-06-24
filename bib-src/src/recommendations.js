@@ -1,4 +1,5 @@
 import { getVocab, contractTerm, RDF_TYPE, RDFS_LABEL, RDFS } from "cori-sdk/utils.js"
+import { sparqlSelect } from "@foerderfunke/sem-ops-utils/sparql"
 import { BP, LOCAL } from "./vocab.js"
 import { recommendFromSavedBooks } from "./qdrant.js"
 
@@ -36,6 +37,45 @@ export function getStrategies() {
             combine: combinatorOf(v, iri),
         }
     })
+}
+
+// Natural-language German explanation (HTML) for why a strategy recommends things,
+// derived from the vocab + the user's profile via one federated SPARQL query: for each
+// profile property the strategy uses, take its bp:explanationPhrase and fill "{value}"
+// with the matching profile value label(s) (bolded). Fragments are joined by the
+// strategy's combinator word ("und"/"oder") and prefixed with "Wird empfohlen, weil …".
+export async function explainStrategy(strategy, profileStore, profileSubject) {
+    const rows = await sparqlSelect(`
+        PREFIX bp: <${BP}>
+        PREFIX rdfs: <${RDFS}>
+        SELECT ?prop ?phrase ?value ?valueLabel WHERE {
+            <${strategy.iri}> bp:usesProfileProperty ?prop .
+            OPTIONAL { ?prop bp:explanationPhrase ?phrase . FILTER(lang(?phrase) = "de") }
+            <${profileSubject}> ?prop ?value .
+            OPTIONAL { ?value rdfs:label ?valueLabel . FILTER(lang(?valueLabel) = "de" || lang(?valueLabel) = "") }
+        }`, [getVocab(), profileStore])
+
+    const byProp = new Map()
+    for (const r of rows) {
+        if (!byProp.has(r.prop)) byProp.set(r.prop, { phrase: r.phrase, values: new Set() })
+        const label = r.valueLabel ?? r.value
+        if (label) byProp.get(r.prop).values.add(label)
+    }
+    const fragments = []
+    for (const { phrase, values } of byProp.values()) {
+        if (!phrase) continue
+        if (!phrase.includes("{value}")) { fragments.push(phrase); continue }
+        if (values.size === 0) continue
+        const bolded = [...values].map(v => `<strong>${escapeHtml(v)}</strong>`).join(", ")
+        fragments.push(phrase.replace("{value}", bolded))
+    }
+    if (fragments.length === 0) return `Empfohlen über „${escapeHtml(strategy.label)}".`
+    const join = strategy.combine?.iri === BP + "And" ? " und " : " oder "
+    return `Wird empfohlen, weil ${fragments.join(join)}.`
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
 }
 
 // The strategy's bp:combine value as { iri, label, space }, or null if unset. `space` is

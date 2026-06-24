@@ -40,6 +40,12 @@
     font-weight: 600; font-size: 0.72em; line-height: 1.3; color: inherit; text-decoration: none; }
 .bp-card-title:hover { text-decoration: underline; }
 .bp-card-author { font-size: 0.68em; color: #555; margin-top: 0.2rem; }
+/* "why recommended" tooltip (fixed-position, set inline by JS) */
+.bp-tip { position: fixed; z-index: 10000; max-width: 15rem; padding: 0.45rem 0.65rem; border-radius: 6px;
+    background: #222; color: #fff; font-size: 0.78rem; line-height: 1.35; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    pointer-events: none; }
+.bp-tip[hidden] { display: none; }
+.bp-tip strong { font-weight: 700; }
 /* dialog.bp-modal (two selectors) outranks TYPO3's higher-specificity overrides that
    constrained the modal narrower than expected. !important on both width properties
    guards against host !important too. */

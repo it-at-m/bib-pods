@@ -18,6 +18,7 @@ bp:favoriteWork a rdf:Property ;
 bp:favoriteAuthor a rdf:Property ;
     rdfs:label "favorite author"@en, "Autor*in"@de ;
     rdfs:range bf:Person ;
+    bp:explanationPhrase "dir {value} gefällt"@de ;
     bp:linkedToIndex [
         bp:labelField "author" ;
         bp:iriField "author_uri_str_mv"
@@ -29,6 +30,7 @@ bp:favoriteAuthor a rdf:Property ;
 bp:favoriteGenre a rdf:Property ;
     rdfs:label "favorite genre"@en, "Genre"@de ;
     rdfs:range bf:GenreForm ;
+    bp:explanationPhrase "du das Genre {value} magst"@de ;
     bp:linkedToIndex [
         bp:labelField "genre" ;
         bp:iriField "genre_uri_str_mv"
@@ -37,6 +39,7 @@ bp:favoriteGenre a rdf:Property ;
 bp:interestedIn a rdf:Property ;
     rdfs:label "interested in"@en, "Thema"@de ;
     rdfs:range bf:Topic ;
+    bp:explanationPhrase "dich {value} interessiert"@de ;
     bp:linkedToIndex [
         bp:labelField "topic" ;
         bp:iriField "topic_uri_str_mv"
@@ -44,9 +47,15 @@ bp:interestedIn a rdf:Property ;
 
 bp:savedBook a rdf:Property ; # SOPAC identifier
     rdfs:label "saved book"@en, "Gemerktes Buch"@de ;
-    rdfs:range xsd:string .
+    rdfs:range xsd:string ;
+    bp:explanationPhrase "es deinen gemerkten Büchern ähnelt"@de .
 
 bp:sourceLabel a rdf:Property .
+
+# German fragment for the "why is this recommended" tooltip; "{value}" (if present) is
+# replaced with the matching profile value(s). Fragments are joined by the strategy's
+# bp:combine word and prefixed with "Wird empfohlen, weil …".
+bp:explanationPhrase a rdf:Property .
 
 # ----- Index mapping -----
 
