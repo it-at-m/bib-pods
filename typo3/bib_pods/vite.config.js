@@ -8,6 +8,7 @@ export default defineConfig({
     plugins: [emitRefreshWorker],
     define: {
         __SOLR_ENDPOINT__: JSON.stringify(config.solrEndpoint),
+        __QDRANT_ENDPOINT__: JSON.stringify(config.qdrantEndpoint),
         __MAIN_PATH__: JSON.stringify(config.mainPath),
     },
     build: {

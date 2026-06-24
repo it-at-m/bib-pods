@@ -150,6 +150,11 @@ cori-profile .cori-profile-actions button:hover { color: #222; }
 .bp-book-option { display: block; cursor: pointer; padding: 0.15rem 0; }
 .bp-book-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
 
+#bp-strategy-settings { margin: 0.5rem 0; }
+#bp-strategy-toggles { margin: 0.25rem 0 0.5rem 0.25rem; }
+.bp-strategy-option { display: block; cursor: pointer; padding: 0.15rem 0; }
+.bp-strategy-note { margin: 0 0 0.5rem 1.4rem; font-size: 0.8em; color: #666; }
+
 /* ----- Landing page ----- */
 
 /* The landing page fills the host's content column (TYPO3 .maincontents / the

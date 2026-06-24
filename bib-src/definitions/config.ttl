@@ -6,4 +6,5 @@ bp:config
     cori:profileFilename "bib-pods.ttl" ; # filename of the user's profile resource in their Solid pod
     bp:mainPath "/bib-pods" ;             # consumed at build time; gates whether the bundle mounts on a given host page
     bp:solrEndpoint <https://bib-pods.ngrok.dev/solr/interim-index/select> ;
-    bp:solrEndpointDev <http://localhost:8983/solr/interim-index/select> .
+    bp:solrEndpointDev <http://localhost:8983/solr/interim-index/select> ;
+    bp:qdrantEndpoint <https://inspira-bib-waftest.muenchen.de/api/recommend> .

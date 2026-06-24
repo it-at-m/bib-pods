@@ -21,6 +21,7 @@ if (document.body.hasAttribute("data-bp-solid-callback")) {
         const solidCallbackUrl = new URL("../solid-callback.html", import.meta.url).href
         mount(document.getElementById("bp-root"), {
             solrEndpoint: __SOLR_ENDPOINT__,
+            qdrantEndpoint: __QDRANT_ENDPOINT__,
             solidCallbackUrl,
             landing: isMainPage,
             mainHref: __MAIN_PATH__

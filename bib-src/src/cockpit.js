@@ -1,9 +1,9 @@
-import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, loadStore, getStorageInfo, listMessages, markMessageRead, addMessage } from "cori-sdk/storage/index.js"
+import { getChoice, setChoice, clearChoice, isStorageReady, warmupStorage, loadStore, getStorageInfo, listMessages, markMessageRead, addMessage, replaceSubjectObjects } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
 import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
-import { runRecommendations } from "./recommendations.js"
+import { runRecommendations, getStrategies, readDisabledStrategies, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl } from "./catalogue.js"
 import { installInterestPicker } from "./interests.js"
 import styleCss from "./ui/style.css?raw"
@@ -54,7 +54,7 @@ function renderMessageContent(m) {
     return fragment
 }
 
-export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, openBookPrompt, landing = false, mainHref } = {}) {
+export async function installCockpit(root, { solrEndpoint, qdrantEndpoint, solidCallbackUrl, openBookPrompt, landing = false, mainHref } = {}) {
     injectStyles()
     // Host's .button pill styling is scoped to .maincontents. On pages where
     // TYPO3 places #bp-root outside that scope (e.g. homepage header), reparent
@@ -112,6 +112,7 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     const msgOldList = root.querySelector("#bp-msg-old")
     const checkRecBtn = dialog.querySelector("#bp-check-recommendations-btn")
     const checkRecLink = root.querySelector("#bp-check-recommendations-link")
+    const strategyToggles = dialog.querySelector("#bp-strategy-toggles")
     const recommendationsLink = dialog.querySelector("#bp-recommendations-link")
     if (recommendationsLink) {
         const link = recommendationsLink.querySelector("a")
@@ -139,6 +140,7 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
             renderInfo()
             profileEl?.refresh()
             renderMessages()
+            renderStrategyToggles()
             decorateCards({ solrEndpoint, onBookClick: openBookPrompt })
         } else {
             badge.hidden = true
@@ -334,7 +336,7 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
         triggers.forEach(t => { t.textContent = "Lädt …"; if ("disabled" in t) t.disabled = true })
         try {
             const profileStore = await loadStore()
-            const { results, serverUnreachable } = await runRecommendations(profileStore, getProfileSubject(), solrEndpoint)
+            const { results, serverUnreachable } = await runRecommendations(profileStore, getProfileSubject(), { solrEndpoint, qdrantEndpoint })
             let count = 0
             for (const { strategy, docs } of results) {
                 for (const doc of docs) {
@@ -359,6 +361,54 @@ export async function installCockpit(root, { solrEndpoint, solidCallbackUrl, ope
     }
     checkRecBtn?.addEventListener("click", () => checkRecommendations())
     checkRecLink?.addEventListener("click", (e) => { e.preventDefault(); checkRecommendations() })
+
+    // Recommendation strategy toggles (opt-out, persisted to the profile). The list is
+    // built once from the vocab; checked states sync from the profile on each applyState,
+    // and a change writes the full disabled-set (the unchecked strategies) back.
+    const strategyCheckboxes = new Map()
+    function buildStrategyToggles() {
+        if (!strategyToggles || strategyToggles.childElementCount) return
+        for (const strategy of getStrategies()) {
+            const option = document.createElement("label")
+            option.className = "bp-strategy-option"
+            const checkbox = document.createElement("input")
+            checkbox.type = "checkbox"
+            checkbox.checked = true
+            checkbox.addEventListener("change", persistStrategyToggles)
+            option.append(checkbox, document.createTextNode(" " + strategy.label))
+            strategyToggles.append(option)
+            // Surface the strategy's rdfs:comment (e.g. the inspira note that this sends
+            // the Merkliste to another City of Munich server) so the data flow is visible
+            // right where the user enables it.
+            if (strategy.comment) {
+                const note = document.createElement("p")
+                note.className = "bp-strategy-note"
+                note.textContent = strategy.comment
+                strategyToggles.append(note)
+            }
+            strategyCheckboxes.set(strategy.iri, checkbox)
+        }
+    }
+    async function persistStrategyToggles() {
+        const disabled = [...strategyCheckboxes].filter(([, cb]) => !cb.checked).map(([iri]) => iri)
+        try {
+            await replaceSubjectObjects(SETTINGS_SUBJECT, DISABLED_STRATEGY, disabled)
+        } catch (err) {
+            console.error("[bib-pods] saving strategy settings failed:", err)
+            window.alert("Einstellung konnte nicht gespeichert werden:\n" + storageErrorMessage(err))
+        }
+    }
+    async function renderStrategyToggles() {
+        if (!strategyToggles || !isStorageReady()) return
+        try {
+            const store = await loadStore()
+            const disabled = readDisabledStrategies(store)
+            for (const [iri, cb] of strategyCheckboxes) cb.checked = !disabled.has(iri)
+        } catch (err) {
+            console.error("[bib-pods] strategy toggles render failed:", err)
+        }
+    }
+    buildStrategyToggles()
 
     applyState()
 

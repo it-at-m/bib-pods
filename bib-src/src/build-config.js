@@ -12,6 +12,7 @@ export function loadConfig() {
 
     return {
         solrEndpoint: lookup(BP + (DEV ? "solrEndpointDev" : "solrEndpoint")),
+        qdrantEndpoint: lookup(BP + "qdrantEndpoint"),
         mainPath: lookup(BP + "mainPath"),
     }
 }

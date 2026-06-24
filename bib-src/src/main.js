@@ -14,11 +14,11 @@ setStorageConfig({
     profileFilename: configLookup(CORI + "profileFilename"),
 })
 
-export async function mount(root, { solrEndpoint, solidCallbackUrl, landing, mainHref } = {}) {
+export async function mount(root, { solrEndpoint, qdrantEndpoint, solidCallbackUrl, landing, mainHref } = {}) {
     // book-prompt must exist before the cockpit's applyState first decorates cards,
     // since decorate-cards calls openBookPrompt on user click.
     let applyState = () => {}
     const openBookPrompt = installBookPrompt(root, { onSaved: () => applyState() })
-    const cockpit = await installCockpit(root, { solrEndpoint, solidCallbackUrl, openBookPrompt, landing, mainHref })
+    const cockpit = await installCockpit(root, { solrEndpoint, qdrantEndpoint, solidCallbackUrl, openBookPrompt, landing, mainHref })
     applyState = cockpit.applyState
 }

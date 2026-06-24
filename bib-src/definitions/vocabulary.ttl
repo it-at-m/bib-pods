@@ -77,16 +77,37 @@ bp:combine a rdf:Property ;
     rdfs:domain bp:RecommendationStrategy ;
     rdfs:range bp:Combinator .
 
+bp:engine a rdf:Property ; # which backend computes the strategy's results
+    rdfs:domain bp:RecommendationStrategy ;
+    rdfs:range bp:RecommendationEngine .
+
+bp:RecommendationEngine a rdfs:Class .
+bp:SolrEngine a bp:RecommendationEngine ; # Lucene query over the interim index, built from profile facts
+    rdfs:label "Solr" .
+bp:InspiraEngine a bp:RecommendationEngine ; # inspira_BIB embeddings recommender (Qdrant), seeded from the Merkliste
+    rdfs:label "inspira_BIB" .
+
 bp:Combinator a rdfs:Class .
 bp:Or a bp:Combinator ; rdfs:label "OR" .
 bp:And a bp:Combinator ; rdfs:label "AND" .
 
+# Opt-out flag in a user's profile: a strategy runs unless its IRI is listed here
+bp:disabledStrategy a rdf:Property ;
+    rdfs:range bp:RecommendationStrategy .
+
 bp:authorMatch a bp:RecommendationStrategy ;
     rdfs:label "Mehr von Lieblingsautor*in"@de ;
+    bp:engine bp:SolrEngine ;
     bp:usesProfileProperty bp:favoriteAuthor ;
     bp:combine bp:Or .
 
 bp:authorAndTopic a bp:RecommendationStrategy ;
     rdfs:label "Autor*in & Thema kombiniert"@de ;
+    bp:engine bp:SolrEngine ;
     bp:usesProfileProperty bp:favoriteAuthor, bp:interestedIn ;
     bp:combine bp:And .
+
+bp:savedBookSimilarity a bp:RecommendationStrategy ;
+    rdfs:label "Ähnlich zu gemerkten Büchern"@de ;
+    rdfs:comment "Sendet deine Merkliste an einen weiteren Server der Stadt München (inspira_BIB), um ähnliche Titel zu finden."@de ;
+    bp:engine bp:InspiraEngine .

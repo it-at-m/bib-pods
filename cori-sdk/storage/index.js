@@ -154,3 +154,10 @@ export const addInquiryFacts = (facts) => mutate(store => {
         addTripleToStore(store, subject ?? defaultSubject, predicate, object)
     }
 })
+
+// Replace the full set of objects for (subject, predicate) in one write — for
+// multi-valued settings (e.g. which recommendation strategies a user switched off).
+export const replaceSubjectObjects = (subject, predicate, objects) => mutate(store => {
+    for (const q of store.getQuads(subject, predicate, null, null)) store.removeQuad(q)
+    for (const object of objects) addTripleToStore(store, subject, predicate, object)
+})
