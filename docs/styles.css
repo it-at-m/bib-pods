@@ -7,12 +7,18 @@ body {
 
 .nav-bar {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    row-gap: 0.5rem;
     padding: 1.1rem 1.75rem;
     background: #fff;
     border-bottom: 1px solid #e5e5e5;
+}
+
+.nav-links {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 0.5rem;
 }
 
 .nav-bar a {
@@ -30,8 +36,25 @@ body {
     font-weight: 700;
 }
 
+/* the wordmark / home link — stays visible even when the rest collapse */
+.nav-bar .nav-brand {
+    margin-right: 2.25rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
 .nav-bar .spacer {
     flex: 1;
+}
+
+/* the last link (Code) sits flush against the right padding */
+.nav-links a:last-child {
+    margin-right: 0;
+}
+
+/* the hamburger only appears at the narrow-screen breakpoint below */
+.nav-toggle {
+    display: none;
 }
 
 main {
@@ -202,5 +225,44 @@ textarea.code-input {
     .results-table {
         display: block;
         overflow-x: auto;
+    }
+
+    /* Collapse the nav into a hamburger: the toggle shows, the links hide
+       until .open is set, then stack vertically below the bar. */
+    .nav-bar {
+        flex-wrap: wrap;
+    }
+    .nav-toggle {
+        display: block;
+        margin-left: auto;
+        padding: 0.1rem 0.4rem;
+        background: none;
+        border: none;
+        color: #222;
+        font-size: 1.6rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .nav-toggle:hover {
+        background: none;
+        border: none;
+    }
+    .nav-links {
+        display: none;
+        flex-basis: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        row-gap: 0;
+        margin-top: 0.5rem;
+    }
+    .nav-bar.open .nav-links {
+        display: flex;
+    }
+    .nav-links a {
+        margin-right: 0;
+        padding: 0.5rem 0;
+    }
+    .nav-links .spacer {
+        display: none;
     }
 }
