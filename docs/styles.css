@@ -5,30 +5,32 @@ body {
     background: #fafafa;
 }
 
-.top-menu {
+.nav-bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    padding: 0.75rem 1.5rem;
+    row-gap: 0.5rem;
+    padding: 1.1rem 1.75rem;
     background: #fff;
     border-bottom: 1px solid #e5e5e5;
 }
 
-.top-menu a {
+.nav-bar a {
     color: #222;
     text-decoration: none;
-    margin-right: 1.5rem;
+    margin-right: 1.85rem;
     font-weight: 500;
 }
 
-.top-menu a:hover {
+.nav-bar a:hover {
     text-decoration: underline;
 }
 
-.top-menu .brand {
+.nav-bar .brand {
     font-weight: 700;
 }
 
-.top-menu .spacer {
+.nav-bar .spacer {
     flex: 1;
 }
 
@@ -193,4 +195,12 @@ textarea.code-input {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 1rem;
     padding: 0.6rem 0.8rem;
+}
+
+/* Minimal mobile: let wide result tables scroll instead of widening the page. */
+@media (max-width: 640px) {
+    .results-table {
+        display: block;
+        overflow-x: auto;
+    }
 }

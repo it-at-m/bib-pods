@@ -2,11 +2,12 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>search — bib-pods</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Search — bib-pods</title>
         <link rel="stylesheet" href="../styles.css">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/react-querybuilder@7.7.1/dist/query-builder.css">
-        <script src="../top-menu.js"></script>
+        <script src="../nav-bar.js"></script>
         <script src="../solr-results.js"></script>
         <style>
             main { max-width: 1500px; }
@@ -159,7 +160,7 @@
         </style>
     </head>
     <body>
-        <top-menu current="search"></top-menu>
+        <nav-bar current="search"></nav-bar>
         <main>
             <h4>
                 Experimental showcase: the same Solr query expressed through different visual concepts.
