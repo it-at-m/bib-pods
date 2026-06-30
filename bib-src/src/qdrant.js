@@ -6,17 +6,26 @@ import { BP } from "./vocab.js"
 // used ones in `basedOn`; if none match it answers 422, handled here as "nothing matched".
 // Returns { savedIds, basedOn, results, empty }; each result point's payload.metadata
 // carries akkey/isbn/author/title/type for mapping back to our catalogue.
-//
-// Sent WITHOUT a Content-Type header on purpose: that keeps it a CORS "simple" request,
-// dodging the preflight (OPTIONS) this server currently answers with 503. Drop the Blob
-// for a plain application/json POST once the inspira team fixes the preflight.
 export async function recommendFromSavedBooks(profileStore, profileSubject, qdrantEndpoint, limit = 10) {
     const savedIds = profileStore.getObjects(profileSubject, BP + "savedBook", null).map(o => o.value)
     if (savedIds.length === 0) return { savedIds, basedOn: [], results: [], empty: true }
 
     const bareIds = savedIds.map(id => id.replace(/^AK/, ""))
     const body = JSON.stringify({ query: { recommend: { positive: bareIds } }, limit })
-    // A Blob with an empty type makes fetch send no Content-Type header (see note above).
+
+    // A POST with Content-Type: application/json is a "non-simple" CORS request, so the
+    // browser sends an OPTIONS preflight first — which this server currently answers with
+    // 503, blocking the call before it ever reaches us. Wrapping the body in a Blob with
+    // no declared type makes fetch omit Content-Type entirely; that keeps the request
+    // "simple" and the browser skips the preflight. FastAPI still parses it as JSON fine.
+    // Once OPTIONS /api/recommend answers 2xx with the right CORS headers, swap this for
+    // the commented-out version below — a plain, properly-typed application/json POST:
+    //
+    //   const res = await fetch(qdrantEndpoint, {
+    //       method: "POST",
+    //       headers: { "Content-Type": "application/json" },
+    //       body,
+    //   })
     const res = await fetch(qdrantEndpoint, { method: "POST", body: new Blob([body]) })
     const json = await res.json().catch(() => null)
 
