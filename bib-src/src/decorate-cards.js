@@ -1,5 +1,5 @@
 import { isActivated } from "cori-sdk/storage/index.js"
-import { fetchBook } from "./catalogue.js"
+import { fetchBook, fetchBookByOnleiheId } from "./catalogue.js"
 
 // aDIS/BMS SOPAC URLs use `sp=S<key>` where the leading `S` is a service-param
 // type tag and the numeric portion is zero-padded to 8 digits. Solr stores the
@@ -23,7 +23,7 @@ export function decorateCards({ solrEndpoint, onBookClick } = {}) {
     })
     document.querySelectorAll('a[href*="onleihe.de"]').forEach(link => {
         const match = link.href.match(ONLEIHE_RE)
-        if (match) decorateOnlineCard(link, match[1])
+        if (match) decorateOnlineCard(link, match[1], { solrEndpoint, onBookClick })
     })
     document.querySelectorAll('a[href*="/veranstaltungen/details/"]').forEach(link => {
         const match = link.href.match(EVENT_RE)
@@ -34,7 +34,7 @@ export function decorateCards({ solrEndpoint, onBookClick } = {}) {
         decorateBookCard(el, el.dataset.sopacId, { solrEndpoint, onBookClick })
     })
     document.querySelectorAll("[data-onleihe-id]").forEach(el => {
-        decorateOnlineCard(el, el.dataset.onleiheId)
+        decorateOnlineCard(el, el.dataset.onleiheId, { solrEndpoint, onBookClick })
     })
     document.querySelectorAll("[data-event-id]").forEach(el => {
         decorateEventCard(el, el.dataset.eventId)
@@ -61,13 +61,23 @@ function decorateBookCard(target, sopacId, { solrEndpoint, onBookClick }) {
     })
 }
 
-// Onleihe media get the same button, but the click only logs the divibib media
-// id — resolving it to its catalogue record in Solr is not wired up.
-function decorateOnlineCard(target, mediaId) {
+// Onleihe media get the same button and the same popup as a book — the click
+// resolves the divibib media id to its catalogue record via the onleihe_id field.
+function decorateOnlineCard(target, mediaId, { solrEndpoint, onBookClick }) {
     const btn = mountDecoration(target)
     if (!btn) return
-    btn.addEventListener("click", () => {
-        console.log("[bib-pods] divibib media id:", mediaId)
+    btn.addEventListener("click", async () => {
+        let book = null
+        try {
+            book = await fetchBookByOnleiheId(solrEndpoint, mediaId)
+            console.log("[bib-pods] fetched Onleihe book:", book)
+        } catch (err) {
+            console.error("[bib-pods] fetchBookByOnleiheId failed:", err)
+        }
+        // Once resolved, the catalogue's own AK id is the canonical one to save/recommend
+        // on (same shape as a regular book) — the Onleihe id was only a lookup key, and
+        // qdrant.js's savedBook→akkey stripping assumes an "AK…" id, not a divibib one.
+        onBookClick?.(book?.id ?? mediaId, book)
     })
 }
 
