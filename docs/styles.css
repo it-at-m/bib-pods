@@ -21,7 +21,8 @@ body {
     row-gap: 0.5rem;
 }
 
-.nav-bar a {
+.nav-bar a,
+.nav-bar .nav-dropdown-toggle {
     color: #222;
     text-decoration: none;
     margin-right: 1.85rem;
@@ -52,10 +53,22 @@ body {
     margin-right: 0;
 }
 
-/* "Plugin" is a link that also reveals its sub-page(s) on hover/focus. The inner <a>
-   keeps the shared .nav-bar spacing, so the parent needs no margin of its own. */
+/* A nav item with a dropdown reveals its sub-pages on hover/focus. Its toggle (e.g.
+   "Plugin", "More") is a <button>, not a link — color/spacing/weight come from the
+   shared .nav-bar a rule above; this just undoes the page's default button chrome. */
 .nav-dropdown-parent { position: relative; }
 .nav-caret { font-size: 0.7em; color: #888; margin-left: 0.25rem; }
+.nav-dropdown-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+}
+.nav-dropdown-toggle:hover {
+    background: none;
+    border-color: transparent;
+}
 .nav-dropdown {
     display: none;
     position: absolute;
@@ -85,6 +98,29 @@ body {
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
     gap: 0.6rem 1.5rem;
+}
+
+/* Parking Lot: one boxed .pl-experiment per prototype, each with its own heading, a short
+   description, a source link, and a distinct visual state where its output shows up. */
+.pl-group-heading { margin-top: 0; }
+.pl-experiment {
+    margin-top: 1rem;
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    padding: 1rem 1.2rem 1.2rem;
+}
+.pl-experiment h3 { margin: 0 0 0.4rem; font-size: 1.1rem; }
+.pl-experiment p { margin: 0 0 0.8rem; font-size: 0.9rem; color: #777; }
+.pl-experiment select { max-width: 24rem; width: 100%; }
+#pl-gnd-output {
+    margin-top: 0.75rem;
+    padding: 0.6rem 0.8rem;
+    background: #f4f4f4;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    min-height: 1.2em;
 }
 
 /* the hamburger only appears at the narrow-screen breakpoint below */
@@ -141,9 +177,6 @@ button:hover {
     display: flex;
     gap: 0.5rem;
     margin-bottom: 0.75rem;
-}
-
-.field-row {
     align-items: flex-start;
 }
 
@@ -293,7 +326,8 @@ textarea.code-input {
     .nav-bar.open .nav-links {
         display: flex;
     }
-    .nav-links a {
+    .nav-links a,
+    .nav-links .nav-dropdown-toggle {
         margin-right: 0;
         padding: 0.5rem 0;
     }

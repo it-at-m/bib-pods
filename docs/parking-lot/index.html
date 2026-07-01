@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Parking Lot — bib-pods</title>
+        <link rel="stylesheet" href="../styles.css">
+        <script src="../nav-bar.js"></script>
+    </head>
+    <body>
+        <nav-bar current="parking-lot"></nav-bar>
+        <main>
+            <h2 class="pl-group-heading">Reuse explorations of other vocabularies</h2>
+
+            <section class="pl-experiment">
+                <h3>GND-Sachgruppen</h3>
+                <p>
+                    Picking a subject interest from the GND-Systematik's 37 main categories.
+                    Source: <a href="https://d-nb.info/standards/vocab/gnd/gnd-sc.html" target="_blank" rel="noopener">GND-Sachgruppen</a>
+                </p>
+                <select id="pl-gnd-select">
+                    <option value="" selected disabled>Lädt …</option>
+                </select>
+                <div id="pl-gnd-output"></div>
+            </section>
+        </main>
+        <script type="module" src="../dist/parking-lot.js"></script>
+    </body>
+</html>

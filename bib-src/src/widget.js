@@ -5,7 +5,6 @@ import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations, getStrategies, readDisabledStrategies, explainStrategy, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl } from "./catalogue.js"
-import { installInterestPicker } from "./interests.js"
 import styleCss from "./ui/style.css?raw"
 import entryHtml from "./ui/entry.html?raw"
 import landingHtml from "./ui/landing.html?raw"
@@ -256,9 +255,6 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const lanes = root.querySelector("#bp-lanes")
     const checkRecLink = root.querySelector("#bp-check-recommendations-link")
     const strategyToggles = root.querySelector("#bp-strategy-toggles")
-
-    // The "add interest" picker sits directly below the profile.
-    installInterestPicker(profileEl, { onAdded: () => applyState() })
 
     // Book covers come from the inspira service's open /image/{isbn} route (same origin as
     // the recommend endpoint; VLB is 403-locked, Onleihe URLs need an underivable hash).

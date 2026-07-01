@@ -273,8 +273,3 @@ dialog.cori-turtle-view::backdrop { background: rgba(0, 0, 0, 0.4); }
 .cori-turtle-view-header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
 .cori-turtle-view-header h3 { margin: 0; margin-right: auto; }
 .cori-turtle-view-validate { font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
-
-/* "Interesse hinzufügen" picker below the profile (GND-Systematik categories). */
-.bp-add-interest { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.3rem; max-width: 24rem; }
-.bp-add-interest label { font-weight: 600; font-size: 0.9em; }
-.bp-add-interest select { padding: 0.4rem; }
