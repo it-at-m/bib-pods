@@ -18,30 +18,127 @@
 }
 .bp-badge[hidden] { display: none; }
 
-/* ----- Schaufenster lanes (one carousel per recommendation strategy) ----- */
-/* Lanes stack vertically and scroll within the Schaufenster if they overflow; each
-   lane's cards scroll horizontally. Cover images are placeholders for now. */
-#bp-lanes { display: flex; flex-direction: column; gap: 1.6rem; max-height: 70vh; overflow-y: auto; }
+/* Shared round icon-button look: decorate-cards.js's "+" (injected on host catalogue
+   cards, e.g. the production coverflow) and the carousel's "seen" control below both use
+   this — same circle/border/shadow, differing only by glyph, color and where they sit. */
+.bp-round-btn { width: 1.7em; height: 1.7em; padding: 0; font-size: 1.1em; font-weight: bold;
+    line-height: 1; border: 1px solid currentColor; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.92); cursor: pointer; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4); }
+
+/* ----- Schaufenster carousel (one per recommendation strategy) -----
+   Loosely follows the Munich city library's coverflow widget (card look, arrow/dot style),
+   adapted: shorter cards, and each lane gets its own tinted "shelf" so adjacent strategies
+   read as distinct rows — the source never stacks multiple coverflows on one page, so it
+   has no such need. Native scroll-snap drives the sliding; initCarousel() wires the arrows
+   and page dots. */
+/* Scroll hint for when there are more lanes than fit in max-height: a soft shadow fades in
+   at whichever edge (top/bottom) still has more content, and fades out once scrolled flush
+   with that edge — pure CSS, no JS/scroll-listener needed. Two gradient pairs per edge: the
+   "cover" layer scrolls WITH the content (attachment: local) and paints over the "shadow"
+   layer (attachment: scroll, pinned to the viewport edge) whenever content is flush with
+   that edge, so the shadow only shows through where there's actually more to reveal.
+   Colors match .bp-block's own white background, since that's what's visible in the gaps
+   between lanes. */
+#bp-lanes { display: flex; flex-direction: column; gap: 1.25rem; max-height: 70vh; overflow-y: auto;
+    background:
+        linear-gradient(#fff 30%, rgba(255, 255, 255, 0)) 0 0,
+        linear-gradient(rgba(255, 255, 255, 0), #fff 70%) 0 100%,
+        radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0)) 0 0,
+        radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0)) 0 100%;
+    background-repeat: no-repeat;
+    background-size: 100% 36px, 100% 36px, 100% 12px, 100% 12px;
+    background-attachment: local, local, scroll, scroll; }
 #bp-lanes[hidden] { display: none; }
-.bp-lane-title { margin: 0 0 0.6rem; font-size: 0.95em; }
-/* vertical padding gives the covers' drop shadows room (the track clips its overflow) */
-.bp-lane-track { display: flex; gap: 0.9rem; overflow-x: auto; padding: 0.4rem 0.2rem 1rem; scroll-snap-type: x proximity; }
-.bp-card { position: relative; flex: 0 0 5.5rem; width: 5.5rem; scroll-snap-align: start; }
-/* No border-radius on our side: sharp where the host doesn't round (docs), rounded where
-   the host theme already rounds <img> (TYPO3 staging) — both look fine. */
-.bp-card-cover { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background: #e7e7e7;
-    margin-bottom: 0.5rem; box-shadow: 0 3px 9px rgba(0, 0, 0, 0.32); transition: box-shadow 0.15s ease; }
-.bp-card:hover .bp-card-cover { box-shadow: 0 7px 20px rgba(0, 0, 0, 0.45); }
-/* "seen" control over the cover's top-right corner; subtle until hovered */
-.bp-card-dismiss { position: absolute; top: 0.35rem; right: 0.35rem; width: 1.1rem; height: 1.1rem; padding: 0;
-    display: flex; align-items: center; justify-content: center; border: none; border-radius: 50%;
-    background: rgba(0, 0, 0, 0.5); color: #fff; font-size: 0.65rem; line-height: 1; cursor: pointer; opacity: 0.55; }
-.bp-card-dismiss:hover, .bp-card-dismiss:focus { opacity: 1; }
-/* clamp the title to keep cards short */
-.bp-card-title { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-    font-weight: 600; font-size: 0.72em; line-height: 1.3; color: inherit; text-decoration: none; }
-.bp-card-title:hover { text-decoration: underline; }
-.bp-card-author { font-size: 0.68em; color: #555; margin-top: 0.2rem; }
+
+/* --bp-cf-pad/--bp-cf-nav size the side gutter and the arrow that sits inside it (see
+   .bp-cf-prev/.bp-cf-next below) — kept as variables so the mobile tier can shrink both in
+   lockstep and the arrow stays centered in its gutter without repeating the math.
+   container-type goes on the lane (not the viewport) so the page dots — a sibling of the
+   viewport — are also inside the query container and can hide at the mobile breakpoint. */
+.bp-cf { --bp-cf-accent: var(--contrastcolor, #d14900); --bp-cf-gap: 24px; --bp-cf-pad: 44px; --bp-cf-nav: 36px;
+    padding: 14px var(--bp-cf-pad); background: #f7f5f0; border-radius: 14px; container-type: inline-size; }
+/* Clearly bigger and a distinct muted tone from both the near-black book titles and the
+   vivid --bp-cf-accent used on arrows/dots/dismiss — so the shelf label reads as a heading,
+   not just another line of text, without competing with the interactive accent color. */
+.bp-cf-title { margin: 0 0 0.75rem; font-size: 19px; font-weight: 700; color: #a8632c; }
+
+/* viewport: positioning context for the absolutely-placed arrows */
+.bp-cf-viewport { position: relative; }
+.bp-cf-track { list-style: none; margin: 0; padding: 0; display: flex; align-items: flex-start;
+    gap: var(--bp-cf-gap); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.bp-cf-track::-webkit-scrollbar { display: none; }
+
+/* four covers per page, dropping to three then a single peek. The library's own
+   breakpoints (1020px/710px) are calibrated to a near-full-bleed viewport; we're always
+   embedded in a content column, so the same container-relative thresholds would leave us
+   permanently in the narrowest layout. Retuned to the widths our hosts actually give the
+   carousel (the query measures .bp-cf's content box, i.e. excluding its own padding). */
+.bp-cf-slide { flex: 0 0 calc((100% - 3 * var(--bp-cf-gap)) / 4); scroll-snap-align: start; margin: 0; }
+@container (max-width: 640px) {
+    .bp-cf { --bp-cf-gap: 18px; }
+    .bp-cf-slide { flex-basis: calc((100% - 2 * var(--bp-cf-gap)) / 3); }
+}
+@container (max-width: 420px) {
+    .bp-cf { --bp-cf-pad: 28px; --bp-cf-nav: 30px; }
+    .bp-cf-slide { flex-basis: 66%; }
+}
+
+/* the card: cover on top, title/author below (their column-reverse wrap) */
+.bp-cf-wrap { display: flex; flex-flow: column-reverse nowrap; }
+.bp-cf-desc { padding: 12px 14px; }
+/* 2-line clamp: caps how much a long title can grow the card, so a row of cards stays a
+   consistent height regardless of title length. */
+.bp-cf-desc h3 { margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; font-size: 15px; line-height: 1.3; font-weight: 600; }
+.bp-cf-desc h3 a, .bp-cf-desc h3 span { color: var(--text-color, #000); text-decoration: none; }
+.bp-cf-desc h3 a:hover { text-decoration: underline; }
+.bp-cf-author { margin-top: 0.25rem; font-size: 13px; color: #555; }
+
+.bp-cf-image { position: relative; box-sizing: border-box; width: 100%; display: flex;
+    padding: 14px; min-height: 190px; background: #f1f1f1; border-radius: 16px; }
+/* max-height/max-width (not a fixed height) so a cover shrinks to fit a narrow slide
+   instead of overflowing it — width:auto;height:auto lets the browser preserve aspect
+   ratio when either cap binds. border-radius:0 + width !important defend against TYPO3's
+   ".maincontents img{width:100%}" (confirmed on the live theme), which would otherwise
+   stretch every cover to the slide's full width and round its corners. */
+.bp-cf-image img { display: block; width: auto !important; height: auto; max-width: 100%;
+    max-height: 160px; margin: auto; border-radius: 0; box-shadow: 5px 5px 3px rgba(0, 0, 0, 0.3); }
+/* color: #fff here was invisible against the box's own #f1f1f1 background — a warm grey
+   that actually shows up, in the same muted family as .bp-cf-author's #555. */
+.bp-cf-noimage { width: 100%; min-height: 160px; display: flex; color: #b3aea3; }
+.bp-cf-noimage svg { width: 56px; height: 56px; margin: auto; }
+
+/* "seen" control over the cover's top-right corner — the .bp-round-btn look (see above),
+   colored to match the carousel's own accent (arrows/dots) rather than the host's. */
+.bp-cf-dismiss { position: absolute; top: 8px; right: 8px; color: var(--bp-cf-accent); }
+
+/* circular arrows (their .swiper-button-*): white disc, brand-orange ring + chevron.
+   Sized/positioned from --bp-cf-nav/--bp-cf-pad so they sit centered in the lane's own
+   side gutter, fully inside the lane's own box — never overhanging past it, never
+   dependent on how much room a surrounding host container happens to leave. */
+.bp-cf-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 10;
+    width: var(--bp-cf-nav); height: var(--bp-cf-nav); padding: 0; display: flex;
+    align-items: center; justify-content: center; background: #fff; color: var(--bp-cf-accent);
+    border: 1px solid var(--bp-cf-accent); border-radius: 50%; cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease; }
+.bp-cf-prev { left: calc(-1 * (var(--bp-cf-pad) + var(--bp-cf-nav)) / 2); }
+.bp-cf-next { right: calc(-1 * (var(--bp-cf-pad) + var(--bp-cf-nav)) / 2); }
+.bp-cf-nav:hover { background: var(--bp-cf-accent); color: #fff; }
+.bp-cf-nav:disabled { opacity: 0.35; cursor: default; background: #fff; color: var(--bp-cf-accent); }
+
+/* page dots (their .swiper-pagination-bullet): ringed circle, filled when active */
+.bp-cf-dots { display: flex; justify-content: center; gap: 0.7rem; margin: 12px 0 0; }
+.bp-cf-dot { width: 16px; height: 16px; padding: 0; cursor: pointer; border: 2px solid var(--bp-cf-accent);
+    border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #fff; transition: box-shadow 0.5s, border-color 0.5s; }
+.bp-cf-dot.is-active { background: var(--bp-cf-accent); }
+.bp-cf-dot:hover { border-color: #fff; box-shadow: 0 0 0 2px var(--bp-cf-accent); }
+/* hide the dots on the narrow (peek) layout — matches the flex-basis:66% switch above, and
+   sits after the .bp-cf-dots base rule so this container query wins the cascade over it
+   (equal specificity → source order decides). */
+@container (max-width: 420px) { .bp-cf-dots { display: none; } }
+
+/* nothing to page through → no arrows, no dots */
+.bp-cf-static .bp-cf-nav, .bp-cf-static .bp-cf-dots { display: none; }
 /* "why recommended" tooltip (fixed-position, set inline by JS) */
 .bp-tip { position: fixed; z-index: 10000; max-width: 18rem; padding: 0.55rem 0.8rem; border-radius: 6px;
     background: #222; color: #fff; font-size: 0.95rem; line-height: 1.4; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);

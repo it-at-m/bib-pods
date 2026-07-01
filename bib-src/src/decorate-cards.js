@@ -110,11 +110,14 @@ function mountDecoration(target) {
 
     const btn = document.createElement("button")
     btn.type = "button"
-    btn.className = "bp-decoration"
+    // .bp-round-btn is the shared round icon-button look (also used by the carousel's
+    // "seen" control in style.css) — the "+" here and the "✕" there are the same button,
+    // different glyph/action.
+    btn.className = msbWrap || eventBox ? "bp-decoration bp-round-btn" : "bp-decoration"
     btn.textContent = "+"
     btn.title = "Zu Favoriten hinzufügen"
     btn.style.cssText = msbWrap || eventBox
-        ? "position: absolute; top: 0.4em; right: 0.4em; z-index: 10; width: 1.7em; height: 1.7em; padding: 0; font-size: 1.1em; font-weight: bold; line-height: 1; border: 1px solid currentColor; border-radius: 50%; background: rgba(255,255,255,0.92); cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.4);"
+        ? "position: absolute; top: 0.4em; right: 0.4em; z-index: 10;"
         : "margin-left: 0.5em; cursor: pointer;"
 
     if ((msbWrap || eventBox) && getComputedStyle(host).position === "static") host.style.position = "relative"

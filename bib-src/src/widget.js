@@ -5,7 +5,7 @@ import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations, getStrategies, readDisabledStrategies, explainStrategy, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl } from "./catalogue.js"
-import styleCss from "./ui/style.css?raw"
+import styleCss from "./ui/style.css?inline"
 import entryHtml from "./ui/entry.html?raw"
 import landingHtml from "./ui/landing.html?raw"
 import modalHtml from "./ui/modal.html?raw"
@@ -56,68 +56,185 @@ async function endSession() {
     clearChoice()
 }
 
-// A labelled lane = a strategy heading + a horizontally scrolling track of book cards.
-// ctx carries { onDismiss, tip, explanation } shared by every card in the lane.
+// Inline SVG icons so the carousel needs no icon font: the city library's coverflow uses
+// Font Awesome for its arrows/no-cover glyph, which is loaded on TYPO3 but absent on docs.
+const CHEVRON_LEFT = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M15.5 4.5 8 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+const CHEVRON_RIGHT = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M8.5 4.5 16 12l-7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+// An open book, not a "broken image" glyph: this state means "no cover available", not
+// "something failed" (a 404 from inspira's partial-coverage image endpoint is expected,
+// not an error — see the img error handler in buildCard below).
+const NO_COVER = `<svg viewBox="0 0 64 64" width="72" height="72" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M32 20 C 27 15 17 13 10 15 V46 C17 44 27 46 32 51 C37 46 47 44 54 46 V15 C47 13 37 15 32 20 Z"/><line x1="32" y1="20" x2="32" y2="51"/></svg>`
+
+function buildNoCoverPlaceholder() {
+    const placeholder = document.createElement("div")
+    placeholder.className = "bp-cf-noimage"
+    placeholder.setAttribute("aria-hidden", "true")
+    placeholder.innerHTML = NO_COVER
+    return placeholder
+}
+
+// A labelled lane = a strategy heading + the city library's coverflow carousel of book
+// cards. The DOM here is inert; initCarousel() wires the arrows and page dots once the lane
+// is in the document and its widths are measurable. ctx carries { onDismiss, tip,
+// explanation } shared by every card in the lane.
 function buildLane(label, items, ctx) {
     const lane = document.createElement("div")
-    lane.className = "bp-lane"
+    lane.className = "bp-cf"
     const heading = document.createElement("h4")
-    heading.className = "bp-lane-title"
+    heading.className = "bp-cf-title"
     heading.textContent = label
     lane.appendChild(heading)
-    const track = document.createElement("div")
-    track.className = "bp-lane-track"
+
+    const viewport = document.createElement("div")
+    viewport.className = "bp-cf-viewport"
+    const prev = document.createElement("button")
+    prev.type = "button"
+    prev.className = "bp-cf-nav bp-cf-prev"
+    prev.setAttribute("aria-label", "Vorherige")
+    prev.innerHTML = CHEVRON_LEFT
+    const track = document.createElement("ul")
+    track.className = "bp-cf-track"
     for (const item of items) track.appendChild(buildCard(item, ctx))
-    lane.appendChild(track)
+    const next = document.createElement("button")
+    next.type = "button"
+    next.className = "bp-cf-nav bp-cf-next"
+    next.setAttribute("aria-label", "Nächste")
+    next.innerHTML = CHEVRON_RIGHT
+    viewport.append(prev, track, next)
+    lane.appendChild(viewport)
+
+    const dots = document.createElement("div")
+    dots.className = "bp-cf-dots"
+    lane.appendChild(dots)
     return lane
 }
 
-// One book card: a cover placeholder (real images come later), a "seen" control to
-// dismiss it, the title (linked to the catalogue when we have a SOPAC id), and the author.
-// On hover it shows the lane's "why recommended" tooltip.
+// One coverflow slide: the cover on top, then the title (linked to the catalogue when we
+// have a SOPAC id) and author below — the library's column-reverse card. Adds our two
+// affordances the library card lacks: a "seen" dismiss control over the cover, and the
+// lane's "why recommended" tooltip on hover.
 function buildCard({ uri, title, author, sopacId, coverUrl }, { onDismiss, tip, explanation }) {
-    const card = document.createElement("article")
-    card.className = "bp-card"
+    const slide = document.createElement("li")
+    slide.className = "bp-cf-slide"
     if (explanation) {
-        card.addEventListener("mouseenter", () => tip.schedule(explanation, card))
-        card.addEventListener("mouseleave", () => tip.hide())
+        slide.addEventListener("mouseenter", () => tip.schedule(explanation, slide))
+        slide.addEventListener("mouseleave", () => tip.hide())
     }
-    let cover
-    if (coverUrl) {
-        cover = document.createElement("img")
-        cover.src = coverUrl
-        cover.alt = ""           // decorative; the title sits right below
-        cover.loading = "lazy"
-    } else {
-        cover = document.createElement("div")
-        cover.setAttribute("aria-hidden", "true")
-    }
-    cover.className = "bp-card-cover"
-    card.appendChild(cover)
-    const dismiss = document.createElement("button")
-    dismiss.type = "button"
-    dismiss.className = "bp-card-dismiss"
-    dismiss.textContent = "✕"
-    dismiss.title = "Als gesehen markieren"
-    dismiss.setAttribute("aria-label", "Als gesehen markieren")
-    dismiss.addEventListener("click", () => onDismiss(uri))
-    card.appendChild(dismiss)
-    const titleEl = document.createElement(sopacId ? "a" : "div")
-    titleEl.className = "bp-card-title"
+    const wrap = document.createElement("div")
+    wrap.className = "bp-cf-wrap"
+
+    const desc = document.createElement("div")
+    desc.className = "bp-cf-desc"
+    const heading = document.createElement("h3")
+    const titleEl = document.createElement(sopacId ? "a" : "span")
     titleEl.textContent = title || sopacId || ""
     if (sopacId) {
         titleEl.href = sopacCatalogueUrl(sopacId)
         titleEl.target = "_blank"
         titleEl.rel = "noopener"
     }
-    card.appendChild(titleEl)
+    heading.appendChild(titleEl)
+    desc.appendChild(heading)
     if (author) {
         const authorEl = document.createElement("div")
-        authorEl.className = "bp-card-author"
+        authorEl.className = "bp-cf-author"
         authorEl.textContent = author
-        card.appendChild(authorEl)
+        desc.appendChild(authorEl)
     }
-    return card
+
+    const image = document.createElement("div")
+    image.className = "bp-cf-image"
+    if (coverUrl) {
+        const img = document.createElement("img")
+        img.src = coverUrl
+        img.alt = ""             // decorative; the title sits right below
+        img.loading = "lazy"
+        // coverUrl only reflects "this book has an ISBN", not "inspira has a cover image
+        // for it" (coverage is partial — see cover_images note) — a 404 there must fall
+        // back to the same placeholder as "no ISBN at all", not fail silently as a blank box.
+        // replaceWith (not image.replaceChildren) swaps just the failed <img> in place — by
+        // the time "error" fires, the dismiss button is already a sibling in .bp-cf-image,
+        // and replaceChildren would have wiped it out along with the image.
+        img.addEventListener("error", () => img.replaceWith(buildNoCoverPlaceholder()), { once: true })
+        image.appendChild(img)
+    } else {
+        image.appendChild(buildNoCoverPlaceholder())
+    }
+    const dismiss = document.createElement("button")
+    dismiss.type = "button"
+    dismiss.className = "bp-cf-dismiss bp-round-btn"
+    dismiss.textContent = "✕"
+    dismiss.title = "Als gesehen markieren"
+    dismiss.setAttribute("aria-label", "Als gesehen markieren")
+    dismiss.addEventListener("click", () => onDismiss(uri))
+    image.appendChild(dismiss)
+
+    // DOM order desc → image; the wrap's column-reverse renders the cover on top, text below.
+    wrap.append(desc, image)
+    slide.appendChild(wrap)
+    return slide
+}
+
+// Turn a built lane into a working carousel: the arrows page by one viewport width, a dot
+// per page tracks and drives the scroll position, and both disappear when every slide
+// already fits. Native scroll-snap does the sliding, so there's no library to load. Returns
+// a cleanup that disconnects the resize observer — called before each re-render.
+function initCarousel(lane) {
+    const track = lane.querySelector(".bp-cf-track")
+    const prev = lane.querySelector(".bp-cf-prev")
+    const next = lane.querySelector(".bp-cf-next")
+    const dots = lane.querySelector(".bp-cf-dots")
+
+    const pageWidth = () => track.clientWidth || 1
+    // Round up so a trailing partial page still gets a dot; the small tolerance keeps a
+    // track that really fits (sub-pixel overflow) at a single page.
+    const pageCount = () => Math.max(1, Math.ceil(track.scrollWidth / pageWidth() - 0.02))
+    const maxScroll = () => Math.max(0, track.scrollWidth - track.clientWidth)
+    // Item counts rarely divide evenly by slides-per-page, so the last page is usually
+    // partial and its native scroll distance is less than a full pageWidth — dividing
+    // scrollLeft by pageWidth would then round the true rightmost scroll position back down
+    // to an earlier page (arrows/dots never reaching "last"). Scaling scrollLeft's fraction
+    // of the *actual* scrollable range across the page buckets instead always lands on the
+    // last page at the true native max, regardless of how full that last page is.
+    const currentPage = () => {
+        const max = maxScroll()
+        if (max <= 0) return 0
+        return Math.min(pageCount() - 1, Math.round((track.scrollLeft / max) * (pageCount() - 1)))
+    }
+
+    function update() {
+        const page = currentPage()
+        const pages = pageCount()
+        for (let i = 0; i < dots.children.length; i++) dots.children[i].classList.toggle("is-active", i === page)
+        prev.disabled = page <= 0
+        next.disabled = page >= pages - 1
+    }
+
+    // Rebuild the dots when the page count changes (container resize shifts slides-per-view).
+    function layout() {
+        const pages = pageCount()
+        lane.classList.toggle("bp-cf-static", track.scrollWidth - track.clientWidth <= 1)
+        if (dots.childElementCount !== pages) {
+            dots.replaceChildren()
+            for (let i = 0; i < pages; i++) {
+                const dot = document.createElement("button")
+                dot.type = "button"
+                dot.className = "bp-cf-dot"
+                dot.setAttribute("aria-label", `Seite ${i + 1}`)
+                dot.addEventListener("click", () => track.scrollTo({ left: i * pageWidth(), behavior: "smooth" }))
+                dots.appendChild(dot)
+            }
+        }
+        update()
+    }
+
+    prev.addEventListener("click", () => track.scrollBy({ left: -pageWidth(), behavior: "smooth" }))
+    next.addEventListener("click", () => track.scrollBy({ left: pageWidth(), behavior: "smooth" }))
+    track.addEventListener("scroll", update, { passive: true })
+    const ro = new ResizeObserver(layout)
+    ro.observe(track)
+    layout()
+    return () => ro.disconnect()
 }
 
 // Shared "why recommended" tooltip for lane cards — fixed-position so the lane's overflow
@@ -303,9 +420,14 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             : STORAGE_LABELS[choice] ?? ""
     }
 
-    // The Schaufenster: one lane per strategy of unread recommendations (seen ones drop
+    // The Schaufenster: one carousel per strategy of unread recommendations (seen ones drop
     // out, so a fully-seen strategy disappears). Empty / unreadable → hide the lanes.
+    // Each render replaces the lanes wholesale, so first tear down the previous carousels'
+    // resize observers to avoid leaking them across renders.
+    let carouselCleanups = []
     async function renderLanes() {
+        for (const cleanup of carouselCleanups) cleanup()
+        carouselCleanups = []
         const unread = await readUnread()
         if (!unread || unread.length === 0) { lanes.replaceChildren(); lanes.hidden = true; return }
         try {
@@ -329,6 +451,9 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             }
             lanes.replaceChildren(frag)
             lanes.hidden = false
+            // Now that the lanes are in the document, wire each into a working carousel
+            // (dot counts need measured widths, so this must run post-insertion).
+            for (const lane of lanes.querySelectorAll(".bp-cf")) carouselCleanups.push(initCarousel(lane))
         } catch (err) {
             console.error("[bib-pods] showcase render failed:", err)
             lanes.replaceChildren()
