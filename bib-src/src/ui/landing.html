@@ -15,10 +15,40 @@
         </details>
     </div>
 
-    <div class="bp-entry-mount"></div>
+    <!-- Logged-out entry: a single "Anmelden" call to action. Clicking it reveals the
+         storage chooser below (step two of the login: where should data be stored?). -->
+    <section id="bp-login-cta" class="bp-block">
+        <button id="bp-anmelden-btn" class="button" type="button">Anmelden</button>
+    </section>
+
+    <!-- Step two of the login. Hidden until "Anmelden" is clicked; once a location is
+         picked it gives way to the Konto block. Visibility is driven by applyState. -->
+    <section id="bp-chooser" class="bp-block" hidden>
+        <p>Wo sollen deine Daten gespeichert werden?</p>
+        <button id="bp-choose-session-btn" class="button" type="button" title="session storage">Nur in dieser Sitzung</button>
+        <button id="bp-choose-local-btn" class="button" type="button" title="local storage">Lokal im Browser</button>
+        <button id="bp-choose-solid-btn" class="button" type="button">In meinem Solid Pod</button>
+    </section>
+    <section id="bp-solid-setup" class="bp-block" hidden>
+        <p>Du hast noch keinen Pod? Optionen findest du <a href="https://solidproject.org/get_a_pod" target="_blank" rel="noopener">hier</a>.</p>
+        <div class="bp-solid-connect">
+            <input type="url" id="bp-solid-input" placeholder="Provider URL">
+            <button id="bp-solid-connect-btn" class="button" type="button">Verbinden</button>
+        </div>
+        <button id="bp-solid-cancel-btn" class="button" type="button">Zurück</button>
+    </section>
+
+    <section id="bp-account" class="bp-block bp-when-activated" hidden>
+        <p id="bp-storage-label" class="bp-storage-label"></p>
+        <button class="button bp-logout" type="button">Abmelden</button>
+    </section>
 
     <section id="bp-showcase" class="bp-block bp-showcase bp-when-activated" aria-labelledby="bp-showcase-heading" hidden>
         <h3 id="bp-showcase-heading">Schaufenster</h3>
+        <details id="bp-strategy-settings">
+            <summary>Welche Empfehlungen?</summary>
+            <div id="bp-strategy-toggles"></div>
+        </details>
         <p><a id="bp-check-recommendations-link" href="#">Empfehlungen prüfen</a></p>
         <div id="bp-lanes" hidden></div>
     </section>

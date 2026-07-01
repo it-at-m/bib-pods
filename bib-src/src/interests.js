@@ -46,7 +46,7 @@ function placeholderOption(text) {
 
 // Inserts the picker once, directly after `profileEl`. Living inside the profile's
 // bp-when-activated section, it shows/hides with activation automatically. onAdded
-// (cockpit's applyState) refreshes the profile view after a write.
+// (the widget's applyState) refreshes the profile view after a write.
 export async function installInterestPicker(profileEl, { onAdded } = {}) {
     if (profileEl.nextElementSibling?.classList.contains("bp-add-interest")) return
 

@@ -61,36 +61,63 @@ dialog.bp-modal {
     max-height: 92vh;
     overflow: auto;
 }
+/* The bib-pods modal is a compact account/notifications menu, so it's much narrower
+   than the shared .bp-modal width; the book-prompt keeps the wider default. */
+dialog.bp-pods-modal {
+    max-width: min(22rem, 92vw) !important;
+    width: min(22rem, 92vw) !important;
+}
 .bp-modal::backdrop {
     background: rgba(0, 0, 0, 0.4);
 }
 .bp-modal-content {
     padding: 2rem 2.5rem;
 }
-.bp-modal-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
+/* Konto block: a concise "where stored" line above the Abmelden button. */
+.bp-storage-label { margin: 0 0 0.75rem; color: #555; }
+/* The bib-pods modal is a small, plain account panel: a close ✕ in the corner, the
+   title, the unread-recommendations line + a link to the main page, and a quiet
+   Abmelden action set off by a hairline. */
+.bp-pods-modal .bp-modal-content { position: relative; padding: 1.5rem 1.75rem; }
+.bp-pods-modal #bp-modal-title { margin: 0 0 1.1rem; font-size: 1.15rem; }
+.bp-pods-modal .bp-modal-close {
+    position: absolute; top: 0.8rem; right: 0.9rem;
+    width: 1.8rem; height: 1.8rem; min-width: 0; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border: none; border-radius: 50%; background: none;
+    font-size: 1.4rem; line-height: 1; color: #999; cursor: pointer;
 }
-/* Consistent vertical rhythm between the cockpit's stacked sections (storage info,
-   recommendations button, messages, profile, switch button), without targeting each one. */
-#bp-status > * + * { margin-top: 1.75rem; }
+.bp-pods-modal .bp-modal-close:hover { background: #f0f0f0; color: #333; }
+/* Notifications line + link home, stacked and left-aligned. */
+.bp-modal-body { display: flex; flex-direction: column; align-items: flex-start; gap: 0.85rem; }
+.bp-modal-note { margin: 0; color: #888; font-size: 0.95em; }
+.bp-modal-rec { color: var(--contrastcolor, #d14900); font-weight: 600; text-decoration: none; }
+.bp-modal-rec:hover { text-decoration: underline; }
+.bp-modal-link { color: #222; text-decoration: none; font-weight: 500; }
+.bp-modal-link:hover { color: var(--contrastcolor, #d14900); text-decoration: underline; }
+/* Quiet secondary action, set off by a hairline. Resets the docs/host global <button>
+   (dark pill) styling — including :hover — so it reads as a plain text action. */
+.bp-pods-modal .bp-modal-logout {
+    display: block; width: 100%; margin: 1.1rem 0 0; padding: 0.85rem 0 0;
+    border: none; border-top: 1px solid #eee; border-radius: 0;
+    background: none; box-shadow: none; text-align: left;
+    font: inherit; color: #999; cursor: pointer;
+}
+.bp-pods-modal .bp-modal-logout:hover { background: none; color: var(--contrastcolor, #d14900); }
+.bp-modal-hint { margin-top: 1rem; }
 /* TYPO3's stylesheet drops the default <details> disclosure marker entirely
    (via `display: block` / `list-style: none` on summary). We render our own
    so the affordance is host-independent. */
-.bp-modal summary { list-style: none; cursor: pointer; }
-.bp-modal summary::-webkit-details-marker { display: none; }
-.bp-modal details > summary::before { content: "▶ "; display: inline-block; margin-right: 0.25rem; font-size: 0.75em; color: #666; }
-.bp-modal details[open] > summary::before { content: "▼ "; }
-.bp-modal-header h3 { margin: 0; }
-.bp-info-details,
+#bp-strategy-settings summary { list-style: none; cursor: pointer; }
+#bp-strategy-settings summary::-webkit-details-marker { display: none; }
+#bp-strategy-settings > summary::before { content: "▶ "; display: inline-block; margin-right: 0.25rem; font-size: 0.75em; color: #666; }
+#bp-strategy-settings[open] > summary::before { content: "▼ "; }
 cori-profile .cori-profile-table {
     color: #666;
     font-size: 0.85em;
     margin: 0.5rem 0 1rem 0;
     border-collapse: collapse;
 }
-.bp-info-details td,
 cori-profile .cori-profile-table td {
     vertical-align: top;
     word-break: break-all;
@@ -99,14 +126,14 @@ cori-profile .cori-profile-table td {
 }
 /* Solid connect row: URL input + "Verbinden" button side-by-side. Without the input
    overrides TYPO3 styles the field as a pill with a thick orange border, which clashes
-   with the modal and pushes the button onto its own line. */
+   with the surrounding block and pushes the button onto its own line. */
 .bp-solid-connect {
     display: flex;
     gap: 0.5rem;
     align-items: stretch;
     margin: 0.75rem 0;
 }
-.bp-modal input[type="url"] {
+#bp-solid-setup input[type="url"] {
     padding: 0.4rem 0.6rem !important;
     border: 1px solid #ccc !important;
     border-radius: 4px !important;
@@ -226,10 +253,6 @@ cori-profile .cori-profile-actions button:hover { color: #222; }
 }
 .bp-landing.is-activated .bp-collapsible[open] { flex: 1 0 100%; }
 
-/* The activation button sits between the top blocks and the activated-only ones.
-   .bp-entry defaults to right-aligned (compact embed); left reads better here. */
-.bp-landing .bp-entry { text-align: left; }
-
 /* <cori-profile> is a cori-sdk light-DOM primitive — the app owns its layout/look.
    Custom elements are inline by default, so make it a block; its table and action
    buttons reuse the shared styles above. */
@@ -237,7 +260,7 @@ cori-profile { display: block; }
 cori-profile .cori-profile-heading { margin-top: 0; }
 
 /* <cori-profile>'s Turtle inspector dialog — structure + Prism theme come from the
-   SDK; the app frames it to match the cockpit modal. */
+   SDK; the app frames it to match the bib-pods modal. */
 dialog.cori-turtle-view {
     padding: 1.5rem 2rem;
     border: none;

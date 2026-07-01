@@ -57,7 +57,7 @@ textNode["<div align='left'>
     end
 
     subgraph cori["<h2>CORI</h2>Contextual Relational Infrastructure"]
-        cockpit["<b>Cockpit</b>
+        client["<b>Client</b>
             <small><i>serverless</i></small>
             #bull; Profile verwalten
             #bull; Import/Export
@@ -67,7 +67,7 @@ textNode["<div align='left'>
         admin["<b>Admin</b><br>#bull;&nbsp;Gesamtvokabular&nbsp;verwalten<br>#bull;&nbsp;Änderungen&nbsp;kommunizieren<br>#bull;&nbsp;Liste&nbsp;teilnehmender&nbsp;Apps"]
         exec["<b>Execution Engine</b>"]:::planned
         integrate["<b>Integration SDK</b>"]
-        cockpit -->|nutzt| integrate
+        client -->|nutzt| integrate
         integrate <-->|read/write| psi
         integrate -.-> exec
         exec -.->|führt Verarbeitungslogik aus| psi
@@ -122,7 +122,7 @@ textNode["<div align='left'>
 ```
 
 - **`cori-sdk/`**: headless Integration-SDK. Enthält die Storage-Abstraktion mit Backends für lokalen Browser-Speicher und Solid-Pods, das Meta-Vokabular (`UserAction`, `Message`) und RDF-Hilfsfunktionen.
-- **`bib-src/`**: bibliotheksspezifische Schicht. Baut auf cori-sdk auf und stellt das Cockpit, den Buch-Prompt (Folgefragen beim Klick auf ein Buch), die Buch-Dekoration auf Katalogseiten, die Solr-gestützten Empfehlungen sowie das domänenspezifische Vokabular (`favoriteAuthor`, `RecommendationStrategy`, …) bereit.
+- **`bib-src/`**: bibliotheksspezifische Schicht. Baut auf cori-sdk auf und stellt das Bibliotheks-Pods-Widget (Anmeldung, Benachrichtigungen und – auf der Hauptseite – Speicherortwahl, Profil und Empfehlungen), den Buch-Prompt (Folgefragen beim Klick auf ein Buch), die Buch-Dekoration auf Katalogseiten, die Solr-gestützten Empfehlungen sowie das domänenspezifische Vokabular (`favoriteAuthor`, `RecommendationStrategy`, …) bereit.
 - **`docs/`**: arbeitet Aspekte von `bib-src` über GitHub Pages heraus im Sinne einer Dokumentation + Demo + selber experimentieren.
 - **`typo3/bib_pods/`**: bündelt `bib-src` zur TYPO3-Extension, die in der lokalen Instanz und auf der Webseite der Münchner Stadtbibliothek eingebunden wird.
 - **`api/`**: minimaler HTTP-Server, der `bib-src` headless einbindet: Nutzer*innen senden ihr Profil-Turtle und erhalten Empfehlungen als JSON zurück. Dieselbe Empfehlungslogik wie im Plugin, nur anders ausgeliefert.

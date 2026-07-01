@@ -16,6 +16,7 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 plugin: "plugin/src/main.js",
+                example: "example/src/main.js",
                 recommendations: "recommendations/src/main.js",
                 interactions: "interactions/src/main.js",
                 search: "search/src/main.js",
@@ -26,7 +27,16 @@ export default defineConfig({
             output: {
                 format: "es",
                 entryFileNames: "[name].js",
-                chunkFileNames: "chunks/[name]-[hash].js",
+                // Keep shared chunks at the dist root (not a chunks/ subdir): cori-sdk's
+                // solid.js resolves the SharedWorker via `new URL("RefreshWorker.js",
+                // import.meta.url)`, which only finds the emitted dist/RefreshWorker.js
+                // when the calling code sits beside it. A subdir would 404 the worker and
+                // hang session.restore() (and thus the whole widget mount).
+                // (Letting Vite resolve the worker natively via `?url` isn't an option:
+                // the @uvdsl package doesn't export the worker as a subpath, and lib-mode
+                // TYPO3 would inline it as an origin-less data: URL — hence the manual
+                // emitRefreshWorker plugin + this co-location.)
+                chunkFileNames: "[name]-[hash].js",
             },
         },
     },

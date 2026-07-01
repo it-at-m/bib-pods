@@ -52,6 +52,41 @@ body {
     margin-right: 0;
 }
 
+/* "Plugin" is a link that also reveals its sub-page(s) on hover/focus. The inner <a>
+   keeps the shared .nav-bar spacing, so the parent needs no margin of its own. */
+.nav-dropdown-parent { position: relative; }
+.nav-caret { font-size: 0.7em; color: #888; margin-left: 0.25rem; }
+.nav-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    padding: 0.55rem 1.25rem;
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    z-index: 100;
+}
+.nav-dropdown-parent:hover .nav-dropdown,
+.nav-dropdown-parent:focus-within .nav-dropdown { display: block; }
+.nav-dropdown a { display: block; padding: 0.4rem 0; }
+
+/* Example page note: a lead-in explaining the page simulates a library page. */
+.bp-example-note { margin-top: 0; }
+/* On the example page the compact button stands alone, so center it with room above
+   and below — its default right-alignment looks odd here. */
+#bp-root .bp-entry { text-align: center; margin: 2.5rem 0; }
+/* Sample entities: a heading above three columns (Books, Onleihe, Events), each
+   category stacked top-to-bottom. Column flow + 3 fixed rows fills down each column in
+   DOM order before moving to the next. */
+.bp-sample-heading { font-size: 1.15rem; font-weight: 600; margin: 1.75rem 0 2rem; }
+.bp-sample-grid {
+    display: grid;
+    grid-template-rows: repeat(3, auto);
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 0.6rem 1.5rem;
+}
+
 /* the hamburger only appears at the narrow-screen breakpoint below */
 .nav-toggle {
     display: none;
@@ -265,4 +300,6 @@ textarea.code-input {
     .nav-links .spacer {
         display: none;
     }
+    /* No hover on touch: show the sub-page(s) as static, indented links. */
+    .nav-dropdown { display: block; position: static; padding: 0; margin-left: 1rem; border: none; }
 }
