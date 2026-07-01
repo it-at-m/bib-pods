@@ -156,6 +156,21 @@ function mediumLabel(marc) {
     return h ? (h.replace(/^\s*\[|\]\s*$/g, "").trim() || null) : null
 }
 
+// Onleihe mediaInfo URLs carry the divibib media id as the third dash-segment after
+// the comma; mirrors bib-src/src/decorate-cards.js's ONLEIHE_RE, which extracts the
+// same id client-side from a clicked link. Indexing it here lets that click resolve
+// straight to this record via `onleihe_id:<id>` instead of only being logged. Not
+// guaranteed unique — the same id occasionally appears on more than one record (the
+// same holding re-imported over time) — but any match is an equally valid resolution
+// since duplicates share the same bibliographic data; callers can just take the first.
+const ONLEIHE_RE = /onleihe\.de\/.+\/mediaInfo,\d+-\d+-(\d+)-/
+
+function onleiheIds(marc) {
+    return subfields(marc, "856", "u")
+        .map(u => u.match(ONLEIHE_RE)?.[1])
+        .filter(Boolean)
+}
+
 // https://www.loc.gov/marc/bibliographic
 function mapRecord(oaiRecord) {
     const marc = oaiRecord.metadata.record[0]
@@ -239,6 +254,7 @@ function mapRecord(oaiRecord) {
         // Misc (VuFind: contents=505a:505t, url=856u:555u)
         contents:         [...subfields(marc, "505", "a"), ...subfields(marc, "505", "t")],
         url:              [...subfields(marc, "856", "u"), ...subfields(marc, "555", "u")],
+        onleihe_id:       onleiheIds(marc),
 
         // Non-VuFind: OAI setSpec → mapped to institution per VuFind convention
         institution:      oaiRecord.header.setSpec ?? [],
