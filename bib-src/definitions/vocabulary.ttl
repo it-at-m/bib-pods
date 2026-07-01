@@ -111,13 +111,13 @@ bp:disabledStrategy a rdf:Property ;
     rdfs:range bp:RecommendationStrategy .
 
 bp:authorMatch a bp:RecommendationStrategy ;
-    rdfs:label "Mehr von Lieblingsautor*in"@de ;
+    rdfs:label "Mehr von deinen Lieblingsautor*innen"@de ;
     bp:engine bp:SolrEngine ;
     bp:usesProfileProperty bp:favoriteAuthor ;
     bp:combine bp:Or .
 
 bp:authorAndTopic a bp:RecommendationStrategy ;
-    rdfs:label "Autor*in & Thema kombiniert"@de ;
+    rdfs:label "Autor*innen & Themen kombiniert"@de ;
     bp:engine bp:SolrEngine ;
     bp:usesProfileProperty bp:favoriteAuthor, bp:interestedIn ;
     bp:combine bp:And .
