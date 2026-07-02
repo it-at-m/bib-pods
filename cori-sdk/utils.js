@@ -33,6 +33,27 @@ export function getVocab() {
     return vocabStore
 }
 
+const PROFILE_SECTION = CORI + "ProfileSection"
+const IN_SECTION = CORI + "inSection"
+const ORDER = CORI + "order"
+
+// Sections with their fields, both sorted by cori:order, straight from the merged
+// vocab. Plain store reads + JS sort — the bundled Comunica's multi-key ORDER BY is
+// unreliable across OPTIONAL groups, and the vocab store is synchronous anyway.
+export function sectionPlan() {
+    const v = getVocab()
+    const orderOf = iri => Number(getOne(v, iri, ORDER) ?? Number.MAX_SAFE_INTEGER)
+    return subjectsOfType(v, PROFILE_SECTION)
+        .sort((a, b) => orderOf(a) - orderOf(b))
+        .map(iri => ({
+            iri,
+            label: getLabel(iri) ?? contractTerm(iri),
+            fields: v.getSubjects(IN_SECTION, iri, null)
+                .map(t => t.value)
+                .sort((a, b) => orderOf(a) - orderOf(b)),
+        }))
+}
+
 export function expandTerm(token) {
     const colonIdx = token.indexOf(":")
     if (colonIdx === -1) return token

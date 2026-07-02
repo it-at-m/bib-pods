@@ -27,7 +27,8 @@ cori:comment a rdf:Property ;
     rdfs:domain cori:Profile ;
     rdfs:range xsd:string ;
     cori:inSection cori:PersonalSection ;
-    cori:order 20 .
+    cori:order 20 ;
+    cori:assistantQuestion false . # a free-form remark, not something to prompt for
 
 # =================================================================================
 # Profile sections — thematic groups of profile fields, the basis for the profile UI
@@ -52,6 +53,11 @@ cori:order a rdf:Property ;
 
 cori:pluralLabel a rdf:Property ;
     rdfs:comment "Plural form of rdfs:label, used where the UI titles a group of values of this property." .
+
+cori:assistantQuestion a rdf:Property ;
+    rdfs:domain rdf:Property ;
+    rdfs:range xsd:boolean ;
+    rdfs:comment "Whether the dialog assistant asks about this profile field. false = the field's values arrive through dedicated interactions (e.g. catalogue clicks) or the field doesn't suit a guided question (free-form remarks). Unset counts as true." .
 
 # ----- Generic sections -----
 

@@ -20,14 +20,16 @@ export function readDisabledStrategies(profileStore) {
 }
 
 // Returns descriptors for every bp:RecommendationStrategy in the vocab:
-//   [{ iri, label, comment, engine, properties: [propUri], combine }]
+//   [{ iri, label, comment, engine, properties: [propUri], combine, maxSuggestions }]
 // engine defaults to the Solr backend when unspecified; comment is the strategy's
 // rdfs:comment (e.g. a note about external network traffic) or null; combine is the
-// combinator descriptor { iri, label, space } or null (see combinatorOf).
+// combinator descriptor { iri, label, space } or null (see combinatorOf);
+// maxSuggestions is the strategy's bp:maxSuggestions or null (runner default applies).
 export function getStrategies() {
     const v = getVocab()
     return v.getSubjects(RDF_TYPE, BP + "RecommendationStrategy", null).map(t => {
         const iri = t.value
+        const max = v.getObjects(iri, BP + "maxSuggestions", null)[0]?.value
         return {
             iri,
             label: labelOf(v, iri),
@@ -35,6 +37,7 @@ export function getStrategies() {
             engine: v.getObjects(iri, BP + "engine", null)[0]?.value ?? BP + "SolrEngine",
             properties: v.getObjects(iri, BP + "usesProfileProperty", null).map(o => o.value),
             combine: combinatorOf(v, iri),
+            maxSuggestions: max !== undefined ? Number(max) : null,
         }
     })
 }
@@ -174,6 +177,7 @@ export function buildQuery(strategy, profileStore, profileSubject) {
 // runs every enabled strategy against its engine (Solr index or the inspira recommender)
 // and returns:
 //   { results: [{ strategy, docs: [...] }], serverUnreachable: bool }
+// `limit` caps each strategy's results; a strategy's bp:maxSuggestions overrides it.
 // Disabled strategies (bp:disabledStrategy in the profile) are skipped, as are Solr
 // strategies that yield no clauses (profile lacks the necessary predicates).
 // serverUnreachable lets callers tell "backend down" apart from "reached it, but nothing
@@ -194,7 +198,7 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
                 // The inspira recommender is seeded by the Merkliste, returning points whose
                 // payload.metadata mirrors our catalogue. Reshape to the {id, title} docs the
                 // caller already knows, minting the SOPAC id back from the bare akkey.
-                const { savedIds, basedOn, results: points } = await recommendFromSavedBooks(profileStore, profileSubject, qdrantEndpoint, limit)
+                const { savedIds, basedOn, results: points } = await recommendFromSavedBooks(profileStore, profileSubject, qdrantEndpoint, strategy.maxSuggestions ?? limit)
                 reached++
                 // basedOn = the bare akkeys the recommender actually used; the rest of the
                 // Merkliste isn't in the collection. Logged so we can see what went in/out.
@@ -220,7 +224,7 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
         const query = buildQuery(strategy, profileStore, profileSubject)
         if (!query) continue
         attempted++
-        const url = solrUrl(solrEndpoint, query, limit)
+        const url = solrUrl(solrEndpoint, query, strategy.maxSuggestions ?? limit)
         console.log(`[bib-pods] ${strategy.label}: ${url}`)
         try {
             const res = await fetch(url)

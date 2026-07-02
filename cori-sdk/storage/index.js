@@ -113,6 +113,16 @@ function ensureProfileTyped(store) {
 export const addTriple = (subject, predicate, object) =>
     mutate(store => addTripleToStore(store, subject, predicate, object))
 
+// Removes one profile fact (subject = profile root); `object` is the RDF term, so
+// IRI and literal values delete precisely. An IRI object that is no longer referenced
+// anywhere afterwards takes its own description triples (labels etc.) with it.
+export const removeProfileFact = (predicate, object) => mutate(store => {
+    for (const q of store.getQuads(getProfileSubject(), predicate, object, null)) store.removeQuad(q)
+    if (object.termType === "NamedNode" && store.getQuads(null, null, object, null).length === 0) {
+        for (const q of store.getQuads(object, null, null, null)) store.removeQuad(q)
+    }
+})
+
 export const clearStorage = () => getStorage().save(baseProfileStore())
 
 function baseProfileStore() {

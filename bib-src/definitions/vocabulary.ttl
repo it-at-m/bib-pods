@@ -68,6 +68,7 @@ bp:savedBook a rdf:Property ; # SOPAC identifier
     rdfs:range xsd:string ;
     cori:inSection bp:SavedSection ;
     cori:order 10 ;
+    cori:assistantQuestion false ; # values are catalogue ids — the Merkliste grows via book interactions, not typed input
     bp:explanationPhrase "es deinen gemerkten Büchern ähnelt"@de .
 
 bp:hobby a rdf:Property ;
@@ -143,6 +144,10 @@ bp:engine a rdf:Property ; # which backend computes the strategy's results
     rdfs:domain bp:RecommendationStrategy ;
     rdfs:range bp:RecommendationEngine .
 
+bp:maxSuggestions a rdf:Property ; # how many results a strategy may return; without it the runner's default applies
+    rdfs:domain bp:RecommendationStrategy ;
+    rdfs:range xsd:integer .
+
 bp:RecommendationEngine a rdfs:Class .
 bp:SolrEngine a bp:RecommendationEngine ; # Lucene query over the interim index, built from profile facts
     rdfs:label "Solr" .
@@ -180,4 +185,5 @@ bp:savedBookSimilarity a bp:RecommendationStrategy ;
     rdfs:comment "Sendet deine Merkliste an einen weiteren Server der Stadt München (inspira_BIB), um ähnliche Titel zu finden."@de ;
     bp:engine bp:InspiraEngine ;
     bp:usesProfileProperty bp:savedBook ;
-    bp:combine bp:AverageVector .
+    bp:combine bp:AverageVector ;
+    bp:maxSuggestions 5 .

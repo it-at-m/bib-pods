@@ -2,7 +2,7 @@
 // profile shapes plus any shapes a consuming app registers (registerProfileShapes)
 // or passes in explicitly. Built on the shacl-engine wrapper in sem-ops-utils.
 import { buildValidatorFromDataset } from "@foerderfunke/sem-ops-utils/shacl"
-import { datasetFromStore, datasetFromTurtles } from "@foerderfunke/sem-ops-utils/core"
+import { datasetFromStore, datasetFromTurtles, storeFromTurtles } from "@foerderfunke/sem-ops-utils/core"
 import coriProfileShapesTtl from "./definitions/profile.shapes.ttl.js"
 
 // Turtle strings of additional profile shapes, contributed by the app layer.
@@ -12,6 +12,16 @@ const registeredShapes = []
 // so validateProfile() picks them up without the caller threading them through.
 export function registerProfileShapes(ttl) {
     registeredShapes.push(ttl)
+    shapesStore = null
+}
+
+// The fused profile shapes as a queryable store — the same graph validateProfile()
+// checks against, so consumers reading constraints (e.g. the assistant reading
+// sh:maxCount) can never drift from what validation enforces.
+let shapesStore = null
+export function getProfileShapesStore() {
+    if (!shapesStore) shapesStore = storeFromTurtles([coriProfileShapesTtl, ...registeredShapes])
+    return shapesStore
 }
 
 // Validates a profile store against cori's base shapes fused with `additionalShapes`

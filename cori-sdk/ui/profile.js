@@ -1,12 +1,10 @@
-import { loadStore, loadAsTurtle, addTriple, clearStorage, isStorageReady, getStorageEntryName } from "../storage/index.js"
-import { getProfileSubject, getLabel, getPluralLabel, getOne, getVocab, subjectsOfType, contractTerm, expandTerm, storageErrorMessage, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
+import { loadStore, loadAsTurtle, addTriple, removeProfileFact, clearStorage, isStorageReady, getStorageEntryName } from "../storage/index.js"
+import { getProfileSubject, getLabel, getPluralLabel, getOne, contractTerm, expandTerm, sectionPlan, storageErrorMessage, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
 import { validateProfile } from "../shacl.js"
+import { openAssistant, askableFields } from "./assistant.js"
 import { datasetToTurtle } from "@foerderfunke/sem-ops-utils/core"
 
 const PROFILE_TYPE = CORI + "Profile"
-const PROFILE_SECTION = CORI + "ProfileSection"
-const IN_SECTION = CORI + "inSection"
-const ORDER = CORI + "order"
 
 // <cori-profile> — a light-DOM UI primitive. Renders the user's profile triples
 // grouped into the profile sections the merged vocabulary declares
@@ -14,6 +12,9 @@ const ORDER = CORI + "order"
 // wired straight to cori-sdk storage. Sections without entries collapse under a
 // trailing "noch leere Bereiche" disclosure; profile facts whose predicate
 // belongs to no section land in a catch-all group, so nothing is silently hidden.
+// The heading carries a "Profil ausfüllen" launcher and every section with
+// currently askable fields an "Ergänzen" launcher — both open the derived dialog
+// assistant (./assistant.js), scoped to the whole profile or to that section.
 // No shadow root, no bundled styles.
 // Call refresh() to re-render after the profile changes elsewhere.
 // Assignable property:
@@ -22,22 +23,6 @@ const ORDER = CORI + "order"
 //     as cover tiles); null/undefined or a throw falls back to the default chips.
 // Bubbling event:
 //   cori-profile:change --> the profile was mutated (entry added or cleared)
-
-// Sections with their fields, both sorted by cori:order. Plain store reads +
-// JS sort — the bundled Comunica's multi-key ORDER BY is unreliable across
-// OPTIONAL groups, and the vocab store is synchronous anyway.
-function sectionPlan() {
-    const v = getVocab()
-    const orderOf = iri => Number(getOne(v, iri, ORDER) ?? Number.MAX_SAFE_INTEGER)
-    return subjectsOfType(v, PROFILE_SECTION)
-        .sort((a, b) => orderOf(a) - orderOf(b))
-        .map(iri => ({
-            label: getLabel(iri) ?? contractTerm(iri),
-            fields: v.getSubjects(IN_SECTION, iri, null)
-                .map(t => t.value)
-                .sort((a, b) => orderOf(a) - orderOf(b)),
-        }))
-}
 
 // Prism is loaded from a CDN the first time the Turtle inspector opens; the promise
 // is cached module-wide so concurrent <cori-profile> instances share one load.
@@ -85,7 +70,10 @@ export class CoriProfile extends HTMLElement {
     connectedCallback() {
         if (this._sectionsEl) return // render once; connect may fire again if moved in the DOM
         this.innerHTML = `
-            <h3 class="cori-profile-heading">Profil</h3>
+            <div class="cori-profile-header">
+                <h3 class="cori-profile-heading">Profil</h3>
+                <button type="button" class="cori-profile-fill">Profil ausfüllen</button>
+            </div>
             <div class="cori-profile-sections"></div>
             <div class="cori-profile-actions">
                 <button type="button" data-action="inspect">Als Turtle anzeigen</button>
@@ -96,6 +84,7 @@ export class CoriProfile extends HTMLElement {
         this._sectionsEl = this.querySelector(".cori-profile-sections")
         this._refreshSeq = 0
 
+        this.querySelector(".cori-profile-fill").addEventListener("click", () => this._assist())
         this.querySelector('[data-action="add"]').addEventListener("click", () => this._add())
         this.querySelector('[data-action="download"]').addEventListener("click", () => this._download())
         this.querySelector('[data-action="inspect"]').addEventListener("click", () => this._inspect())
@@ -140,14 +129,29 @@ export class CoriProfile extends HTMLElement {
             if (!values.has(q.predicate.value)) values.set(q.predicate.value, [])
             values.get(q.predicate.value).push(q.object)
         }
+        // counts snapshot for the launcher visibility — `values` is consumed below
+        const counts = new Map([...values].map(([predicate, objects]) => [predicate, objects.length]))
+        const countOf = f => counts.get(f) ?? 0
         const sections = []
         const emptySections = []
         for (const s of sectionPlan()) {
             const el = document.createElement("section")
             el.className = "cori-profile-section"
+            const head = document.createElement("div")
+            head.className = "cori-profile-section-head"
             const heading = document.createElement("h4")
             heading.textContent = s.label
-            el.appendChild(heading)
+            head.appendChild(heading)
+            // sections with something to ask right now get their own assistant launcher
+            if (askableFields(s.fields, countOf).length > 0) {
+                const addBtn = document.createElement("button")
+                addBtn.type = "button"
+                addBtn.className = "cori-profile-add"
+                addBtn.textContent = "Ergänzen"
+                addBtn.addEventListener("click", () => this._assist(s.iri))
+                head.appendChild(addBtn)
+            }
+            el.appendChild(head)
             for (const field of s.fields) {
                 const objects = values.get(field)
                 values.delete(field)
@@ -199,21 +203,51 @@ export class CoriProfile extends HTMLElement {
         }
         const chips = document.createElement("ul")
         chips.className = "cori-profile-chips"
-        chips.append(...objects.map(o => this._buildChip(store, o)))
+        chips.append(...objects.map(o => this._buildChip(store, predicate, o)))
         group.appendChild(chips)
         return group
     }
 
-    // IRI values prefer their locally stored rdfs:label; literals pass through
-    _buildChip(store, object) {
+    // IRI values prefer their locally stored rdfs:label; literals pass through.
+    // Each chip carries a remove control that deletes the fact from the profile.
+    _buildChip(store, predicate, object) {
         const li = document.createElement("li")
+        const text = document.createElement("span")
         if (object.termType === "NamedNode") {
-            li.textContent = getOne(store, object.value, RDFS_LABEL) ?? contractTerm(object.value)
+            text.textContent = getOne(store, object.value, RDFS_LABEL) ?? contractTerm(object.value)
             li.title = contractTerm(object.value)
         } else {
-            li.textContent = object.value
+            text.textContent = object.value
         }
+        const remove = document.createElement("button")
+        remove.type = "button"
+        remove.className = "cori-profile-chip-remove"
+        remove.textContent = "×"
+        remove.title = "Entfernen"
+        remove.setAttribute("aria-label", `„${text.textContent}" entfernen`)
+        remove.addEventListener("click", async () => {
+            try {
+                await removeProfileFact(predicate, object)
+                await this.refresh()
+                this._emitChange()
+            } catch (err) {
+                console.error("[cori-profile] removeProfileFact failed:", err)
+                window.alert("Eintrag konnte nicht entfernt werden:\n" + storageErrorMessage(err))
+            }
+        })
+        li.append(text, remove)
         return li
+    }
+
+    // Opens the derived dialog assistant, whole-profile or scoped to one section.
+    // Every stored answer refreshes the sections behind the dialog and notifies the
+    // app (same event as the other mutations).
+    _assist(sectionIri = null) {
+        openAssistant({
+            host: this,
+            sectionIri,
+            onChange: () => { this.refresh(); this._emitChange() },
+        })
     }
 
     async _inspect() {

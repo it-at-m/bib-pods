@@ -497,6 +497,11 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     async function renderLanes() {
         for (const cleanup of carouselCleanups) cleanup()
         carouselCleanups = []
+        // Re-renders keep each lane's scroll position (dismissing a card would
+        // otherwise snap the carousel back to the start); restoring clamps to the
+        // new maximum, so a shortened lane stays right-aligned.
+        const scrollLeftByLane = new Map([...lanes.querySelectorAll(".bp-cf")].map(lane =>
+            [lane.querySelector(".bp-cf-title").textContent, lane.querySelector(".bp-cf-track").scrollLeft]))
         const unread = await readUnread()
         if (!unread || unread.length === 0) { lanes.replaceChildren(); lanes.hidden = true; return }
         try {
@@ -529,7 +534,11 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             lanes.hidden = false
             // Now that the lanes are in the document, wire each into a working carousel
             // (dot counts need measured widths, so this must run post-insertion).
-            for (const lane of lanes.querySelectorAll(".bp-cf")) carouselCleanups.push(initCarousel(lane))
+            for (const lane of lanes.querySelectorAll(".bp-cf")) {
+                carouselCleanups.push(initCarousel(lane))
+                const prev = scrollLeftByLane.get(lane.querySelector(".bp-cf-title").textContent)
+                if (prev) lane.querySelector(".bp-cf-track").scrollLeft = prev
+            }
         } catch (err) {
             console.error("[bib-pods] showcase render failed:", err)
             lanes.replaceChildren()

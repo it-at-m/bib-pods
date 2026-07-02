@@ -238,9 +238,39 @@ dialog.bp-pods-modal {
 cori-profile .cori-profile-sections { margin: 8px 0 16px; }
 cori-profile .cori-profile-section { padding: 12px 0; }
 cori-profile .cori-profile-section + .cori-profile-section { border-top: 1px solid #eee; }
-cori-profile .cori-profile-section > h4 {
+cori-profile .cori-profile-section h4 {
     margin: 0;
     font-size: 1em;
+}
+/* Heading rows: title left, assistant launcher right. */
+cori-profile .cori-profile-header,
+cori-profile .cori-profile-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+cori-profile .cori-profile-header .cori-profile-heading { margin: 0; }
+/* Launchers as quiet outlined pills; explicit background/border so host button
+   styling can't leak in. */
+cori-profile .cori-profile-fill,
+cori-profile .cori-profile-add {
+    padding: 3px 14px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 999px;
+    box-shadow: none;
+    font: inherit;
+    font-size: 0.85em;
+    color: #444;
+    cursor: pointer;
+    white-space: nowrap;
+}
+cori-profile .cori-profile-fill:hover,
+cori-profile .cori-profile-add:hover {
+    background: #fff;
+    border-color: var(--contrastcolor, #d14900);
+    color: var(--contrastcolor, #d14900);
 }
 cori-profile .cori-profile-field { margin: 10px 0 0; }
 cori-profile .cori-profile-field-label {
@@ -258,14 +288,29 @@ cori-profile .cori-profile-chips {
     list-style: none;
 }
 cori-profile .cori-profile-chips li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     margin: 0;
-    padding: 3px 12px;
+    padding: 3px 10px 3px 12px;
     background: #f4f1ea;
     border: 1px solid #e4e0d7;
     border-radius: 999px;
     font-size: 0.85em;
     list-style: none;
 }
+cori-profile .cori-profile-chip-remove {
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    line-height: 1;
+    color: #b3aea3;
+    cursor: pointer;
+}
+cori-profile .cori-profile-chip-remove:hover { background: none; color: var(--contrastcolor, #d14900); }
 cori-profile .cori-profile-notice {
     margin: 10px 0 0;
     font-size: 0.85em;
@@ -285,7 +330,58 @@ cori-profile .cori-profile-more > summary::-webkit-details-marker { display: non
 cori-profile .cori-profile-more > summary::before { content: "▶ "; display: inline-block; margin-right: 4px; font-size: 0.75em; }
 cori-profile .cori-profile-more[open] > summary::before { content: "▼ "; }
 cori-profile .cori-profile-more .cori-profile-section { border-top: none; padding: 10px 0 0; }
-cori-profile .cori-profile-more .cori-profile-section > h4 { color: #666; }
+cori-profile .cori-profile-more .cori-profile-section h4 { color: #666; }
+
+/* ----- Profile assistant dialog ----- */
+/* px box sizing for the TYPO3 root-font mismatch (see dialog.bp-pods-modal). */
+dialog.cori-assistant {
+    padding: 22px 26px;
+    border: none;
+    border-radius: var(--border-radius, 12px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    max-width: min(440px, 92vw) !important;
+    width: min(440px, 92vw) !important;
+}
+dialog.cori-assistant::backdrop { background: rgba(0, 0, 0, 0.4); }
+.cori-assistant-topline {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 10px;
+    font-size: 0.85em;
+    color: #888;
+}
+.cori-assistant-question { margin: 0 0 14px; font-weight: 600; }
+cori-profile .cori-assistant-existing { margin: 0 0 14px; }
+/* the chips base sets display:flex, which would override the hidden attribute */
+cori-profile .cori-assistant-existing[hidden] { display: none; }
+.cori-assistant-form { display: flex; gap: 8px; margin: 0 0 16px; }
+.cori-assistant-form[hidden] { display: none; }
+/* same host-input overrides as the Solid connect field */
+.cori-assistant-form input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 10px !important;
+    border: 1px solid #ccc !important;
+    border-radius: 4px !important;
+    background: #fff !important;
+    color: inherit !important;
+    font: inherit !important;
+    box-shadow: none !important;
+}
+.cori-assistant-form .button { min-width: 0; white-space: nowrap; }
+.cori-assistant-actions { display: flex; justify-content: space-between; }
+.cori-assistant-actions button {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #555;
+    text-decoration: underline;
+    font: inherit;
+    font-weight: normal;
+    cursor: pointer;
+}
+.cori-assistant-actions button:hover { background: none; color: #222; }
 /* Solid connect row: URL input + "Verbinden" button side-by-side. Without the input
    overrides TYPO3 styles the field as a pill with a thick orange border, which clashes
    with the surrounding block and pushes the button onto its own line. */
