@@ -74,6 +74,60 @@ export async function explainStrategy(strategy, profileStore, profileSubject) {
     return `Wird empfohlen, weil ${fragments.join(join)}.`
 }
 
+// Per-book explanation (HTML): which of the user's profile facts THIS doc actually
+// matches, checked symbolically against the doc's index fields via the same
+// bp:linkedToIndex mappings the query builder uses. `properties` restricts the
+// check to a strategy's own bp:usesProfileProperty set — the tooltip makes a causal
+// claim ("weil"), so a vector-similarity lane must not cite symbolic overlaps that
+// weren't its reason; without it every mapped property is checked (best effort for
+// lanes whose strategy is unknown, e.g. messages from a renamed strategy).
+// Returns null when no fact matches — callers fall back to the strategy-level
+// explanation.
+export function explainDocMatches(doc, profileStore, profileSubject, properties = null) {
+    const v = getVocab()
+    const props = properties ?? v.getSubjects(BP + "linkedToIndex", null, null).map(t => t.value)
+    const fragments = []
+    for (const prop of props) {
+        const phrase = germanText(v, prop, BP + "explanationPhrase")
+        // phrases without {value} state no traceable fact — only actual matches count here
+        if (!phrase?.includes("{value}")) continue
+        const mappings = getLinkedIndices(v, prop)
+        const matched = new Set()
+        for (const obj of profileStore.getObjects(profileSubject, prop, null)) {
+            if (!docMatchesFact(doc, mappings, obj, profileStore)) continue
+            matched.add(obj.termType === "NamedNode"
+                ? germanText(profileStore, obj.value, RDFS_LABEL) ?? contractTerm(obj.value)
+                : obj.value)
+        }
+        if (matched.size === 0) continue
+        const bolded = [...matched].map(x => `<strong>${escapeHtml(x)}</strong>`).join(", ")
+        fragments.push(phrase.replace("{value}", bolded))
+    }
+    if (fragments.length === 0) return null
+    return `Wird empfohlen, weil ${fragments.join(" und ")}.`
+}
+
+// Does the doc carry this profile fact in any of the property's index fields?
+// Authority IRIs check the iriField, literals the labelField; locally minted URNs
+// (urn:bibpods:…) never appear in the index, so they check the labelField via their
+// preserved raw index form (bp:sourceLabel). Exact matches only — a near-miss
+// (e.g. a differing name-date variant) counts as "not traceable", not as a match.
+function docMatchesFact(doc, mappings, obj, profileStore) {
+    const inField = (field, value) => field && [].concat(doc[field] ?? []).includes(value)
+    for (const m of mappings) {
+        if (obj.termType !== "NamedNode") {
+            if (inField(m.labelField, obj.value)) return true
+        } else if (obj.value.startsWith(LOCAL)) {
+            const raw = germanText(profileStore, obj.value, BP + "sourceLabel")
+                ?? germanText(profileStore, obj.value, RDFS_LABEL)
+            if (raw && inField(m.labelField, raw)) return true
+        } else if (inField(m.iriField, obj.value)) {
+            return true
+        }
+    }
+    return false
+}
+
 export function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
 }

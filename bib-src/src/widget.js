@@ -3,7 +3,7 @@ import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk
 import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
-import { runRecommendations, getStrategies, readDisabledStrategies, explainStrategy, escapeHtml, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
+import { runRecommendations, getStrategies, readDisabledStrategies, explainStrategy, explainDocMatches, escapeHtml, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl, fetchBook } from "./catalogue.js"
 import { cleanAuthorName } from "./book-prompt.js"
 import { BP } from "./vocab.js"
@@ -77,9 +77,9 @@ function buildNoCoverPlaceholder() {
 
 // A lane = an optional heading + the city library's coverflow carousel of book cards.
 // The DOM here is inert; initCarousel() wires the arrows and page dots once the lane
-// is in the document and its widths are measurable. ctx carries { onDismiss, tip,
-// explanation } shared by every card in the lane. buildSlide makes the full strategy
-// card by default; the profile's Merkliste passes buildMiniCard for cover-only tiles.
+// is in the document and its widths are measurable. ctx carries { onDismiss, tip }
+// shared by every card in the lane. buildSlide makes the full strategy card by
+// default; the profile's Merkliste passes buildMiniCard for cover-only tiles.
 function buildLane(label, items, ctx, buildSlide = buildCard) {
     const lane = document.createElement("div")
     lane.className = "bp-cf"
@@ -117,8 +117,8 @@ function buildLane(label, items, ctx, buildSlide = buildCard) {
 // One coverflow slide: the cover on top, then the title (linked to the catalogue when we
 // have a SOPAC id) and author below — the library's column-reverse card. Adds our two
 // affordances the library card lacks: a "seen" dismiss control over the cover, and the
-// lane's "why recommended" tooltip on hover.
-function buildCard({ uri, title, author, sopacId, coverUrl }, { onDismiss, tip, explanation }) {
+// card's own "why recommended" tooltip on hover.
+function buildCard({ uri, title, author, sopacId, coverUrl, explanation }, { onDismiss, tip }) {
     const slide = document.createElement("li")
     slide.className = "bp-cf-slide"
     if (explanation) {
@@ -405,19 +405,19 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const logoutBtn = root.querySelector(".bp-logout")
     const activatedBlocks = root.querySelectorAll(".bp-when-activated")
     const profileEl = root.querySelector("cori-profile")
-    // The Merkliste renders as a compact coverflow instead of chips: each SOPAC id
-    // resolves to its Solr doc once per page view (the map caches the promise; a
-    // failed lookup degrades that book to the no-cover placeholder with its raw id).
-    const savedBookDocs = new Map()
-    function fetchSavedBook(id) {
-        if (!savedBookDocs.has(id)) savedBookDocs.set(id, fetchBook(solrEndpoint, id).catch(() => null))
-        return savedBookDocs.get(id)
+    // Solr docs by SOPAC id, shared by the profile's Merkliste and the lanes' per-card
+    // explanations: each id resolves once per page view (the map caches the promise;
+    // a failed lookup yields null and callers degrade gracefully).
+    const docCache = new Map()
+    function fetchDocCached(id) {
+        if (!docCache.has(id)) docCache.set(id, fetchBook(solrEndpoint, id).catch(() => null))
+        return docCache.get(id)
     }
     let savedBooksCleanup = null
     profileEl.renderFieldValues = async (predicate, objects) => {
         if (predicate !== BP + "savedBook") return null
         const items = await Promise.all(objects.map(async ({ value }) => {
-            const doc = await fetchSavedBook(value)
+            const doc = await fetchDocCached(value)
             const isbn = doc?.isbn?.[0]
             return {
                 // titles occasionally carry "| marketing subtitle" appendices — the tooltip shows the main title
@@ -515,8 +515,15 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             const frag = document.createDocumentFragment()
             for (const [label, items] of byStrategy) {
                 const strategy = strategyByLabel.get(label)
-                const explanation = strategy ? await explainStrategy(strategy, profileStore, profileSubject) : null
-                frag.appendChild(buildLane(label, items, { onDismiss: dismissCard, tip, explanation }))
+                const laneExplanation = strategy ? await explainStrategy(strategy, profileStore, profileSubject) : null
+                // Per-card precision: check which profile facts the recommended book itself
+                // carries. The strategy-level text is the fallback — for docs that can't be
+                // fetched, and for non-symbolic matches (inspira's vector similarity).
+                for (const item of items) {
+                    const doc = item.sopacId ? await fetchDocCached(item.sopacId) : null
+                    item.explanation = (doc && explainDocMatches(doc, profileStore, profileSubject, strategy?.properties)) ?? laneExplanation
+                }
+                frag.appendChild(buildLane(label, items, { onDismiss: dismissCard, tip }))
             }
             lanes.replaceChildren(frag)
             lanes.hidden = false
