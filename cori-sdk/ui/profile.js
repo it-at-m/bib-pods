@@ -1,16 +1,43 @@
 import { loadStore, loadAsTurtle, addTriple, clearStorage, isStorageReady, getStorageEntryName } from "../storage/index.js"
-import { getProfileSubject, getLabel, getOne, contractTerm, expandTerm, storageErrorMessage, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
+import { getProfileSubject, getLabel, getPluralLabel, getOne, getVocab, subjectsOfType, contractTerm, expandTerm, storageErrorMessage, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
 import { validateProfile } from "../shacl.js"
 import { datasetToTurtle } from "@foerderfunke/sem-ops-utils/core"
 
 const PROFILE_TYPE = CORI + "Profile"
+const PROFILE_SECTION = CORI + "ProfileSection"
+const IN_SECTION = CORI + "inSection"
+const ORDER = CORI + "order"
 
-// <cori-profile> — a light-DOM UI primitive. Renders the user's profile triples as
-// a table plus profile-actions, wired straight to cori-sdk storage.
+// <cori-profile> — a light-DOM UI primitive. Renders the user's profile triples
+// grouped into the profile sections the merged vocabulary declares
+// (cori:ProfileSection / cori:inSection / cori:order), plus profile-actions,
+// wired straight to cori-sdk storage. Sections without entries collapse under a
+// trailing "noch leere Bereiche" disclosure; profile facts whose predicate
+// belongs to no section land in a catch-all group, so nothing is silently hidden.
 // No shadow root, no bundled styles.
 // Call refresh() to re-render after the profile changes elsewhere.
+// Assignable property:
+//   renderFieldValues: async (predicateIri, objectTerms) => Element | null
+//     lets the app take over rendering of one field's values (e.g. saved books
+//     as cover tiles); null/undefined or a throw falls back to the default chips.
 // Bubbling event:
 //   cori-profile:change --> the profile was mutated (entry added or cleared)
+
+// Sections with their fields, both sorted by cori:order. Plain store reads +
+// JS sort — the bundled Comunica's multi-key ORDER BY is unreliable across
+// OPTIONAL groups, and the vocab store is synchronous anyway.
+function sectionPlan() {
+    const v = getVocab()
+    const orderOf = iri => Number(getOne(v, iri, ORDER) ?? Number.MAX_SAFE_INTEGER)
+    return subjectsOfType(v, PROFILE_SECTION)
+        .sort((a, b) => orderOf(a) - orderOf(b))
+        .map(iri => ({
+            label: getLabel(iri) ?? contractTerm(iri),
+            fields: v.getSubjects(IN_SECTION, iri, null)
+                .map(t => t.value)
+                .sort((a, b) => orderOf(a) - orderOf(b)),
+        }))
+}
 
 // Prism is loaded from a CDN the first time the Turtle inspector opens; the promise
 // is cached module-wide so concurrent <cori-profile> instances share one load.
@@ -56,17 +83,18 @@ function buildTurtleDialog(onValidate) {
 
 export class CoriProfile extends HTMLElement {
     connectedCallback() {
-        if (this._table) return // render once; connect may fire again if moved in the DOM
+        if (this._sectionsEl) return // render once; connect may fire again if moved in the DOM
         this.innerHTML = `
             <h3 class="cori-profile-heading">Profil</h3>
-            <table class="cori-profile-table"></table>
+            <div class="cori-profile-sections"></div>
             <div class="cori-profile-actions">
                 <button type="button" data-action="inspect">Als Turtle anzeigen</button>
                 <button type="button" data-action="add">Eintrag hinzufügen</button>
                 <button type="button" data-action="download">Profil herunterladen</button>
                 <button type="button" data-action="clear">Profil leeren</button>
             </div>`
-        this._table = this.querySelector(".cori-profile-table")
+        this._sectionsEl = this.querySelector(".cori-profile-sections")
+        this._refreshSeq = 0
 
         this.querySelector('[data-action="add"]').addEventListener("click", () => this._add())
         this.querySelector('[data-action="download"]').addEventListener("click", () => this._download())
@@ -76,39 +104,116 @@ export class CoriProfile extends HTMLElement {
         this.refresh()
     }
 
-    // An empty table would read as "no profile entries" — when the storage is
-    // not connected or fails to load, say so instead.
+    // Empty sections alone would read as "no profile entries" — when the storage
+    // is not connected or fails to load, say so instead.
     _renderNotice(text) {
-        const cell = this._table.insertRow().insertCell()
-        cell.colSpan = 2
-        cell.textContent = text
+        const p = document.createElement("p")
+        p.className = "cori-profile-notice"
+        p.textContent = text
+        this._sectionsEl.replaceChildren(p)
     }
 
     async refresh() {
-        if (!this._table) return
-        this._table.replaceChildren()
+        if (!this._sectionsEl) return
+        // Refreshes overlap (e.g. mount + session restore); the sequence number lets
+        // stale ones discard their result, and the single replaceChildren at the end
+        // keeps the previous rendering visible until the new one is complete.
+        const seq = ++this._refreshSeq
         if (!isStorageReady()) return this._renderNotice("Keine Verbindung zum Speicherort.")
         try {
             const store = await loadStore()
-            for (const q of store.getQuads(getProfileSubject(), null, null, null)) {
-                // the structural `a cori:Profile` base triple isn't a profile fact — skip it
-                if (q.predicate.value === RDF_TYPE && q.object.value === PROFILE_TYPE) continue
-                const tr = this._table.insertRow()
-                // Predicate column shows a human label; its title surfaces the
-                // prefixed IRI (e.g. ex:knows) on hover.
-                const prefixed = contractTerm(q.predicate.value)
-                const predCell = tr.insertCell()
-                predCell.textContent = getLabel(q.predicate.value) ?? prefixed
-                predCell.title = prefixed
-                // IRI objects: prefer a locally stored rdfs:label; literals pass through.
-                tr.insertCell().textContent = q.object.termType === "NamedNode"
-                    ? (getOne(store, q.object.value, RDFS_LABEL) ?? contractTerm(q.object.value))
-                    : q.object.value
-            }
+            const sections = await this._renderSections(store)
+            if (seq !== this._refreshSeq) return
+            this._sectionsEl.replaceChildren(...sections)
         } catch (err) {
             console.error("[cori-profile] render failed:", err)
             this._renderNotice("Daten konnten gerade nicht geladen werden.")
         }
+    }
+
+    async _renderSections(store) {
+        // profile facts grouped by predicate; the structural `a cori:Profile` base
+        // triple isn't a profile fact
+        const values = new Map()
+        for (const q of store.getQuads(getProfileSubject(), null, null, null)) {
+            if (q.predicate.value === RDF_TYPE && q.object.value === PROFILE_TYPE) continue
+            if (!values.has(q.predicate.value)) values.set(q.predicate.value, [])
+            values.get(q.predicate.value).push(q.object)
+        }
+        const sections = []
+        const emptySections = []
+        for (const s of sectionPlan()) {
+            const el = document.createElement("section")
+            el.className = "cori-profile-section"
+            const heading = document.createElement("h4")
+            heading.textContent = s.label
+            el.appendChild(heading)
+            for (const field of s.fields) {
+                const objects = values.get(field)
+                values.delete(field)
+                if (objects?.length) el.appendChild(await this._buildFieldGroup(store, field, objects))
+            }
+            // sections without entries are collapsed away below
+            ;(el.children.length > 1 ? sections : emptySections).push(el)
+        }
+        // facts whose predicate no section claims (e.g. manually added triples)
+        if (values.size > 0) {
+            const el = document.createElement("section")
+            el.className = "cori-profile-section"
+            const heading = document.createElement("h4")
+            heading.textContent = "Weiteres"
+            el.appendChild(heading)
+            for (const [predicate, objects] of values) {
+                el.appendChild(await this._buildFieldGroup(store, predicate, objects))
+            }
+            sections.push(el)
+        }
+        if (emptySections.length > 0) {
+            const details = document.createElement("details")
+            details.className = "cori-profile-more"
+            const summary = document.createElement("summary")
+            summary.textContent = `Noch leere Bereiche (${emptySections.length})`
+            details.append(summary, ...emptySections)
+            sections.push(details)
+        }
+        return sections
+    }
+
+    async _buildFieldGroup(store, predicate, objects) {
+        const group = document.createElement("div")
+        group.className = "cori-profile-field"
+        const label = document.createElement("p")
+        label.className = "cori-profile-field-label"
+        // several values get the plural form; the title surfaces the prefixed IRI on hover
+        label.textContent = (objects.length > 1 ? getPluralLabel(predicate) : null)
+            ?? getLabel(predicate) ?? contractTerm(predicate)
+        label.title = contractTerm(predicate)
+        group.appendChild(label)
+        let custom = null
+        try { custom = await this.renderFieldValues?.(predicate, objects) } catch (err) {
+            console.error("[cori-profile] renderFieldValues failed, falling back to chips:", err)
+        }
+        if (custom) {
+            group.appendChild(custom)
+            return group
+        }
+        const chips = document.createElement("ul")
+        chips.className = "cori-profile-chips"
+        chips.append(...objects.map(o => this._buildChip(store, o)))
+        group.appendChild(chips)
+        return group
+    }
+
+    // IRI values prefer their locally stored rdfs:label; literals pass through
+    _buildChip(store, object) {
+        const li = document.createElement("li")
+        if (object.termType === "NamedNode") {
+            li.textContent = getOne(store, object.value, RDFS_LABEL) ?? contractTerm(object.value)
+            li.title = contractTerm(object.value)
+        } else {
+            li.textContent = object.value
+        }
+        return li
     }
 
     async _inspect() {

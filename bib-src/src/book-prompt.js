@@ -83,7 +83,7 @@ export function installBookPrompt(root, { onSaved } = {}) {
 
 // MARC 100 author strings arrive as "Lastname, Firstname YYYY-YYYY?"
 // strip the trailing date range and swap the comma'd name to its natural order
-function cleanAuthorName(s) {
+export function cleanAuthorName(s) {
     const withoutDates = s.replace(/\s+\d{4}-\d{0,4}\s*$/, "").trim()
     const comma = withoutDates.indexOf(",")
     if (comma === -1) return withoutDates

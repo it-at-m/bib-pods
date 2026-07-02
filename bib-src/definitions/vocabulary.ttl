@@ -13,11 +13,19 @@
 
 bp:favoriteWork a rdf:Property ;
     rdfs:label "favorite work"@en, "Lieblingsbuch"@de ;
-    rdfs:range bf:Work .
+    cori:pluralLabel "favorite works"@en, "Lieblingsbücher"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range bf:Work ;
+    cori:inSection bp:TasteSection ;
+    cori:order 30 .
 
 bp:favoriteAuthor a rdf:Property ;
     rdfs:label "favorite author"@en, "Autor*in"@de ;
+    cori:pluralLabel "favorite authors"@en, "Autor*innen"@de ;
+    rdfs:domain cori:Profile ;
     rdfs:range bf:Person ;
+    cori:inSection bp:TasteSection ;
+    cori:order 10 ;
     bp:explanationPhrase "dir {value} gefällt"@de ;
     bp:linkedToIndex [
         bp:labelField "author" ;
@@ -29,7 +37,11 @@ bp:favoriteAuthor a rdf:Property ;
 
 bp:favoriteGenre a rdf:Property ;
     rdfs:label "favorite genre"@en, "Genre"@de ;
+    cori:pluralLabel "favorite genres"@en, "Genres"@de ;
+    rdfs:domain cori:Profile ;
     rdfs:range bf:GenreForm ;
+    cori:inSection bp:TasteSection ;
+    cori:order 20 ;
     bp:explanationPhrase "du das Genre {value} magst"@de ;
     bp:linkedToIndex [
         bp:labelField "genre" ;
@@ -38,7 +50,11 @@ bp:favoriteGenre a rdf:Property ;
 
 bp:interestedIn a rdf:Property ;
     rdfs:label "interested in"@en, "Thema"@de ;
+    cori:pluralLabel "topics"@en, "Themen"@de ;
+    rdfs:domain cori:Profile ;
     rdfs:range bf:Topic ;
+    cori:inSection bp:TasteSection ;
+    cori:order 40 ;
     bp:explanationPhrase "dich {value} interessiert"@de ;
     bp:linkedToIndex [
         bp:labelField "topic" ;
@@ -47,8 +63,20 @@ bp:interestedIn a rdf:Property ;
 
 bp:savedBook a rdf:Property ; # SOPAC identifier
     rdfs:label "saved book"@en, "Gemerktes Buch"@de ;
+    cori:pluralLabel "saved books"@en, "Gemerkte Bücher"@de ;
+    rdfs:domain cori:Profile ;
     rdfs:range xsd:string ;
+    cori:inSection bp:SavedSection ;
+    cori:order 10 ;
     bp:explanationPhrase "es deinen gemerkten Büchern ähnelt"@de .
+
+bp:hobby a rdf:Property ;
+    rdfs:label "hobby"@en, "Hobby"@de ;
+    cori:pluralLabel "hobbies"@en, "Hobbys"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range xsd:string ;
+    cori:inSection bp:HobbiesSection ;
+    cori:order 10 .
 
 bp:sourceLabel a rdf:Property .
 
@@ -56,6 +84,31 @@ bp:sourceLabel a rdf:Property .
 # replaced with the matching profile value(s). Fragments are joined by the strategy's
 # bp:combine word and prefixed with "Wird empfohlen, weil …".
 bp:explanationPhrase a rdf:Property .
+
+# ----- Profile sections -----
+# cori:PersonalSection (cori-sdk) opens the profile at cori:order 10; the library
+# sections follow. Sections without fields yet are deliberate sketches: they render
+# empty and are the attachment points for future fields and dialog assistants.
+
+bp:TasteSection a cori:ProfileSection ;
+    rdfs:label "reading taste"@en, "Lesegeschmack"@de ;
+    cori:order 20 .
+
+bp:HobbiesSection a cori:ProfileSection ;
+    rdfs:label "hobbies"@en, "Hobbys"@de ;
+    cori:order 40 .
+
+bp:ProjectsSection a cori:ProfileSection ;
+    rdfs:label "projects"@en, "Projekte"@de ;
+    cori:order 50 .
+
+bp:LanguagesSection a cori:ProfileSection ;
+    rdfs:label "languages"@en, "Sprachen"@de ;
+    cori:order 60 .
+
+bp:SavedSection a cori:ProfileSection ;
+    rdfs:label "saved list"@en, "Merkliste"@de ;
+    cori:order 70 .
 
 # ----- Index mapping -----
 

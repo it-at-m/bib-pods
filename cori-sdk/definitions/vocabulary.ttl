@@ -18,12 +18,46 @@ cori:Profile a rdfs:Class ;
 cori:username a rdf:Property ;
     rdfs:label "username"@en, "Benutzername"@de ;
     rdfs:domain cori:Profile ;
-    rdfs:range xsd:string .
+    rdfs:range xsd:string ;
+    cori:inSection cori:PersonalSection ;
+    cori:order 10 .
 
 cori:comment a rdf:Property ;
     rdfs:label "comment"@en, "Kommentar"@de ;
     rdfs:domain cori:Profile ;
-    rdfs:range xsd:string .
+    rdfs:range xsd:string ;
+    cori:inSection cori:PersonalSection ;
+    cori:order 20 .
+
+# =================================================================================
+# Profile sections — thematic groups of profile fields, the basis for the profile UI
+# =================================================================================
+
+# A "profile field" is any property with rdfs:domain cori:Profile — that domain
+# triple attaches the field to the profile root. Fields and sections may come from
+# any registered vocabulary; getVocab() merges them all into one graph.
+
+cori:ProfileSection a rdfs:Class ;
+    rdfs:label "profile section"@en, "Profilbereich"@de .
+
+cori:inSection a rdf:Property ;
+    rdfs:label "in section"@en ;
+    rdfs:domain rdf:Property ;
+    rdfs:range cori:ProfileSection ;
+    rdfs:comment "The section a profile field is displayed under. Fields without a section render in a generic catch-all." .
+
+cori:order a rdf:Property ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "Display order among siblings: sections within the profile, fields within their section. Lower comes first." .
+
+cori:pluralLabel a rdf:Property ;
+    rdfs:comment "Plural form of rdfs:label, used where the UI titles a group of values of this property." .
+
+# ----- Generic sections -----
+
+cori:PersonalSection a cori:ProfileSection ;
+    rdfs:label "personal"@en, "Persönliches"@de ;
+    cori:order 10 .
 
 cori:Message a rdfs:Class ;
     rdfs:label "message" ;

@@ -145,6 +145,17 @@
 
 /* nothing to page through → no arrows, no dots */
 .bp-cf-static .bp-cf-nav, .bp-cf-static .bp-cf-dots { display: none; }
+
+/* Compact lane variant for the profile's Merkliste: fixed-width cover-only tiles
+   (no desc block, no dismiss), tighter gutters, smaller arrows and dots. */
+.bp-cf-mini { --bp-cf-gap: 12px; --bp-cf-pad: 36px; --bp-cf-nav: 26px; padding-top: 10px; padding-bottom: 10px; }
+.bp-cf-mini .bp-cf-slide { flex: 0 0 92px; }
+.bp-cf-mini .bp-cf-image { padding: 8px; min-height: 116px; border-radius: 10px; }
+.bp-cf-mini .bp-cf-image img { max-height: 110px; box-shadow: 3px 3px 2px rgba(0, 0, 0, 0.3); }
+.bp-cf-mini .bp-cf-noimage { min-height: 100px; }
+.bp-cf-mini .bp-cf-noimage svg { width: 36px; height: 36px; }
+.bp-cf-mini .bp-cf-dots { gap: 0.5rem; margin-top: 8px; }
+.bp-cf-mini .bp-cf-dot { width: 11px; height: 11px; border-width: 1px; }
 /* "why recommended" tooltip (fixed-position, set inline by JS) */
 .bp-tip { position: fixed; z-index: 10000; max-width: 18rem; padding: 0.55rem 0.8rem; border-radius: 6px;
     background: #222; color: #fff; font-size: 0.95rem; line-height: 1.4; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
@@ -221,18 +232,60 @@ dialog.bp-pods-modal {
 #bp-strategy-settings summary::-webkit-details-marker { display: none; }
 #bp-strategy-settings > summary::before { content: "▶ "; display: inline-block; margin-right: 0.25rem; font-size: 0.75em; color: #666; }
 #bp-strategy-settings[open] > summary::before { content: "▼ "; }
-cori-profile .cori-profile-table {
-    color: #666;
+/* Profile sections: calm stacked groups separated by hairlines; entries render
+   as quiet chips. px (not rem) for box dimensions — the TYPO3 host's 62.5% root
+   font-size would otherwise shrink them (see the box-sizing note below). */
+cori-profile .cori-profile-sections { margin: 8px 0 16px; }
+cori-profile .cori-profile-section { padding: 12px 0; }
+cori-profile .cori-profile-section + .cori-profile-section { border-top: 1px solid #eee; }
+cori-profile .cori-profile-section > h4 {
+    margin: 0;
+    font-size: 1em;
+}
+cori-profile .cori-profile-field { margin: 10px 0 0; }
+cori-profile .cori-profile-field-label {
+    margin: 0 0 4px;
+    font-size: 0.8em;
+    color: #888;
+}
+/* explicit list resets: host globals (.maincontents ul/li) leak into the light DOM */
+cori-profile .cori-profile-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+cori-profile .cori-profile-chips li {
+    margin: 0;
+    padding: 3px 12px;
+    background: #f4f1ea;
+    border: 1px solid #e4e0d7;
+    border-radius: 999px;
     font-size: 0.85em;
-    margin: 0.5rem 0 1rem 0;
-    border-collapse: collapse;
+    list-style: none;
 }
-cori-profile .cori-profile-table td {
-    vertical-align: top;
-    word-break: break-all;
-    padding: 0.3rem 0.6rem;
-    border: 1px solid #eee;
+cori-profile .cori-profile-notice {
+    margin: 10px 0 0;
+    font-size: 0.85em;
+    color: #999;
+    font-style: italic;
 }
+/* Sections without entries sit collapsed behind this disclosure. Own marker, since
+   TYPO3's stylesheet drops the native <summary> one (see #bp-strategy-settings). */
+cori-profile .cori-profile-more { padding: 12px 0 0; border-top: 1px solid #eee; }
+cori-profile .cori-profile-more > summary {
+    list-style: none;
+    cursor: pointer;
+    font-size: 0.85em;
+    color: #888;
+}
+cori-profile .cori-profile-more > summary::-webkit-details-marker { display: none; }
+cori-profile .cori-profile-more > summary::before { content: "▶ "; display: inline-block; margin-right: 4px; font-size: 0.75em; }
+cori-profile .cori-profile-more[open] > summary::before { content: "▼ "; }
+cori-profile .cori-profile-more .cori-profile-section { border-top: none; padding: 10px 0 0; }
+cori-profile .cori-profile-more .cori-profile-section > h4 { color: #666; }
 /* Solid connect row: URL input + "Verbinden" button side-by-side. Without the input
    overrides TYPO3 styles the field as a pill with a thick orange border, which clashes
    with the surrounding block and pushes the button onto its own line. */
@@ -363,7 +416,7 @@ cori-profile .cori-profile-actions button:hover { color: #222; }
 .bp-landing.is-activated .bp-collapsible[open] { flex: 1 0 100%; }
 
 /* <cori-profile> is a cori-sdk light-DOM primitive — the app owns its layout/look.
-   Custom elements are inline by default, so make it a block; its table and action
+   Custom elements are inline by default, so make it a block; its sections and action
    buttons reuse the shared styles above. */
 cori-profile { display: block; }
 cori-profile .cori-profile-heading { margin-top: 0; }

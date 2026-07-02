@@ -3,8 +3,10 @@ import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk
 import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
-import { runRecommendations, getStrategies, readDisabledStrategies, explainStrategy, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
-import { sopacCatalogueUrl } from "./catalogue.js"
+import { runRecommendations, getStrategies, readDisabledStrategies, explainStrategy, escapeHtml, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
+import { sopacCatalogueUrl, fetchBook } from "./catalogue.js"
+import { cleanAuthorName } from "./book-prompt.js"
+import { BP } from "./vocab.js"
 import styleCss from "./ui/style.css?inline"
 import entryHtml from "./ui/entry.html?raw"
 import landingHtml from "./ui/landing.html?raw"
@@ -73,17 +75,20 @@ function buildNoCoverPlaceholder() {
     return placeholder
 }
 
-// A labelled lane = a strategy heading + the city library's coverflow carousel of book
-// cards. The DOM here is inert; initCarousel() wires the arrows and page dots once the lane
+// A lane = an optional heading + the city library's coverflow carousel of book cards.
+// The DOM here is inert; initCarousel() wires the arrows and page dots once the lane
 // is in the document and its widths are measurable. ctx carries { onDismiss, tip,
-// explanation } shared by every card in the lane.
-function buildLane(label, items, ctx) {
+// explanation } shared by every card in the lane. buildSlide makes the full strategy
+// card by default; the profile's Merkliste passes buildMiniCard for cover-only tiles.
+function buildLane(label, items, ctx, buildSlide = buildCard) {
     const lane = document.createElement("div")
     lane.className = "bp-cf"
-    const heading = document.createElement("h4")
-    heading.className = "bp-cf-title"
-    heading.textContent = label
-    lane.appendChild(heading)
+    if (label) {
+        const heading = document.createElement("h4")
+        heading.className = "bp-cf-title"
+        heading.textContent = label
+        lane.appendChild(heading)
+    }
 
     const viewport = document.createElement("div")
     viewport.className = "bp-cf-viewport"
@@ -94,7 +99,7 @@ function buildLane(label, items, ctx) {
     prev.innerHTML = CHEVRON_LEFT
     const track = document.createElement("ul")
     track.className = "bp-cf-track"
-    for (const item of items) track.appendChild(buildCard(item, ctx))
+    for (const item of items) track.appendChild(buildSlide(item, ctx))
     const next = document.createElement("button")
     next.type = "button"
     next.className = "bp-cf-nav bp-cf-next"
@@ -172,6 +177,37 @@ function buildCard({ uri, title, author, sopacId, coverUrl }, { onDismiss, tip, 
     // DOM order desc → image; the wrap's column-reverse renders the cover on top, text below.
     wrap.append(desc, image)
     slide.appendChild(wrap)
+    return slide
+}
+
+// A compact slide for the profile's Merkliste: just the cover (or the no-cover
+// placeholder) linking to the catalogue entry. Title + author live in the shared
+// tooltip — shown instantly (no schedule() delay), since these tiles carry no
+// visible text at all.
+function buildMiniCard({ title, author, sopacId, coverUrl }, { tip }) {
+    const slide = document.createElement("li")
+    slide.className = "bp-cf-slide"
+    const tipHtml = `<strong>${escapeHtml(title)}</strong>${author ? "<br>" + escapeHtml(author) : ""}`
+    slide.addEventListener("mouseenter", () => tip.show(tipHtml, slide))
+    slide.addEventListener("mouseleave", () => tip.hide())
+    const link = document.createElement("a")
+    link.className = "bp-cf-image"
+    link.href = sopacCatalogueUrl(sopacId)
+    link.target = "_blank"
+    link.rel = "noopener"
+    link.setAttribute("aria-label", author ? `${title} – ${author}` : title)
+    if (coverUrl) {
+        const img = document.createElement("img")
+        img.src = coverUrl
+        img.alt = ""
+        img.loading = "lazy"
+        // same expected-404 fallback as buildCard: partial cover coverage, not an error
+        img.addEventListener("error", () => img.replaceWith(buildNoCoverPlaceholder()), { once: true })
+        link.appendChild(img)
+    } else {
+        link.appendChild(buildNoCoverPlaceholder())
+    }
+    slide.appendChild(link)
     return slide
 }
 
@@ -369,6 +405,39 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const logoutBtn = root.querySelector(".bp-logout")
     const activatedBlocks = root.querySelectorAll(".bp-when-activated")
     const profileEl = root.querySelector("cori-profile")
+    // The Merkliste renders as a compact coverflow instead of chips: each SOPAC id
+    // resolves to its Solr doc once per page view (the map caches the promise; a
+    // failed lookup degrades that book to the no-cover placeholder with its raw id).
+    const savedBookDocs = new Map()
+    function fetchSavedBook(id) {
+        if (!savedBookDocs.has(id)) savedBookDocs.set(id, fetchBook(solrEndpoint, id).catch(() => null))
+        return savedBookDocs.get(id)
+    }
+    let savedBooksCleanup = null
+    profileEl.renderFieldValues = async (predicate, objects) => {
+        if (predicate !== BP + "savedBook") return null
+        const items = await Promise.all(objects.map(async ({ value }) => {
+            const doc = await fetchSavedBook(value)
+            const isbn = doc?.isbn?.[0]
+            return {
+                // titles occasionally carry "| marketing subtitle" appendices — the tooltip shows the main title
+                title: doc?.title?.[0]?.split(" | ")[0] ?? value,
+                author: doc?.author?.[0] ? cleanAuthorName(doc.author[0]) : "",
+                sopacId: value,
+                coverUrl: isbn && coverBase ? coverBase + encodeURIComponent(isbn) : null,
+            }
+        }))
+        const lane = buildLane(null, items, { tip }, buildMiniCard)
+        lane.classList.add("bp-cf-mini")
+        // carousel wiring needs measured widths: wait until <cori-profile> has inserted
+        // the lane (a superseded refresh never inserts it — then there's nothing to wire)
+        requestAnimationFrame(() => {
+            if (!lane.isConnected) return
+            savedBooksCleanup?.()
+            savedBooksCleanup = initCarousel(lane)
+        })
+        return lane
+    }
     const lanes = root.querySelector("#bp-lanes")
     const checkRecLink = root.querySelector("#bp-check-recommendations-link")
     const strategyToggles = root.querySelector("#bp-strategy-toggles")

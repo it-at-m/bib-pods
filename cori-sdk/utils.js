@@ -47,9 +47,17 @@ export function contractTerm(uri) {
     return uri
 }
 
+function preferDe(terms) {
+    return terms.find(t => t.language === "de")?.value ?? terms[0]?.value
+}
+
 export function getLabel(uri) {
-    const labels = getVocab().getObjects(uri, RDFS_LABEL, null)
-    return labels.find(t => t.language === "de")?.value ?? labels[0]?.value
+    return preferDe(getVocab().getObjects(uri, RDFS_LABEL, null))
+}
+
+// cori:pluralLabel — how a UI titles a group of several values of a property
+export function getPluralLabel(uri) {
+    return preferDe(getVocab().getObjects(uri, CORI + "pluralLabel", null))
 }
 
 export function mintMessageUri() {
