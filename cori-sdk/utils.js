@@ -47,6 +47,7 @@ export function sectionPlan() {
         .sort((a, b) => orderOf(a) - orderOf(b))
         .map(iri => ({
             iri,
+            order: orderOf(iri),
             label: getLabel(iri) ?? contractTerm(iri),
             fields: v.getSubjects(IN_SECTION, iri, null)
                 .map(t => t.value)

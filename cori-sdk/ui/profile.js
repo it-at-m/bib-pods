@@ -1,5 +1,5 @@
 import { loadStore, loadAsTurtle, addTriple, removeProfileFact, clearStorage, isStorageReady, getStorageEntryName } from "../storage/index.js"
-import { getProfileSubject, getLabel, getPluralLabel, getOne, contractTerm, expandTerm, sectionPlan, storageErrorMessage, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
+import { getProfileSubject, getVocab, getLabel, getPluralLabel, getOne, contractTerm, expandTerm, sectionPlan, storageErrorMessage, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
 import { validateProfile } from "../shacl.js"
 import { openAssistant, askableFields } from "./assistant.js"
 import { datasetToTurtle } from "@foerderfunke/sem-ops-utils/core"
@@ -132,7 +132,13 @@ export class CoriProfile extends HTMLElement {
         // counts snapshot for the launcher visibility — `values` is consumed below
         const counts = new Map([...values].map(([predicate, objects]) => [predicate, objects.length]))
         const countOf = f => counts.get(f) ?? 0
+        const askable = f => askableFields([f], countOf).length > 0
+        // The "noch leere Bereiche" disclosure sorts among the sections at the
+        // cori:EmptySectionsBlock anchor's order; filled sections beyond it (e.g. a
+        // machine-fed saved list) render below the disclosure.
+        const gapsOrder = Number(getOne(getVocab(), CORI + "EmptySectionsBlock", CORI + "order") ?? Number.MAX_SAFE_INTEGER)
         const sections = []
+        const trailingSections = []
         const emptySections = []
         for (const s of sectionPlan()) {
             const el = document.createElement("section")
@@ -147,18 +153,41 @@ export class CoriProfile extends HTMLElement {
                 const addBtn = document.createElement("button")
                 addBtn.type = "button"
                 addBtn.className = "cori-profile-add"
-                addBtn.textContent = "Ergänzen"
+                addBtn.textContent = "Bereich ergänzen"
                 addBtn.addEventListener("click", () => this._assist(s.iri))
                 head.appendChild(addBtn)
             }
             el.appendChild(head)
+            const emptyFields = []
             for (const field of s.fields) {
                 const objects = values.get(field)
                 values.delete(field)
-                if (objects?.length) el.appendChild(await this._buildFieldGroup(store, field, objects))
+                if (objects?.length) {
+                    el.appendChild(await this._buildFieldGroup(store, field, objects,
+                        askable(field) ? () => this._assist(s.iri, field) : null))
+                } else {
+                    emptyFields.push(field)
+                }
             }
-            // sections without entries are collapsed away below
-            ;(el.children.length > 1 ? sections : emptySections).push(el)
+            // Empty fields show what could go there: each a "+ <label>" launcher (or
+            // plain text when the assistant has nothing to ask for it). In a fully
+            // empty section they sit inline (the section itself is collapsed away
+            // below); in a populated one they fold behind their own disclosure.
+            const gapFields = this._buildGapFields(s.iri, emptyFields, askable)
+            if (el.children.length === 1) {
+                if (gapFields) el.appendChild(gapFields)
+                emptySections.push(el)
+            } else {
+                if (gapFields) {
+                    const gaps = document.createElement("details")
+                    gaps.className = "cori-profile-more cori-profile-field-gaps"
+                    const gapsSummary = document.createElement("summary")
+                    gapsSummary.textContent = `Noch leere Felder (${emptyFields.length})`
+                    gaps.append(gapsSummary, gapFields)
+                    el.appendChild(gaps)
+                }
+                ;(s.order > gapsOrder ? trailingSections : sections).push(el)
+            }
         }
         // facts whose predicate no section claims (e.g. manually added triples)
         if (values.size > 0) {
@@ -180,18 +209,56 @@ export class CoriProfile extends HTMLElement {
             details.append(summary, ...emptySections)
             sections.push(details)
         }
-        return sections
+        return [...sections, ...trailingSections]
     }
 
-    async _buildFieldGroup(store, predicate, objects) {
+    // The "+ <label>" launcher chips for a section's empty fields (plain muted text
+    // for fields the assistant doesn't ask about). Null when there are no fields.
+    _buildGapFields(sectionIri, fields, askable) {
+        if (fields.length === 0) return null
+        const list = document.createElement("ul")
+        list.className = "cori-profile-gap-fields"
+        for (const field of fields) {
+            const li = document.createElement("li")
+            const label = getLabel(field) ?? contractTerm(field)
+            if (askable(field)) {
+                const btn = document.createElement("button")
+                btn.type = "button"
+                btn.className = "cori-profile-add-field"
+                btn.textContent = `+ ${label}`
+                btn.addEventListener("click", () => this._assist(sectionIri, field))
+                li.appendChild(btn)
+            } else {
+                li.className = "cori-profile-gap-field-static"
+                li.textContent = label
+            }
+            list.appendChild(li)
+        }
+        return list
+    }
+
+    // onAsk (optional): opens the assistant scoped to just this field — rendered as a
+    // small "+" beside the label when the field can still take entries.
+    async _buildFieldGroup(store, predicate, objects, onAsk = null) {
         const group = document.createElement("div")
         group.className = "cori-profile-field"
         const label = document.createElement("p")
         label.className = "cori-profile-field-label"
         // several values get the plural form; the title surfaces the prefixed IRI on hover
-        label.textContent = (objects.length > 1 ? getPluralLabel(predicate) : null)
+        const labelText = (objects.length > 1 ? getPluralLabel(predicate) : null)
             ?? getLabel(predicate) ?? contractTerm(predicate)
+        label.textContent = labelText
         label.title = contractTerm(predicate)
+        if (onAsk) {
+            const addOne = document.createElement("button")
+            addOne.type = "button"
+            addOne.className = "cori-profile-add-one"
+            addOne.textContent = "+"
+            addOne.title = `„${labelText}" ergänzen`
+            addOne.setAttribute("aria-label", `„${labelText}" ergänzen`)
+            addOne.addEventListener("click", onAsk)
+            label.appendChild(addOne)
+        }
         group.appendChild(label)
         let custom = null
         try { custom = await this.renderFieldValues?.(predicate, objects) } catch (err) {
@@ -239,13 +306,14 @@ export class CoriProfile extends HTMLElement {
         return li
     }
 
-    // Opens the derived dialog assistant, whole-profile or scoped to one section.
-    // Every stored answer refreshes the sections behind the dialog and notifies the
-    // app (same event as the other mutations).
-    _assist(sectionIri = null) {
+    // Opens the derived dialog assistant: whole-profile, scoped to one section, or
+    // down to a single field. Every stored answer refreshes the sections behind the
+    // dialog and notifies the app (same event as the other mutations).
+    _assist(sectionIri = null, fieldIri = null) {
         openAssistant({
             host: this,
             sectionIri,
+            fieldIri,
             onChange: () => { this.refresh(); this._emitChange() },
         })
     }

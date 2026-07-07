@@ -127,9 +127,11 @@ bp:LanguagesSection a cori:ProfileSection ;
     rdfs:label "languages"@en, "Sprachen"@de ;
     cori:order 60 .
 
+# order > cori:EmptySectionsBlock (100): the Merkliste fills itself through catalogue
+# clicks rather than curation, so it sits below the "noch leere Bereiche" disclosure.
 bp:SavedSection a cori:ProfileSection ;
     rdfs:label "saved list"@en, "Merkliste"@de ;
-    cori:order 70 .
+    cori:order 110 .
 
 # ----- Index mapping -----
 

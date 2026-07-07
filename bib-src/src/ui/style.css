@@ -279,6 +279,54 @@ cori-profile .cori-profile-field-label {
     font-size: 0.8em;
     color: #888;
 }
+/* single-field assistant launcher beside a filled field's label: a tiny naked "+" */
+cori-profile .cori-profile-add-one {
+    margin-left: 6px;
+    padding: 0 5px;
+    background: none;
+    border: none;
+    box-shadow: none;
+    font: inherit;
+    font-weight: 700;
+    line-height: 1;
+    color: #b3aea3;
+    cursor: pointer;
+}
+cori-profile .cori-profile-add-one:hover { background: none; color: var(--contrastcolor, #d14900); }
+/* what an empty section could hold: its fields as "+ <label>" launcher chips
+   (plain muted text for fields the assistant doesn't ask about). Explicit list
+   resets — host globals (.maincontents ul/li) leak into the light DOM. */
+cori-profile .cori-profile-gap-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+cori-profile .cori-profile-gap-fields li { margin: 0; padding: 0; list-style: none; }
+cori-profile .cori-profile-add-field {
+    padding: 3px 12px;
+    background: #fff;
+    border: 1px dashed #ccc;
+    border-radius: 999px;
+    box-shadow: none;
+    font: inherit;
+    font-size: 0.85em;
+    color: #666;
+    cursor: pointer;
+    white-space: nowrap;
+}
+cori-profile .cori-profile-add-field:hover {
+    background: #fff;
+    border-color: var(--contrastcolor, #d14900);
+    color: var(--contrastcolor, #d14900);
+}
+cori-profile .cori-profile-gap-field-static {
+    padding: 3px 0;
+    font-size: 0.85em;
+    color: #aaa;
+}
 /* explicit list resets: host globals (.maincontents ul/li) leak into the light DOM */
 cori-profile .cori-profile-chips {
     display: flex;
@@ -333,6 +381,9 @@ cori-profile .cori-profile-more > summary::before { content: "▶ "; display: in
 cori-profile .cori-profile-more[open] > summary::before { content: "▼ "; }
 cori-profile .cori-profile-more .cori-profile-section { border-top: none; padding: 10px 0 0; }
 cori-profile .cori-profile-more .cori-profile-section h4 { color: #666; }
+/* the in-section variant ("Noch leere Felder" inside a populated section): quieter,
+   carries no separator of its own */
+cori-profile .cori-profile-field-gaps { margin: 10px 0 0; padding: 0; border-top: none; }
 
 /* ----- Profile assistant dialog ----- */
 /* px box sizing for the TYPO3 root-font mismatch (see dialog.bp-pods-modal). */

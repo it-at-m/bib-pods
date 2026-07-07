@@ -52,6 +52,9 @@ cori:order a rdf:Property ;
     rdfs:range xsd:integer ;
     rdfs:comment "Display order among siblings: sections within the profile, fields within their section. Lower comes first." .
 
+cori:EmptySectionsBlock cori:order 100 ;
+    rdfs:comment "UI anchor, not a section: where the profile UI's 'still empty sections' disclosure sorts among the sections. Sections with a higher cori:order render below the disclosure." .
+
 cori:pluralLabel a rdf:Property ;
     rdfs:comment "Plural form of rdfs:label, used where the UI titles a group of values of this property." .
 

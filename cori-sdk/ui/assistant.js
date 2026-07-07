@@ -71,9 +71,10 @@ function questionText(item, addedHere) {
 }
 
 // Opens the wizard on `host` (a <cori-profile>; the dialog joins its light DOM so the
-// app's scoped styles apply). sectionIri limits the agenda to one section; onChange
-// fires after every stored answer, so the profile behind the dialog re-renders live.
-export async function openAssistant({ host, onChange, sectionIri = null }) {
+// app's scoped styles apply). sectionIri limits the agenda to one section, fieldIri to
+// one single field; onChange fires after every stored answer, so the profile behind
+// the dialog re-renders live.
+export async function openAssistant({ host, onChange, sectionIri = null, fieldIri = null }) {
     if (!isStorageReady()) return window.alert("Keine Verbindung zum Speicherort.")
     let store
     try {
@@ -99,7 +100,7 @@ export async function openAssistant({ host, onChange, sectionIri = null }) {
     const agenda = []
     for (const s of sectionPlan()) {
         if (sectionIri && s.iri !== sectionIri) continue
-        const askable = askableFields(s.fields, countOf)
+        const askable = askableFields(s.fields, countOf).filter(f => !fieldIri || f === fieldIri)
         const ordered = [...askable.filter(f => countOf(f) === 0), ...askable.filter(f => countOf(f) > 0)]
         ordered.forEach((field, idx) => {
             const max = maxCountOf(field)
