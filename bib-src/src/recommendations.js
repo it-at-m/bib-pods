@@ -5,8 +5,10 @@ import { recommendFromSavedBooks } from "./qdrant.js"
 
 const INSPIRA_ENGINE = BP + "InspiraEngine"
 
-// Predicate marking a strategy the user switched off (opt-out: a strategy runs unless
-// its IRI appears here). Shared by the toggle UI and the runner.
+// Explicit per-user strategy choices, overriding the vocab's bp:enabledByDefault
+// seed. Only deviations from the seed are persisted (see resolveStrategyEnabled).
+// Shared by the toggle UI and the runner.
+export const ENABLED_STRATEGY = BP + "enabledStrategy"
 export const DISABLED_STRATEGY = BP + "disabledStrategy"
 
 // Settings live under their own subject — NOT the profile subject — so they persist in
@@ -14,17 +16,32 @@ export const DISABLED_STRATEGY = BP + "disabledStrategy"
 // <cori-profile> table, which renders only the profile subject's facts.
 export const SETTINGS_SUBJECT = LOCAL + "recommendation-settings"
 
-// IRIs of strategies the user has switched off, read from the (whole) profile store.
-export function readDisabledStrategies(profileStore) {
-    return new Set(profileStore.getObjects(SETTINGS_SUBJECT, DISABLED_STRATEGY, null).map(o => o.value))
+// The user's explicit strategy on/off choices, read from the (whole) profile store.
+export function readStrategyChoices(profileStore) {
+    return {
+        enabled: new Set(profileStore.getObjects(SETTINGS_SUBJECT, ENABLED_STRATEGY, null).map(o => o.value)),
+        disabled: new Set(profileStore.getObjects(SETTINGS_SUBJECT, DISABLED_STRATEGY, null).map(o => o.value)),
+    }
+}
+
+// A strategy runs iff explicitly enabled, or seeded on (bp:enabledByDefault) and not
+// explicitly disabled. Because only deviations are stored, a strategy added to the
+// vocabulary later keeps its declared seed state even for users with stored choices.
+export function resolveStrategyEnabled(strategy, choices) {
+    if (choices.enabled.has(strategy.iri)) return true
+    if (choices.disabled.has(strategy.iri)) return false
+    return strategy.defaultEnabled
 }
 
 // Returns descriptors for every bp:RecommendationStrategy in the vocab:
-//   [{ iri, label, comment, engine, properties: [propUri], combine, maxSuggestions }]
+//   [{ iri, label, comment, engine, properties: [propUri], combine, maxSuggestions,
+//      defaultEnabled }]
 // engine defaults to the Solr backend when unspecified; comment is the strategy's
 // rdfs:comment (e.g. a note about external network traffic) or null; combine is the
 // combinator descriptor { iri, label, space } or null (see combinatorOf);
-// maxSuggestions is the strategy's bp:maxSuggestions or null (runner default applies).
+// maxSuggestions is the strategy's bp:maxSuggestions or null (runner default applies);
+// defaultEnabled is the bp:enabledByDefault seed (absent = false — new strategies
+// start as opt-in lanes).
 export function getStrategies() {
     const v = getVocab()
     return v.getSubjects(RDF_TYPE, BP + "RecommendationStrategy", null).map(t => {
@@ -38,6 +55,7 @@ export function getStrategies() {
             properties: v.getObjects(iri, BP + "usesProfileProperty", null).map(o => o.value),
             combine: combinatorOf(v, iri),
             maxSuggestions: max !== undefined ? Number(max) : null,
+            defaultEnabled: v.getObjects(iri, BP + "enabledByDefault", null)[0]?.value === "true",
         }
     })
 }
@@ -178,19 +196,20 @@ export function buildQuery(strategy, profileStore, profileSubject) {
 // and returns:
 //   { results: [{ strategy, docs: [...] }], serverUnreachable: bool }
 // `limit` caps each strategy's results; a strategy's bp:maxSuggestions overrides it.
-// Disabled strategies (bp:disabledStrategy in the profile) are skipped, as are Solr
-// strategies that yield no clauses (profile lacks the necessary predicates).
+// Strategies resolved off (seed defaults + the profile's explicit choices, see
+// resolveStrategyEnabled) are skipped, as are Solr strategies that yield no clauses
+// (profile lacks the necessary predicates).
 // serverUnreachable lets callers tell "backend down" apart from "reached it, but nothing
 // matched": it's true when no strategy reached a backend. When nothing was attempted at
 // all we never touched a backend, so probe Solr directly — otherwise an unreachable index
 // would be indistinguishable from an empty profile.
 export async function runRecommendations(profileStore, profileSubject, { solrEndpoint, qdrantEndpoint }, limit = 3) {
-    const disabled = readDisabledStrategies(profileStore)
+    const choices = readStrategyChoices(profileStore)
     const results = []
     let attempted = 0
     let reached = 0
     for (const strategy of getStrategies()) {
-        if (disabled.has(strategy.iri)) continue
+        if (!resolveStrategyEnabled(strategy, choices)) continue
 
         if (strategy.engine === INSPIRA_ENGINE) {
             attempted++

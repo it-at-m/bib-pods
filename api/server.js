@@ -26,6 +26,7 @@ http.createServer(async (req, res) => {
             const ttl = await readBody(req)
             if (!ttl.trim()) throw new Error("empty request body; expected a profile in Turtle")
             const store = parseTurtle(ttl)
+            // TODO broken since runRecommendations switched to an { solrEndpoint, qdrantEndpoint }
             const results = await runRecommendations(store, getProfileSubject(), SOLR, 5)
             // or should we return the same turtle messages as result?
             send(res, 200, {

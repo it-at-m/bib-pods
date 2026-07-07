@@ -61,6 +61,22 @@ bp:interestedIn a rdf:Property ;
         bp:iriField "topic_uri_str_mv"
     ] .
 
+# Backed by the index's geographic subjects (651): small coverage but cleanly
+# GND-linked — see interim-index/field-notes.md §4. Covers travel guides as well
+# as history/politics/art *about* a place.
+bp:interestedInPlace a rdf:Property ;
+    rdfs:label "place of interest"@en, "Ort/Region"@de ;
+    cori:pluralLabel "places of interest"@en, "Orte & Regionen"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range bf:Place ;
+    cori:inSection bp:TasteSection ;
+    cori:order 50 ;
+    bp:explanationPhrase "es um {value} geht"@de ;
+    bp:linkedToIndex [
+        bp:labelField "geographic" ;
+        bp:iriField "geographic_uri_str_mv"
+    ] .
+
 bp:savedBook a rdf:Property ; # SOPAC identifier
     rdfs:label "saved book"@en, "Gemerktes Buch"@de ;
     cori:pluralLabel "saved books"@en, "Gemerkte Bücher"@de ;
@@ -126,7 +142,7 @@ bp:followUpQuestion a rdf:Property ;
 
 bp:BookSelection a cori:UserAction ;
     rdfs:label "user clicks on a book --> follow-up questions"@en, "Nutzer*in klickt auf ein Buch - Folgefragen"@de ;
-    bp:followUpQuestion bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn .
+    bp:followUpQuestion bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn, bp:interestedInPlace .
 
 # ----- Recommendations -----
 
@@ -164,7 +180,19 @@ bp:Or a bp:LogicalCombinator ; rdfs:label "OR" .
 bp:And a bp:LogicalCombinator ; rdfs:label "AND" .
 bp:AverageVector a bp:VectorCombinator ; rdfs:label "average_vector" . # Qdrant: averages the example vectors into one query
 
-# Opt-out flag in a user's profile: a strategy runs unless its IRI is listed here
+# Seed state: strategies with bp:enabledByDefault true are the lanes a fresh
+# profile starts with; everything else is opt-in via the strategy toggles
+# (absent counts as false).
+bp:enabledByDefault a rdf:Property ;
+    rdfs:domain bp:RecommendationStrategy ;
+    rdfs:range xsd:boolean .
+
+# Explicit per-user choices in the profile's settings, overriding the seed:
+# a strategy in bp:enabledStrategy runs, one in bp:disabledStrategy doesn't.
+# Only deviations from the seed are stored, so strategies added to the
+# vocabulary later keep their declared seed state for existing users.
+bp:enabledStrategy a rdf:Property ;
+    rdfs:range bp:RecommendationStrategy .
 bp:disabledStrategy a rdf:Property ;
     rdfs:range bp:RecommendationStrategy .
 
@@ -172,7 +200,8 @@ bp:authorMatch a bp:RecommendationStrategy ;
     rdfs:label "Mehr von deinen Lieblingsautor*innen"@de ;
     bp:engine bp:SolrEngine ;
     bp:usesProfileProperty bp:favoriteAuthor ;
-    bp:combine bp:Or .
+    bp:combine bp:Or ;
+    bp:enabledByDefault true .
 
 bp:authorAndTopic a bp:RecommendationStrategy ;
     rdfs:label "Autor*innen & Themen kombiniert"@de ;
@@ -180,10 +209,33 @@ bp:authorAndTopic a bp:RecommendationStrategy ;
     bp:usesProfileProperty bp:favoriteAuthor, bp:interestedIn ;
     bp:combine bp:And .
 
+# The topic field is the index's best GND-linked subject substrate; genre and
+# geographic matching work label-first (genre carries virtually no authority
+# links in the MSB data) — see interim-index/field-notes.md §4.
+bp:topicMatch a bp:RecommendationStrategy ;
+    rdfs:label "Passend zu deinen Themen"@de ;
+    bp:engine bp:SolrEngine ;
+    bp:usesProfileProperty bp:interestedIn ;
+    bp:combine bp:Or ;
+    bp:enabledByDefault true .
+
+bp:genreMatch a bp:RecommendationStrategy ;
+    rdfs:label "Aus deinen Genres"@de ;
+    bp:engine bp:SolrEngine ;
+    bp:usesProfileProperty bp:favoriteGenre ;
+    bp:combine bp:Or .
+
+bp:placeMatch a bp:RecommendationStrategy ;
+    rdfs:label "Rund um deine Orte & Regionen"@de ;
+    bp:engine bp:SolrEngine ;
+    bp:usesProfileProperty bp:interestedInPlace ;
+    bp:combine bp:Or .
+
 bp:savedBookSimilarity a bp:RecommendationStrategy ;
     rdfs:label "Ähnlich zu gemerkten Büchern"@de ;
     rdfs:comment "Sendet deine Merkliste an einen weiteren Server der Stadt München (inspira_BIB), um ähnliche Titel zu finden."@de ;
     bp:engine bp:InspiraEngine ;
     bp:usesProfileProperty bp:savedBook ;
     bp:combine bp:AverageVector ;
-    bp:maxSuggestions 5 .
+    bp:maxSuggestions 5 ;
+    bp:enabledByDefault true .

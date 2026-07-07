@@ -27,13 +27,17 @@ bp:ProfileShape
         sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )
     ] ;
     sh:property [
+        sh:path bp:interestedInPlace ;
+        sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )
+    ] ;
+    sh:property [
         sh:path bp:savedBook ;
         sh:datatype xsd:string
     ] .
 
 bp:ProfileEntityShape
     a sh:NodeShape ;
-    sh:targetObjectsOf bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn, bp:favoriteWork ;
+    sh:targetObjectsOf bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn, bp:interestedInPlace, bp:favoriteWork ;
     sh:property [
         sh:path rdfs:label ;
         sh:maxCount 1 ;
