@@ -61,6 +61,12 @@
    vivid --bp-cf-accent used on arrows/dots/dismiss — so the shelf label reads as a heading,
    not just another line of text, without competing with the interactive accent color. */
 .bp-cf-title { margin: 0 0 0.75rem; font-size: 19px; font-weight: 700; color: #a8632c; }
+/* pool-size hint behind the lane title ("+213 weitere im Katalog"). As <a> it opens
+   the lane's query on the docs query page — deliberately NOT styled as a link (a
+   power-user affordance): only the cursor reveals it. Both states pinned so host
+   anchor rules can't restyle it. */
+.bp-cf-title .bp-cf-more { margin-left: 10px; font-size: 13px; font-weight: 400; color: #8a8378; white-space: nowrap; }
+.bp-cf-title a.bp-cf-more, .bp-cf-title a.bp-cf-more:hover { color: #8a8378; text-decoration: none; cursor: pointer; }
 
 /* viewport: positioning context for the absolutely-placed arrows */
 .bp-cf-viewport { position: relative; }
@@ -225,19 +231,14 @@ dialog.bp-pods-modal {
 }
 .bp-pods-modal .bp-modal-logout:hover { background: none; color: var(--contrastcolor, #d14900); }
 .bp-modal-hint { margin-top: 16px; }
-/* TYPO3's stylesheet drops the default <details> disclosure marker entirely
-   (via `display: block` / `list-style: none` on summary). We render our own
-   so the affordance is host-independent. */
-#bp-strategy-settings summary { list-style: none; cursor: pointer; }
-#bp-strategy-settings summary::-webkit-details-marker { display: none; }
-#bp-strategy-settings > summary::before { content: "▶ "; display: inline-block; margin-right: 0.25rem; font-size: 0.75em; color: #666; }
-#bp-strategy-settings[open] > summary::before { content: "▼ "; }
 /* Profile sections: calm stacked groups separated by hairlines; entries render
    as quiet chips. px (not rem) for box dimensions — the TYPO3 host's 62.5% root
    font-size would otherwise shrink them (see the box-sizing note below). */
 cori-profile .cori-profile-sections { margin: 8px 0 16px; }
 cori-profile .cori-profile-section { padding: 12px 0; }
 cori-profile .cori-profile-section + .cori-profile-section { border-top: 1px solid #eee; }
+/* sections sorted below the "noch leere Bereiche" disclosure (e.g. the Merkliste) */
+cori-profile .cori-profile-more + .cori-profile-section { border-top: 1px solid #eee; margin-top: 12px; }
 cori-profile .cori-profile-section h4 {
     margin: 0;
     font-size: 1em;
@@ -318,7 +319,8 @@ cori-profile .cori-profile-notice {
     font-style: italic;
 }
 /* Sections without entries sit collapsed behind this disclosure. Own marker, since
-   TYPO3's stylesheet drops the native <summary> one (see #bp-strategy-settings). */
+   TYPO3's stylesheet drops the native <summary> one entirely (via `display: block` /
+   `list-style: none` on summary). */
 cori-profile .cori-profile-more { padding: 12px 0 0; border-top: 1px solid #eee; }
 cori-profile .cori-profile-more > summary {
     list-style: none;
@@ -479,10 +481,59 @@ cori-profile .cori-profile-actions button:hover { color: #222; }
 .bp-book-option { display: block; cursor: pointer; padding: 0.15rem 0; }
 .bp-book-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
 
-#bp-strategy-settings { margin: 0.5rem 0; }
-#bp-strategy-toggles { margin: 0.25rem 0 0.5rem 0.25rem; }
-.bp-strategy-option { display: block; cursor: pointer; padding: 0.15rem 0; }
-.bp-strategy-note { margin: 0 0 0.5rem 1.4rem; font-size: 0.8em; color: #666; }
+/* The strategy multiselect: a quiet outlined trigger over an absolute popover of
+   checkboxes. Explicit background/border/font throughout so host button and
+   .maincontents globals can't leak in; px (not rem) for box dimensions — the TYPO3
+   host's 62.5% root font-size would otherwise shrink them. */
+#bp-strategy-settings { position: relative; display: inline-block; margin: 0.5rem 0; }
+.bp-strategy-summary {
+    padding: 3px 14px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 999px;
+    box-shadow: none;
+    font: inherit;
+    font-size: 0.9em;
+    color: #444;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.bp-strategy-summary:hover {
+    background: #fff;
+    border-color: var(--contrastcolor, #d14900);
+    color: var(--contrastcolor, #d14900);
+}
+/* own glyph instead of a background icon: host-independent (FA exists only on TYPO3) */
+.bp-strategy-summary::after { content: "▾"; margin-left: 8px; }
+.bp-strategy-popover {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 20;
+    min-width: 260px;
+    max-width: 340px;
+    padding: 10px 14px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.bp-strategy-popover[hidden] { display: none; }
+.bp-strategy-bulk { display: flex; gap: 14px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid #eee; }
+.bp-strategy-bulk-btn {
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+    font: inherit;
+    font-size: 0.85em;
+    color: #666;
+    cursor: pointer;
+}
+.bp-strategy-bulk-btn:hover { background: none; color: var(--contrastcolor, #d14900); }
+/* hanging indent: wrapped label lines align after the checkbox, not under it */
+.bp-strategy-option { display: block; cursor: pointer; padding: 2px 0 2px 22px; text-indent: -22px; }
+.bp-strategy-note { margin: 0 0 6px 22px; font-size: 0.8em; color: #666; }
 
 /* ----- Landing page ----- */
 

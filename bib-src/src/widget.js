@@ -3,7 +3,7 @@ import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk
 import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
-import { runRecommendations, getStrategies, readDisabledStrategies, explainStrategy, explainDocMatches, escapeHtml, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
+import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl, fetchBook } from "./catalogue.js"
 import { cleanAuthorName } from "./book-prompt.js"
 import { BP } from "./vocab.js"
@@ -19,6 +19,27 @@ const STORAGE_LABELS = {
     local: "Gespeichert: lokal im Browser",
     session: "Gespeichert: nur in dieser Sitzung",
     solid: "Gespeichert: in deinem Solid Pod",
+}
+
+// The "+N weitere" lane hint deep-links into the docs query page — a power-user
+// affordance. On the docs site itself (recognizable by its <nav-bar>) the link stays
+// in the local build; from any other host (TYPO3) it goes to the published docs.
+const QUERY_PAGE = document.querySelector("nav-bar")
+    ? new URL("../query/", window.location.href).href
+    : "https://it-at-m.github.io/bib-pods/query/"
+
+// Mirrors the param-handover format the docs query page accepts (see
+// docs/query/index.html and the strategy table on docs/recommendations/).
+// rows is NOT the lane's suggestion limit: the link exists to browse the whole pool
+// behind the lane, so it asks for full pages (the query page's table view paginates).
+function queryPageHref(strategy, { q, fq }, solrEndpoint) {
+    const params = new URLSearchParams()
+    params.set("q", q)
+    if (fq.length > 0) params.set("params", fq.map(f => `fq=${f}`).join("\n"))
+    params.set("rows", 50)
+    params.set("label", strategy.label)
+    params.set("endpoint", solrEndpoint)
+    return `${QUERY_PAGE}?${params.toString()}`
 }
 
 // scoped styles injected once into <head>: both hosts (docs, TYPO3) get the same look without coordinating stylesheets
@@ -78,15 +99,31 @@ function buildNoCoverPlaceholder() {
 // A lane = an optional heading + the city library's coverflow carousel of book cards.
 // The DOM here is inert; initCarousel() wires the arrows and page dots once the lane
 // is in the document and its widths are measurable. ctx carries { onDismiss, tip }
-// shared by every card in the lane. buildSlide makes the full strategy card by
-// default; the profile's Merkliste passes buildMiniCard for cover-only tiles.
+// shared by every card in the lane, plus the lane-level `more`: how many further
+// catalogue records the lane's query matches beyond the cards on display.
+// buildSlide makes the full strategy card by default; the profile's Merkliste passes
+// buildMiniCard for cover-only tiles.
 function buildLane(label, items, ctx, buildSlide = buildCard) {
     const lane = document.createElement("div")
     lane.className = "bp-cf"
     if (label) {
+        lane.dataset.label = label
         const heading = document.createElement("h4")
         heading.className = "bp-cf-title"
         heading.textContent = label
+        if (ctx.more > 0) {
+            // deliberately not styled as a link (see the CSS) — only the cursor gives
+            // away that it opens the lane's query on the docs query page
+            const more = document.createElement(ctx.moreHref ? "a" : "span")
+            more.className = "bp-cf-more"
+            more.textContent = `+${ctx.more.toLocaleString("de-DE")} weitere im Katalog`
+            if (ctx.moreHref) {
+                more.href = ctx.moreHref
+                more.target = "_blank"
+                more.rel = "noopener"
+            }
+            heading.appendChild(more)
+        }
         lane.appendChild(heading)
     }
 
@@ -501,7 +538,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         // otherwise snap the carousel back to the start); restoring clamps to the
         // new maximum, so a shortened lane stays right-aligned.
         const scrollLeftByLane = new Map([...lanes.querySelectorAll(".bp-cf")].map(lane =>
-            [lane.querySelector(".bp-cf-title").textContent, lane.querySelector(".bp-cf-track").scrollLeft]))
+            [lane.dataset.label, lane.querySelector(".bp-cf-track").scrollLeft]))
         const unread = await readUnread()
         if (!unread || unread.length === 0) { lanes.replaceChildren(); lanes.hidden = true; return }
         try {
@@ -521,6 +558,13 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             for (const [label, items] of byStrategy) {
                 const strategy = strategyByLabel.get(label)
                 const laneExplanation = strategy ? await explainStrategy(strategy, profileStore, profileSubject) : null
+                // How deep the pool behind this lane is ("+N weitere im Katalog"). The
+                // count includes already-seen records — it sizes the catalogue pool, not
+                // an unseen queue.
+                const total = strategy ? await countStrategyMatches(strategy, profileStore, profileSubject, solrEndpoint) : null
+                const more = total === null ? null : Math.max(0, total - items.length)
+                const query = total === null ? null : buildQuery(strategy, profileStore, profileSubject)
+                const moreHref = query ? queryPageHref(strategy, query, solrEndpoint) : null
                 // Per-card precision: check which profile facts the recommended book itself
                 // carries. The strategy-level text is the fallback — for docs that can't be
                 // fetched, and for non-symbolic matches (inspira's vector similarity).
@@ -528,7 +572,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
                     const doc = item.sopacId ? await fetchDocCached(item.sopacId) : null
                     item.explanation = (doc && explainDocMatches(doc, profileStore, profileSubject, strategy?.properties)) ?? laneExplanation
                 }
-                frag.appendChild(buildLane(label, items, { onDismiss: dismissCard, tip }))
+                frag.appendChild(buildLane(label, items, { onDismiss: dismissCard, tip, more, moreHref }))
             }
             lanes.replaceChildren(frag)
             lanes.hidden = false
@@ -536,7 +580,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             // (dot counts need measured widths, so this must run post-insertion).
             for (const lane of lanes.querySelectorAll(".bp-cf")) {
                 carouselCleanups.push(initCarousel(lane))
-                const prev = scrollLeftByLane.get(lane.querySelector(".bp-cf-title").textContent)
+                const prev = scrollLeftByLane.get(lane.dataset.label)
                 if (prev) lane.querySelector(".bp-cf-track").scrollLeft = prev
             }
         } catch (err) {
@@ -594,15 +638,35 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
-    // Strategy toggles (opt-out, persisted to the profile). Built once from the vocab here;
-    // checked states then sync from the profile on each render, a change writes the set.
+    // Strategy multiselect: a summary trigger ("2 von 5 Empfehlungsarten") over a
+    // popover of checkboxes with select-all/none, persisted to the profile as
+    // deviations from the vocab's bp:enabledByDefault seeds. Options are built once
+    // from the vocab here; checked states then sync from the profile on each render,
+    // a change writes the deviation sets.
+    const strategies = getStrategies()
     const strategyCheckboxes = new Map()
-    for (const strategy of getStrategies()) {
+    const strategySettings = root.querySelector("#bp-strategy-settings")
+    const strategySummary = root.querySelector("#bp-strategy-summary")
+    const bulkRow = document.createElement("div")
+    bulkRow.className = "bp-strategy-bulk"
+    for (const [text, on] of [["Alle auswählen", true], ["Alle abwählen", false]]) {
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = "bp-strategy-bulk-btn"
+        btn.textContent = text
+        btn.addEventListener("click", () => {
+            for (const checkbox of strategyCheckboxes.values()) checkbox.checked = on
+            persistStrategyToggles()
+        })
+        bulkRow.append(btn)
+    }
+    strategyToggles.append(bulkRow)
+    for (const strategy of strategies) {
         const option = document.createElement("label")
         option.className = "bp-strategy-option"
         const checkbox = document.createElement("input")
         checkbox.type = "checkbox"
-        checkbox.checked = true
+        checkbox.checked = strategy.defaultEnabled
         checkbox.addEventListener("change", persistStrategyToggles)
         option.append(checkbox, document.createTextNode(" " + strategy.label))
         strategyToggles.append(option)
@@ -616,9 +680,38 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
         strategyCheckboxes.set(strategy.iri, checkbox)
     }
+    renderStrategySummary()
+    // The trigger label states the popover's current selection: how many lanes are on.
+    function renderStrategySummary() {
+        const on = [...strategyCheckboxes.values()].filter(c => c.checked).length
+        const count = on === strategies.length ? "Alle" : on === 0 ? "Keine" : `${on} von ${strategies.length}`
+        strategySummary.textContent = `${count} Empfehlungsarten`
+    }
+    function setStrategyPopover(open) {
+        strategyToggles.hidden = !open
+        strategySummary.setAttribute("aria-expanded", String(open))
+    }
+    strategySummary.addEventListener("click", () => setStrategyPopover(strategyToggles.hidden))
+    // click outside closes the popover; Escape too, returning focus to the trigger
+    document.addEventListener("mousedown", (e) => {
+        if (!strategyToggles.hidden && !strategySettings.contains(e.target)) setStrategyPopover(false)
+    })
+    strategySettings.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !strategyToggles.hidden) { setStrategyPopover(false); strategySummary.focus() }
+    })
     async function persistStrategyToggles() {
-        const disabled = [...strategyCheckboxes].filter(([, cb]) => !cb.checked).map(([iri]) => iri)
+        renderStrategySummary()
+        // Only deviations from the seed are stored, so later vocab changes to the
+        // seeds keep applying to users who never touched the affected toggle.
+        const enabled = []
+        const disabled = []
+        for (const strategy of strategies) {
+            const checked = strategyCheckboxes.get(strategy.iri).checked
+            if (checked === strategy.defaultEnabled) continue
+            ;(checked ? enabled : disabled).push(strategy.iri)
+        }
         try {
+            await replaceSubjectObjects(SETTINGS_SUBJECT, ENABLED_STRATEGY, enabled)
             await replaceSubjectObjects(SETTINGS_SUBJECT, DISABLED_STRATEGY, disabled)
         } catch (err) {
             console.error("[bib-pods] saving strategy settings failed:", err)
@@ -629,8 +722,11 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         if (!isStorageReady()) return
         try {
             const store = await loadStore()
-            const disabled = readDisabledStrategies(store)
-            for (const [iri, cb] of strategyCheckboxes) cb.checked = !disabled.has(iri)
+            const choices = readStrategyChoices(store)
+            for (const strategy of strategies) {
+                strategyCheckboxes.get(strategy.iri).checked = resolveStrategyEnabled(strategy, choices)
+            }
+            renderStrategySummary()
         } catch (err) {
             console.error("[bib-pods] strategy toggles render failed:", err)
         }

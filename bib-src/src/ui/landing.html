@@ -45,10 +45,12 @@
 
     <section id="bp-showcase" class="bp-block bp-showcase bp-when-activated" aria-labelledby="bp-showcase-heading" hidden>
         <h3 id="bp-showcase-heading">Schaufenster</h3>
-        <details id="bp-strategy-settings">
-            <summary>Welche Empfehlungen?</summary>
-            <div id="bp-strategy-toggles"></div>
-        </details>
+        <div id="bp-strategy-settings">
+            <button id="bp-strategy-summary" class="bp-strategy-summary" type="button"
+                title="Welche Empfehlungen sollen im Schaufenster erscheinen?"
+                aria-haspopup="true" aria-expanded="false"></button>
+            <div id="bp-strategy-toggles" class="bp-strategy-popover" hidden></div>
+        </div>
         <p><a id="bp-check-recommendations-link" href="#">Empfehlungen prüfen</a></p>
         <div id="bp-lanes" hidden></div>
     </section>

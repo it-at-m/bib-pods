@@ -192,6 +192,23 @@ export function buildQuery(strategy, profileStore, profileSubject) {
     return { q, fq: savedIds.map(id => `-id:"${escapeSolr(id)}"`) }
 }
 
+// Total pool behind a strategy for this profile: how many index records its query
+// matches (rows=0, header only — cheap). null means "unknown", not zero: the strategy
+// has no Solr query (inspira engine, or the profile lacks the needed facts) or the
+// request failed. Callers use it for "+N weitere" hints, so unknown must stay silent.
+export async function countStrategyMatches(strategy, profileStore, profileSubject, solrEndpoint) {
+    if (strategy.engine === INSPIRA_ENGINE) return null
+    const query = buildQuery(strategy, profileStore, profileSubject)
+    if (!query) return null
+    try {
+        const res = await fetch(solrUrl(solrEndpoint, query, 0))
+        if (!res.ok) return null
+        return (await res.json()).response?.numFound ?? null
+    } catch {
+        return null
+    }
+}
+
 // runs every enabled strategy against its engine (Solr index or the inspira recommender)
 // and returns:
 //   { results: [{ strategy, docs: [...] }], serverUnreachable: bool }

@@ -673,6 +673,32 @@
             } else {
                 tabs.push(makeNewTab())
             }
+
+            // Param handover: other docs pages (e.g. the strategy table on the
+            // recommendations page) deep-link a runnable query via
+            // ?q=…&fl=…&rows=…&params=…&label=…&endpoint=… — it opens as a fresh tab
+            // and runs immediately. The URL is cleaned afterwards so a reload doesn't
+            // re-add the tab.
+            const handover = new URLSearchParams(window.location.search)
+            if (handover.has("q")) {
+                const t = makeNewTab()
+                t.q = handover.get("q")
+                if (handover.get("label")) t.label = handover.get("label")
+                if (handover.get("fl")) t.fl = handover.get("fl")
+                if (handover.get("rows")) t.rows = handover.get("rows")
+                if (handover.get("params")) t.params = handover.get("params")
+                if (handover.get("endpoint")) {
+                    t.endpoint = handover.get("endpoint")
+                    if (!localStorage.getItem(ENDPOINT_KEY)) localStorage.setItem(ENDPOINT_KEY, t.endpoint)
+                }
+                tabs.push(t)
+                activeTabIndex = tabs.length - 1
+                history.replaceState(null, "", window.location.pathname)
+                loadTabState()
+                persistTabs()
+                runQuery()
+            }
+
             renderTabs()
             window.addEventListener("beforeunload", persistTabs)
         </script>

@@ -6,6 +6,9 @@
         <title>Recommendations — bib-pods</title>
         <link rel="stylesheet" href="../styles.css">
         <style>
+            /* five columns incl. the query need more room than the docs default */
+            main { max-width: 1100px; }
+            .table-scroll { overflow-x: auto; }
             .strategy-table {
                 width: 100%;
                 border-collapse: collapse;
@@ -38,32 +41,93 @@
                 font-family: system-ui, sans-serif;
                 color: #999;
             }
+            .default-cell { text-align: center; }
+            .default-on { color: #2e7d32; }
+            .default-off { color: #bbb; }
+            .query-cell a {
+                color: #07a;
+                text-decoration: none;
+            }
+            .query-cell a:hover code { text-decoration: underline; }
+            .query-cell code {
+                display: inline-block;
+                max-width: 24rem;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                vertical-align: bottom;
+            }
+            .query-cell .no-query {
+                color: #999;
+                font-style: italic;
+                font-size: 0.9em;
+            }
+            .table-hint {
+                color: #888;
+                font-size: 0.85rem;
+                max-width: 60rem;
+            }
         </style>
         <script src="../nav-bar.js"></script>
     </head>
     <body>
         <nav-bar current="recommendations"></nav-bar>
         <main>
+            <div class="table-scroll">
             <table class="strategy-table" id="strategy-table">
                 <thead>
                     <tr>
                         <th>Strategie</th>
                         <th>Profil-Properties</th>
                         <th>Verknüpfung</th>
+                        <th title="bp:enabledByDefault — diese Lanes laufen ohne eigene Einstellung">on&nbsp;by&nbsp;default</th>
+                        <th>Solr-Query</th>
                     </tr>
                 </thead>
                 <tbody id="strategy-tbody"></tbody>
             </table>
+            </div>
+            <p class="table-hint">Die Solr-Query wird aus dem Profil gebaut, das gerade im Browser
+                gespeichert ist (Anmeldung „Lokal im Browser" bzw. „Nur in dieser Sitzung" auf der
+                Plugin-Seite; ein Profil im Solid Pod kann diese Seite nicht lesen). Klick auf eine
+                Query öffnet sie auf der Query-Seite.</p>
         </main>
         <script type="module">
-            import { getStrategies, contractTerm } from "../dist/recommendations.js"
+            import {
+                getStrategies, buildQuery, contractTerm, getProfileSubject,
+                getChoice, isStorageReady, loadStore, SOLR_ENDPOINT,
+            } from "../dist/recommendations.js"
+
+            // The profile behind the query column: readable for the browser-storage
+            // backends (local/session), not for Solid (needs an authenticated session).
+            let profileStore = null
+            try {
+                if (isStorageReady()) profileStore = await loadStore()
+            } catch (err) {
+                console.error("profile load failed:", err)
+            }
+            const noProfileNote = getChoice() === "solid"
+                ? "Profil liegt im Solid Pod — hier nicht lesbar"
+                : "kein Profil im Browser-Speicher"
+
+            // Deep-link into the query page (see its param-handover block): the very
+            // query the runner would send, incl. the saved-book exclusions as fq params.
+            function queryPageHref(strategy, { q, fq }) {
+                const params = new URLSearchParams()
+                params.set("q", q)
+                if (fq.length > 0) params.set("params", fq.map(f => `fq=${f}`).join("\n"))
+                params.set("rows", strategy.maxSuggestions ?? 3)
+                params.set("label", strategy.label)
+                params.set("endpoint", SOLR_ENDPOINT)
+                return `../query/?${params.toString()}`
+            }
 
             const tbody = document.getElementById("strategy-tbody")
             const strategies = getStrategies()
             if (strategies.length === 0) {
                 const tr = document.createElement("tr")
                 const td = document.createElement("td")
-                td.colSpan = 3
+                td.colSpan = 5
                 td.textContent = "Keine Strategien deklariert."
                 tr.appendChild(td)
                 tbody.appendChild(tr)
@@ -98,6 +162,49 @@
                     combineCell.textContent = "—"
                 }
                 tr.appendChild(combineCell)
+
+                const defaultCell = document.createElement("td")
+                defaultCell.className = "default-cell"
+                defaultCell.textContent = s.defaultEnabled ? "✓" : "–"
+                defaultCell.classList.add(s.defaultEnabled ? "default-on" : "default-off")
+                defaultCell.title = s.defaultEnabled
+                    ? "standardmäßig aktiv (bp:enabledByDefault true)"
+                    : "opt-in: erst aktiv, wenn die Lane eingeschaltet wird"
+                tr.appendChild(defaultCell)
+
+                const queryCell = document.createElement("td")
+                queryCell.className = "query-cell"
+                const note = (text) => {
+                    const em = document.createElement("span")
+                    em.className = "no-query"
+                    em.textContent = text
+                    queryCell.appendChild(em)
+                }
+                if (!s.engine.endsWith("SolrEngine")) {
+                    note("keine Solr-Query (Inspira-Engine)")
+                } else if (!profileStore) {
+                    note(noProfileNote)
+                } else {
+                    const query = buildQuery(s, profileStore, getProfileSubject())
+                    if (!query) {
+                        note("Profil hat keine passenden Angaben")
+                    } else {
+                        const a = document.createElement("a")
+                        a.href = queryPageHref(s, query)
+                        a.title = [query.q, ...query.fq.map(f => `fq=${f}`)].join("\n")
+                        const code = document.createElement("code")
+                        code.textContent = query.q
+                        a.appendChild(code)
+                        queryCell.appendChild(a)
+                        if (query.fq.length > 0) {
+                            const fqNote = document.createElement("span")
+                            fqNote.className = "no-query"
+                            fqNote.textContent = ` + ${query.fq.length} fq-Ausschlüsse (gemerkte Bücher)`
+                            queryCell.appendChild(fqNote)
+                        }
+                    }
+                }
+                tr.appendChild(queryCell)
 
                 tbody.appendChild(tr)
             }
