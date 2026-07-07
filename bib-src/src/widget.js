@@ -450,6 +450,36 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         if (!docCache.has(id)) docCache.set(id, fetchBook(solrEndpoint, id).catch(() => null))
         return docCache.get(id)
     }
+    // Transparency marker: a populated field whose facts feed no *enabled* strategy
+    // gets a ⓘ beside its label — the data sits idle until the matching lane is
+    // switched on, and clicking leads straight to the strategy chooser. Fields no
+    // strategy uses at all (Benutzername, Kommentar) stay unmarked: there is nothing
+    // to switch on, so a permanent warning would only be noise.
+    profileEl.annotateField = (predicate, store) => {
+        const usedBy = getStrategies().filter(s => s.properties.includes(predicate))
+        if (usedBy.length === 0) return null
+        const choices = readStrategyChoices(store)
+        if (usedBy.some(s => resolveStrategyEnabled(s, choices))) return null
+        const labels = usedBy.map(s => `„${s.label}"`).join(", ")
+        const state = usedBy.length > 1
+            ? `die Empfehlungsarten ${labels} sind ausgeschaltet`
+            : `die Empfehlungsart ${labels} ist ausgeschaltet`
+        return {
+            title: `Fließt noch nicht in deine Empfehlungen ein — ${state}. Klicken führt zur Auswahl.`,
+            onActivate: () => {
+                strategySettings.scrollIntoView({ behavior: "smooth", block: "center" })
+                setStrategyPopover(true)
+            },
+        }
+    }
+    // the ⓘ markers reuse the lanes' tip for their tooltip — instant, unlike native title
+    profileEl.addEventListener("mouseover", (e) => {
+        const info = e.target.closest(".cori-profile-field-notice")
+        if (info) tip.show(escapeHtml(info.getAttribute("aria-label")), info)
+    })
+    profileEl.addEventListener("mouseout", (e) => {
+        if (e.target.closest(".cori-profile-field-notice")) tip.hide()
+    })
     let savedBooksCleanup = null
     profileEl.renderFieldValues = async (predicate, objects) => {
         if (predicate !== BP + "savedBook") return null
@@ -713,6 +743,8 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         try {
             await replaceSubjectObjects(SETTINGS_SUBJECT, ENABLED_STRATEGY, enabled)
             await replaceSubjectObjects(SETTINGS_SUBJECT, DISABLED_STRATEGY, disabled)
+            // idle-field ⓘ markers (annotateField) depend on these choices — update live
+            profileEl.refresh()
         } catch (err) {
             console.error("[bib-pods] saving strategy settings failed:", err)
             window.alert("Einstellung konnte nicht gespeichert werden:\n" + storageErrorMessage(err))

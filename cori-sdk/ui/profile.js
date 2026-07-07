@@ -17,10 +17,15 @@ const PROFILE_TYPE = CORI + "Profile"
 // assistant (./assistant.js), scoped to the whole profile or to that section.
 // No shadow root, no bundled styles.
 // Call refresh() to re-render after the profile changes elsewhere.
-// Assignable property:
+// Assignable properties:
 //   renderFieldValues: async (predicateIri, objectTerms) => Element | null
 //     lets the app take over rendering of one field's values (e.g. saved books
 //     as cover tiles); null/undefined or a throw falls back to the default chips.
+//   annotateField: async (predicateIri, store) => { title, onActivate? } | null
+//     lets the app flag a populated field with a small ⓘ beside its label (e.g.
+//     "these facts feed no enabled recommendation strategy"); title becomes the
+//     aria-label (visual tooltip presentation is the app's business), onActivate
+//     the click action. null/undefined or a throw = no marker.
 // Bubbling event:
 //   cori-profile:change --> the profile was mutated (entry added or cleared)
 
@@ -258,6 +263,19 @@ export class CoriProfile extends HTMLElement {
             addOne.setAttribute("aria-label", `„${labelText}" ergänzen`)
             addOne.addEventListener("click", onAsk)
             label.appendChild(addOne)
+        }
+        let notice = null
+        try { notice = await this.annotateField?.(predicate, store) } catch (err) {
+            console.error("[cori-profile] annotateField failed:", err)
+        }
+        if (notice) {
+            const info = document.createElement("button")
+            info.type = "button"
+            info.className = "cori-profile-field-notice"
+            info.textContent = "ⓘ"
+            info.setAttribute("aria-label", notice.title)
+            if (notice.onActivate) info.addEventListener("click", notice.onActivate)
+            label.appendChild(info)
         }
         group.appendChild(label)
         let custom = null

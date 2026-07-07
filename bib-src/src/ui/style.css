@@ -279,20 +279,25 @@ cori-profile .cori-profile-field-label {
     font-size: 0.8em;
     color: #888;
 }
-/* single-field assistant launcher beside a filled field's label: a tiny naked "+" */
-cori-profile .cori-profile-add-one {
+/* the small controls beside a filled field's label: the "+" single-field assistant
+   launcher and the ⓘ idle-marker (annotateField; its instant tooltip is the lanes'
+   bp-tip, wired in widget.js) */
+cori-profile .cori-profile-add-one,
+cori-profile .cori-profile-field-notice {
     margin-left: 6px;
     padding: 0 5px;
     background: none;
     border: none;
     box-shadow: none;
     font: inherit;
-    font-weight: 700;
     line-height: 1;
     color: #b3aea3;
     cursor: pointer;
 }
-cori-profile .cori-profile-add-one:hover { background: none; color: var(--contrastcolor, #d14900); }
+cori-profile .cori-profile-add-one { font-weight: 700; }
+cori-profile .cori-profile-field-notice { font-size: 1.35em; vertical-align: middle; }
+cori-profile .cori-profile-add-one:hover,
+cori-profile .cori-profile-field-notice:hover { background: none; color: var(--contrastcolor, #d14900); }
 /* what an empty section could hold: its fields as "+ <label>" launcher chips
    (plain muted text for fields the assistant doesn't ask about). Explicit list
    resets — host globals (.maincontents ul/li) leak into the light DOM. */
