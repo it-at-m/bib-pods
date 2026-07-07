@@ -42,6 +42,10 @@ bp:favoriteGenre a rdf:Property ;
     rdfs:range bf:GenreForm ;
     cori:inSection bp:TasteSection ;
     cori:order 20 ;
+    # Picker values extracted from the catalogue (resources/genre-values.ttl); stored
+    # as label literals since the index's genre field carries no authority IRIs.
+    cori:allowedValues bp:GenreValues ;
+    cori:storeAs cori:LabelLiteral ;
     bp:explanationPhrase "du das Genre {value} magst"@de ;
     bp:linkedToIndex [
         bp:labelField "genre" ;

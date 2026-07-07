@@ -6,6 +6,7 @@ import { registerVocab, registerPrefix, getVocab, contractTerm, RDFS } from "cor
 import { registerProfileShapes } from "cori-sdk/shacl.js"
 import libraryVocabTtl from "../definitions/vocabulary.ttl.js"
 import libraryProfileShapesTtl from "../definitions/profile.shapes.ttl.js"
+import genreValuesTtl from "../resources/genre-values.ttl.js"
 import { sparqlSelect } from "@foerderfunke/sem-ops-utils/sparql"
 
 export const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
@@ -22,6 +23,7 @@ export const NO_IRI = "https://unknown.invalid/"
 registerPrefix("bp", BP)
 registerPrefix("gnd", GND)
 registerVocab(libraryVocabTtl)
+registerVocab(genreValuesTtl) // catalogue-extracted picker values, see scripts/extract-value-sets.js
 registerProfileShapes(libraryProfileShapesTtl)
 
 // collects the follow-up questions declared on a cori:UserAction in the vocabulary

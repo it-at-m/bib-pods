@@ -358,7 +358,8 @@ cori-profile .cori-assistant-existing[hidden] { display: none; }
 .cori-assistant-form { display: flex; gap: 8px; margin: 0 0 16px; }
 .cori-assistant-form[hidden] { display: none; }
 /* same host-input overrides as the Solid connect field */
-.cori-assistant-form input {
+.cori-assistant-form input,
+.cori-assistant-form select {
     flex: 1;
     min-width: 0;
     padding: 6px 10px !important;
@@ -369,7 +370,30 @@ cori-profile .cori-assistant-existing[hidden] { display: none; }
     font: inherit !important;
     box-shadow: none !important;
 }
+.cori-assistant-form input[hidden],
+.cori-assistant-form select[hidden] { display: none; }
 .cori-assistant-form .button { min-width: 0; white-space: nowrap; }
+/* provenance help for picker values: a quiet round ?-trigger, the text folds out below */
+.cori-assistant-form .cori-assistant-info {
+    flex: 0 0 auto;
+    width: 32px;
+    padding: 0;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 50%;
+    box-shadow: none;
+    font: inherit;
+    color: #888;
+    cursor: pointer;
+}
+.cori-assistant-form .cori-assistant-info:hover {
+    background: #fff;
+    border-color: var(--contrastcolor, #d14900);
+    color: var(--contrastcolor, #d14900);
+}
+.cori-assistant-form .cori-assistant-info[hidden] { display: none; }
+.cori-assistant-source { margin: -6px 0 16px; font-size: 0.85em; color: #888; }
+.cori-assistant-source[hidden] { display: none; }
 .cori-assistant-actions { display: flex; justify-content: space-between; }
 .cori-assistant-actions button {
     background: none;

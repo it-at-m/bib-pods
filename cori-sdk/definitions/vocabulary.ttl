@@ -1,6 +1,7 @@
 @prefix cori:    <https://cori.systems/core#> .
 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
 @prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
 
 # ----- Interactions -----
@@ -58,6 +59,22 @@ cori:assistantQuestion a rdf:Property ;
     rdfs:domain rdf:Property ;
     rdfs:range xsd:boolean ;
     rdfs:comment "Whether the dialog assistant asks about this profile field. false = the field's values arrive through dedicated interactions (e.g. catalogue clicks) or the field doesn't suit a guided question (free-form remarks). Unset counts as true." .
+
+# ----- Closed value sets for profile fields -----
+
+cori:allowedValues a rdf:Property ;
+    rdfs:domain rdf:Property ;
+    rdfs:range skos:ConceptScheme ;
+    rdfs:comment "Closed value set for a profile field: a skos:ConceptScheme whose skos:hasTopConcept concepts are the choices on offer (German skos:prefLabel = display text). The dialog assistant renders a picker instead of a free-text input for such fields. Value-set schemes come from the consuming app's registered vocabularies, e.g. snapshots extracted from a catalogue index. A skos:definition on the scheme (German preferred) is surfaced next to the picker as provenance help: where do these values come from." .
+
+cori:StorageForm a rdfs:Class .
+cori:LabelLiteral a cori:StorageForm .
+cori:ConceptIri a cori:StorageForm .
+
+cori:storeAs a rdf:Property ;
+    rdfs:domain rdf:Property ;
+    rdfs:range cori:StorageForm ;
+    rdfs:comment "How a picked allowed-value concept lands in the profile: cori:LabelLiteral stores the concept's label as a plain string (for fields matched label-first against an index whose values carry no authority IRIs), cori:ConceptIri stores the concept IRI plus an rdfs:label triple. Unset counts as cori:LabelLiteral." .
 
 # ----- Generic sections -----
 

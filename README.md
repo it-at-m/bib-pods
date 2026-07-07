@@ -130,6 +130,7 @@ textNode["<div align='left'>
 ### Hilfsskripte
 
 - **`repo.sh {install|build|clean}`**: Sammelaktion über alle npm-Pakete im Repo: `cori-sdk`, `bib-src`, `docs`, `typo3/bib_pods`, `api`, `solid-server`, `interim-index`.
+- **Vorverarbeitung der Vokabulare**: `.ttl`-Dateien werden als generierte `.ttl.js`-Geschwister gebündelt (`npm run ttl-to-js` in `cori-sdk` bzw. `bib-src`; läuft bei `npm install` automatisch, nach dem Editieren einer `.ttl` manuell nötig). Die Auswahllisten für Profil-Dropdowns (z.B. `bib-src/resources/genre-values.ttl`) sind committete Snapshots aus dem Katalog-Index: `npm run extract-value-sets` in `bib-src` erzeugt sie neu (inkl. `ttl-to-js`) — nach jedem Reindex ausführen.
 - **`typo3/script.sh {setup|start|stop|flush}`**: lokales TYPO3-Setup via DDEV. `setup` baut eine frische TYPO3-Installation auf, mountet `bib_pods` als Extension und startet Frontend + Backend.
 - **`typo3/sync.sh {pull|push|diff}`** — spiegelt `typo3/bib_pods` zu/von einem entfernten SFTP-Pfad (für Deployments auf den TYPO3-Server der Bibliothek). Zugangsdaten kommen aus `.syncdetails` neben dem Skript.
 
