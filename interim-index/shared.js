@@ -13,6 +13,9 @@ const parser = new XMLParser({
 
 // Field names and source mappings follow standard VuFind MARC mappings:
 // https://github.com/vufind-org/vufind/blob/dev/import/marc.properties
+// Everything we know about this mapping — MSB/German-specific MARC content,
+// deliberate omissions, measured coverage, schema caveats — is collected in
+// ./field-notes.md.
 
 const ALPHA_CODE = /^[a-z]$/
 
@@ -231,7 +234,10 @@ function mapRecord(oaiRecord) {
         // Language (VuFind: language=008[35-37]:041a:041d:041h:041j)
         language:         languageCodes(marc),
 
-        // Subjects (VuFind: topic, genre, geographic, era as alpha-subfields)
+        // Subjects (VuFind: topic, genre, geographic, era as alpha-subfields).
+        // The RSWK subject chains (689) are deliberately not mapped — MSB's
+        // export already materializes them into these 6xx fields; see
+        // field-notes.md for the measurements behind that decision.
         topic:                 allAlphaSubfields(marc, ["600", "610", "611", "630", "650", "653", "656"]),
         genre:                 allAlphaSubfields(marc, ["655"]),
         geographic:            allAlphaSubfields(marc, ["651"]),
