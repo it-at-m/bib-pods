@@ -75,6 +75,10 @@ bp:interestedInPlace a rdf:Property ;
     rdfs:range bf:Place ;
     cori:inSection bp:TasteSection ;
     cori:order 50 ;
+    # Picker values extracted from the catalogue (resources/place-values.ttl); stored
+    # as label literals to match the index's geographic labels directly.
+    cori:allowedValues bp:PlaceValues ;
+    cori:storeAs cori:LabelLiteral ;
     bp:explanationPhrase "es um {value} geht"@de ;
     bp:linkedToIndex [
         bp:labelField "geographic" ;

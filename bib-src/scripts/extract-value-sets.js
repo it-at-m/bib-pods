@@ -7,12 +7,16 @@
 //
 //   node scripts/extract-value-sets.js [solr-select-endpoint]
 //
-// Currently emits: genre-values.ttl — the catalogue's genre vocabulary. MSB's 655
-// carries bibliographic *forms* (Kochbuch, Ratgeber, Biografie, Führer …), not
-// literary fiction genres (no Krimi/Fantasy; fiction is just "Fiktionale
-// Darstellung"), and virtually no authority links — so the honest value set is
-// these catalogue labels, stored as literals (cori:LabelLiteral) that match the
-// index's genre field directly.
+// Currently emits:
+//   genre-values.ttl — the catalogue's genre vocabulary. MSB's 655 carries
+//     bibliographic *forms* (Kochbuch, Ratgeber, Biografie, Führer …), not literary
+//     fiction genres (no Krimi/Fantasy; fiction is just "Fiktionale Darstellung"),
+//     and virtually no authority links — so the honest value set is these catalogue
+//     labels, stored as literals (cori:LabelLiteral) that match the index's genre
+//     field directly.
+//   place-values.ttl — the catalogue's geographic subjects (651). The frequent
+//     values are clean, recognizable regions; the tail is one-off and year-qualified
+//     places. Stored as label literals matching the index's geographic field.
 
 import { writeFileSync } from "fs"
 import { resolve, dirname } from "path"
@@ -106,3 +110,30 @@ writeFileSync(outPath, conceptScheme({
         + `Seltene sowie medienbezogene Begriffe (z.B. CD, Musikdruck) sind ausgefiltert.`,
 }))
 console.log(`wrote ${outPath} (${genres.length} concepts; dropped ${belowThreshold.length} below min-count, ${mediumLike} medium-like)`)
+
+// ----- Places (bp:interestedInPlace picker) -----
+
+// Same rationale as the genre threshold: rarer places would make lanes too thin.
+// The frequent values need no exclude list — all are user-recognizable, including
+// the historically scoped ones (Deutschland <DDR>, Römisches Reich, Sowjetunion),
+// which readers pick deliberately.
+const PLACE_MIN_COUNT = 300
+
+const allPlaces = await facetValues("geographic_str")
+const placesBelow = allPlaces.filter(v => v.count < PLACE_MIN_COUNT)
+const places = allPlaces.filter(v => v.count >= PLACE_MIN_COUNT)
+
+const placesPath = resolve(OUT_DIR, "place-values.ttl")
+writeFileSync(placesPath, conceptScheme({
+    schemeName: "PlaceValues",
+    schemeLabel: "Orte & Regionen im Katalog",
+    conceptPrefix: "place",
+    values: places,
+    comment: `The catalogue's place value set: ${places.length} of ${allPlaces.length} distinct geographic_str facet values. `
+        + `Excluded: ${placesBelow.length} values below ${PLACE_MIN_COUNT} records `
+        + `(a long tail of one-off and year-qualified places covering ${placesBelow.reduce((n, v) => n + v.count, 0).toLocaleString("en")} records in total).`,
+    definition: `Diese Auswahl stammt aus dem Katalog der Münchner Stadtbibliothek: `
+        + `die ${places.length} häufigsten Orts- und Regionsangaben des Bestands, automatisch extrahiert. `
+        + `Seltene Ortsangaben sind ausgefiltert.`,
+}))
+console.log(`wrote ${placesPath} (${places.length} concepts; dropped ${placesBelow.length} below min-count)`)
