@@ -8,6 +8,8 @@ import libraryVocabTtl from "../definitions/vocabulary.ttl.js"
 import libraryProfileShapesTtl from "../definitions/profile.shapes.ttl.js"
 import genreValuesTtl from "../resources/genre-values.ttl.js"
 import placeValuesTtl from "../resources/place-values.ttl.js"
+import languageValuesTtl from "../resources/language-values.ttl.js"
+import mediumValuesTtl from "../resources/medium-values.ttl.js"
 import { sparqlSelect } from "@foerderfunke/sem-ops-utils/sparql"
 
 export const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
@@ -26,6 +28,8 @@ registerPrefix("gnd", GND)
 registerVocab(libraryVocabTtl)
 registerVocab(genreValuesTtl) // catalogue-extracted picker values, see scripts/extract-value-sets.js
 registerVocab(placeValuesTtl)
+registerVocab(languageValuesTtl)
+registerVocab(mediumValuesTtl)
 registerProfileShapes(libraryProfileShapesTtl)
 
 // collects the follow-up questions declared on a cori:UserAction in the vocabulary

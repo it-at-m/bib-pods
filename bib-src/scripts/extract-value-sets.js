@@ -17,6 +17,13 @@
 //   place-values.ttl — the catalogue's geographic subjects (651). The frequent
 //     values are clean, recognizable regions; the tail is one-off and year-qualified
 //     places. Stored as label literals matching the index's geographic field.
+//   language-values.ttl — the languages of the holdings. The index carries ISO
+//     639-2/B codes ("ger"), so each concept displays a German name and carries the
+//     code as bp:indexValue for query building. Stored as concept IRIs.
+//   medium-values.ttl — the media types (format field). Catalogue jargon is
+//     relabeled for users ("Druckschrift" -> "Buch") and combo values are merged
+//     into their base medium, so a concept may carry several bp:indexValue tokens.
+//     Stored as concept IRIs.
 
 import { writeFileSync } from "fs"
 import { resolve, dirname } from "path"
@@ -65,6 +72,8 @@ function ttlString(s) {
 
 // `definition` is user-facing provenance help: the dialog assistant offers it behind
 // a ?-icon next to the picker, so say in plain German where the values come from.
+// Values may carry `indexValues`: the raw catalogue tokens the concept stands for,
+// emitted as bp:indexValue — needed whenever the display label isn't the index token.
 function conceptScheme({ schemeName, schemeLabel, conceptPrefix, values, comment, definition }) {
     const concepts = values.map(v => ({ ...v, iri: `bp:${conceptPrefix}-${slug(v.label)}` }))
     const lines = [
@@ -84,7 +93,13 @@ function conceptScheme({ schemeName, schemeLabel, conceptPrefix, values, comment
     ]
     for (const c of concepts) {
         lines.push(`${c.iri} a skos:Concept ;`)
-        lines.push(`    skos:prefLabel ${ttlString(c.label)}@de . # ${c.count.toLocaleString("en")} records`)
+        const label = `    skos:prefLabel ${ttlString(c.label)}@de`
+        if (c.indexValues) {
+            lines.push(label + " ;")
+            lines.push(`    bp:indexValue ${c.indexValues.map(ttlString).join(", ")} . # ${c.count.toLocaleString("en")} records`)
+        } else {
+            lines.push(label + ` . # ${c.count.toLocaleString("en")} records`)
+        }
     }
     return lines.join("\n") + "\n"
 }
@@ -137,3 +152,113 @@ writeFileSync(placesPath, conceptScheme({
         + `Seltene Ortsangaben sind ausgefiltert.`,
 }))
 console.log(`wrote ${placesPath} (${places.length} concepts; dropped ${placesBelow.length} below min-count)`)
+
+// ----- Languages (bp:preferredLanguage picker) -----
+
+const LANGUAGE_MIN_COUNT = 300
+
+// The index stores ISO 639-2/B codes; the picker must display German names. Every
+// frequent code needs an entry here — unmapped frequent codes are dropped loudly
+// (console warning), so a reindex introducing new codes surfaces at extraction.
+const LANGUAGE_LABELS = new Map([
+    ["ara", "Arabisch"], ["chi", "Chinesisch"], ["cze", "Tschechisch"], ["dan", "Dänisch"],
+    ["dut", "Niederländisch"], ["eng", "Englisch"], ["fin", "Finnisch"], ["fre", "Französisch"],
+    ["ger", "Deutsch"], ["gre", "Griechisch"], ["heb", "Hebräisch"], ["hrv", "Kroatisch"],
+    ["hun", "Ungarisch"], ["ita", "Italienisch"], ["jpn", "Japanisch"], ["kor", "Koreanisch"],
+    ["lat", "Latein"], ["nor", "Norwegisch"], ["per", "Persisch"], ["pol", "Polnisch"],
+    ["por", "Portugiesisch"], ["rum", "Rumänisch"], ["rus", "Russisch"], ["spa", "Spanisch"],
+    ["swe", "Schwedisch"], ["tur", "Türkisch"], ["ukr", "Ukrainisch"],
+])
+
+// Codes that aren't a language a user could prefer: unb (MSB's "unbestimmt" — no
+// language recorded, the single biggest bucket), zxx (no linguistic content, e.g.
+// instrumental music), mul (multiple), mis (miscellaneous), und (undetermined),
+// xxd (local placeholder).
+const LANGUAGE_EXCLUDE = new Set(["unb", "zxx", "mul", "mis", "und", "xxd"])
+
+const allLanguages = await facetValues("language_str")
+const languagesBelow = allLanguages.filter(v => v.count < LANGUAGE_MIN_COUNT)
+const frequentLanguages = allLanguages.filter(v => v.count >= LANGUAGE_MIN_COUNT && !LANGUAGE_EXCLUDE.has(v.label))
+const nonLanguage = allLanguages.filter(v => v.count >= LANGUAGE_MIN_COUNT && LANGUAGE_EXCLUDE.has(v.label))
+for (const v of frequentLanguages.filter(v => !LANGUAGE_LABELS.has(v.label))) {
+    console.warn(`SKIPPING frequent language code without a German label: ${v.label} (${v.count} records) — extend LANGUAGE_LABELS`)
+}
+const languages = frequentLanguages
+    .filter(v => LANGUAGE_LABELS.has(v.label))
+    .map(v => ({ label: LANGUAGE_LABELS.get(v.label), count: v.count, indexValues: [v.label] }))
+    .sort((a, b) => a.label.localeCompare(b.label, "de"))
+
+const languagesPath = resolve(OUT_DIR, "language-values.ttl")
+writeFileSync(languagesPath, conceptScheme({
+    schemeName: "LanguageValues",
+    schemeLabel: "Sprachen im Katalog",
+    conceptPrefix: "language",
+    values: languages,
+    comment: `The catalogue's language value set: ${languages.length} of ${allLanguages.length} distinct language_str facet values, `
+        + `ISO 639-2/B codes relabeled to German names (the code stays queryable as bp:indexValue). `
+        + `Excluded: ${languagesBelow.length} values below ${LANGUAGE_MIN_COUNT} records `
+        + `(covering ${languagesBelow.reduce((n, v) => n + v.count, 0).toLocaleString("en")} records in total) `
+        + `and the non-language codes ${nonLanguage.map(v => v.label).join("/")} `
+        + `(covering ${nonLanguage.reduce((n, v) => n + v.count, 0).toLocaleString("en")} records).`,
+    definition: `Diese Auswahl stammt aus dem Katalog der Münchner Stadtbibliothek: `
+        + `die ${languages.length} häufigsten Sprachen des Bestands, automatisch extrahiert. `
+        + `Seltene Sprachen sind ausgefiltert.`,
+}))
+console.log(`wrote ${languagesPath} (${languages.length} concepts; dropped ${languagesBelow.length} below min-count, ${nonLanguage.length} non-language codes)`)
+
+// ----- Media types (bp:preferredMedium picker) -----
+
+const MEDIUM_MIN_COUNT = 300
+
+// Catalogue jargon -> user-facing label. Values mapping to the same label merge into
+// one concept carrying all their raw tokens as bp:indexValue (counts add up): a user
+// picking "Buch" shouldn't have to know that book+CD sets are catalogued separately.
+// Frequent values not listed keep their raw label (CD, E-Book, LP, ... are fine as-is).
+const MEDIUM_RELABEL = new Map([
+    ["Druckschrift", "Buch"],
+    ["Buch + CD", "Buch"],
+    ["Buch + CD-ROM", "Buch"],
+    ["Noten + CD", "Noten"],
+    ["DVD-Video", "DVD"],
+    ["Karte allgemein", "Karte"],
+])
+
+// Formats nobody picks as a media preference: archival material, opaque legacy codes
+// (CC/VC = audio/video cassette), and the catch-all Medienkombination.
+const MEDIUM_EXCLUDE = new Set([
+    "Microfilm", "Musikhandschrift", "Medienkombination", "E-Speichermedium", "CC", "VC",
+])
+
+const allMedia = await facetValues("format_str")
+const mediaBelow = allMedia.filter(v => v.count < MEDIUM_MIN_COUNT)
+const frequentMedia = allMedia.filter(v => v.count >= MEDIUM_MIN_COUNT)
+const mediaExcluded = frequentMedia.filter(v => MEDIUM_EXCLUDE.has(v.label))
+const byLabel = new Map()
+for (const v of frequentMedia) {
+    if (MEDIUM_EXCLUDE.has(v.label)) continue
+    const label = MEDIUM_RELABEL.get(v.label) ?? v.label
+    if (!byLabel.has(label)) byLabel.set(label, { label, count: 0, indexValues: [] })
+    const c = byLabel.get(label)
+    c.count += v.count
+    c.indexValues.push(v.label)
+}
+const media = [...byLabel.values()].sort((a, b) => a.label.localeCompare(b.label, "de"))
+const merged = frequentMedia.length - mediaExcluded.length - media.length
+
+const mediaPath = resolve(OUT_DIR, "medium-values.ttl")
+writeFileSync(mediaPath, conceptScheme({
+    schemeName: "MediumValues",
+    schemeLabel: "Medienarten im Katalog",
+    conceptPrefix: "medium",
+    values: media,
+    comment: `The catalogue's media-type value set: ${media.length} concepts from ${allMedia.length} distinct format_str facet values, `
+        + `relabeled/merged for users (raw tokens stay queryable as bp:indexValue; ${merged} combo values merged into their base medium). `
+        + `Excluded: ${mediaBelow.length} values below ${MEDIUM_MIN_COUNT} records `
+        + `(covering ${mediaBelow.reduce((n, v) => n + v.count, 0).toLocaleString("en")} records in total) `
+        + `and ${mediaExcluded.length} archival/opaque formats (${mediaExcluded.map(v => v.label).join(", ")}).`,
+    definition: `Diese Auswahl stammt aus dem Katalog der Münchner Stadtbibliothek: `
+        + `die häufigsten Medienarten des Bestands, automatisch extrahiert. Einige Katalog-Fachbegriffe `
+        + `sind dafür umbenannt oder zusammengefasst (aus „Druckschrift" wird z.B. „Buch"); `
+        + `seltene Medienarten sind ausgefiltert.`,
+}))
+console.log(`wrote ${mediaPath} (${media.length} concepts; dropped ${mediaBelow.length} below min-count, ${mediaExcluded.length} excluded, ${merged} merged)`)

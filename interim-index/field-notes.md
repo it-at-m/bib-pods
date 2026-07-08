@@ -66,6 +66,14 @@ Rationale: consumers should never have to know that `(DE-588)4211695-8` means
   (`https://id.loc.gov/vocabulary/carriers/<code>`) → `format_uri_str_mv`, plus
   `electronic` = carrier `cr` (online resource). 79 distinct `format` values;
   Druckschrift 913k, Noten 113k, CD 80k, E-Book 34k, DVD-Video 22k, ….
+  These are catalog designators, not user-facing labels: a preference/picker built
+  on this field must relabel MSB jargon (Druckschrift → Buch, DVD-Video → DVD,
+  Karte allgemein → Karte) and merge combo values into their base medium
+  (Buch + CD/Buch + CD-ROM → Buch, Noten + CD → Noten) rather than surface the raw
+  strings — the underlying codes still work for exact-match querying, they're just
+  not what a reader would recognize as a choice. Turned into a bib-src picker: 14
+  concepts from the ≥300-records `format_str` values, each carrying its raw
+  catalog token(s) for querying (Buch alone covers 3 merged tokens).
 - **Onleihe**: 856$u links of the form `…onleihe.de/…/mediaInfo,<x>-<y>-<mediaId>-…`
   carry the divibib media id → `onleihe_id`. Not guaranteed unique (the same holding
   is occasionally catalogued twice), but duplicates share bibliographic data, so any
@@ -116,8 +124,25 @@ at all.** Details (docs carrying the field / docs with at least one unresolvable
 entry):
 
 - **topic**: 314,829 docs; only 1.5% carry an unresolvable entry; ~49,000 distinct
-  GND IRIs, ~56,000 distinct labels. The strongest symbolic-recommendation substrate
-  in the index.
+  GND IRIs, ~56,182 distinct labels. The strongest symbolic-recommendation substrate
+  in the index for exact-match querying — but the label set itself is **not viable
+  as a closed picker** the way genre/geographic are. The same ≥300-records cutoff
+  used there keeps only 265 labels, covering 227,719 of 1,262,881 records (18%) —
+  a much thinner slice than genre's or geographic's ≥300 cutoffs, which each keep
+  the bulk of their field's records; 27,034 topic labels occur exactly once.
+  Worse, the head isn't general-interest topics but narrow classification jargon
+  from whichever collection happens to be large: musical forms (Lied 7.1k, Konzert
+  5.3k, Sonate 4.9k, Oper 4.4k, Sinfonie 4.2k, Kunstlied, Quartett, Suite, Kantate)
+  and a philately collection (Postgeschichte \<Fach\> 3.4k, Berühmte Sammlung
+  \<Philatelie\>, Briefmarke, Poststempel, Philatelie, Klassische Briefmarke).
+  Genuine general topics (Wandern, Kunst, Philosophie, Tiere, Architektur, Malerei,
+  Biographie) are interspersed but a minority — no small allowlist/blocklist
+  separates them the way genre's 15-term carrier exclude-list did. Also note
+  "Deutsch"/"Englisch"/"Fremdsprache" appear as topic labels in their own right
+  (5,080/1,854/1,639 records — language-learning materials), which would collide
+  semantically with any language facet built from the `language` field. A
+  user-facing topic picker needs live autocomplete (`facet.prefix` against the
+  live index) rather than a static snapshot.
 - **author**: 730,869 docs; 17.4% (of all docs) carry an unresolvable author →
   roughly 70% of authored records have a GND-linked main author; ~112,000 distinct
   author IRIs.
@@ -126,15 +151,31 @@ entry):
   **label-only** field: 959 distinct values, extremely head-heavy (Musikdruck 106k,
   Musiktonträger 76k, then Führer 10k, Aufsatzsammlung, Kindersachbuch, …).
   Note the head is polluted by carrier-like values (Musikdruck, CD) — a curated
-  genre list for user-facing purposes should filter those.
+  genre list for user-facing purposes should filter those. Done in bib-src:
+  `extract-value-sets.js` keeps 43 of 959 values at a ≥300-records cutoff, plus a
+  15-term carrier/medium blocklist for the qualifier-stripped label.
 - **geographic**: 95,229 docs, only 0.5% unresolvable; 8.8k distinct values
-  (Deutschland 19k, München 4.9k, Bayern 3.2k, …).
-- **era**: 44,963 docs, **zero** resolvable IRIs, 11.6k distinct values that are
-  mostly free-form time phrases ("Geschichte 1933-1945"). Only useful if someone
-  parses the year ranges; not worth authority treatment.
+  (Deutschland 19k, München 4.9k, Bayern 3.2k, …). Also turned into a bib-src
+  picker: 47 of 8,835 `geographic_str` facet values clear a ≥300-records cutoff,
+  no exclude list needed — even the historically scoped values (Deutschland \<DDR\>,
+  Römisches Reich) are things readers pick deliberately.
+- **era**: 44,963 docs, **zero** resolvable IRIs, 11,578 distinct values that are
+  mostly free-form time phrases ("Geschichte 1933-1945"). Confirms it's unusable as
+  a picker too: only **5** values clear even a 300-records cutoff (Geschichte 16.2k,
+  Geschichte 1933-1945, Geschichte 1900-2000, Geschichte 1800-1900, Geschichte
+  1918-), all variants of the same free-text prefix. Only useful if someone parses
+  the year ranges; not worth authority treatment.
 - **language**: 256 distinct codes, but `unb` (undetermined) covers 49% of the whole
   index — essentially the sheet-music and audio stock; `ger` 515k, `eng` 105k,
-  `fre` 23k, `ita` 13k, `spa` 10k. Filters on language must expect `unb`.
+  `fre` 23k, `ita` 13k, `spa` 10k. Filters on language must expect `unb`, and — for
+  a user-facing preference/picker specifically — also exclude the smaller
+  non-language codes `zxx` (no linguistic content, e.g. instrumental music, 6,820),
+  `mul` (multiple, 883), `mis` (miscellaneous, 537), and `xxd` (local placeholder,
+  1,644): together with `unb` they're ~50% of the index and none is a language a
+  reader would select. Turned into a bib-src picker: 27 codes ≥300 records get a
+  German display name (a hand-maintained ISO 639-2/B → German map; new codes
+  crossing the threshold fail loudly rather than silently), stored as a concept
+  that still carries the raw code for querying.
 
 ## 5. What we deliberately do NOT map — and when to revisit
 

@@ -85,6 +85,41 @@ bp:interestedInPlace a rdf:Property ;
         bp:iriField "geographic_uri_str_mv"
     ] .
 
+# The index stores ISO 639-2/B codes ("ger"), so the picker concepts display German
+# names and carry the code as bp:indexValue; the profile keeps the concept IRI.
+# A preference, not a taste: typed bp:RecommendationFilter, it narrows every Solr
+# lane instead of forming one of its own.
+bp:preferredLanguage a rdf:Property, bp:RecommendationFilter ;
+    rdfs:label "preferred language"@en, "Sprache"@de ;
+    cori:pluralLabel "preferred languages"@en, "Sprachen"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range bf:Language ;
+    cori:inSection bp:LanguagesSection ;
+    cori:order 10 ;
+    cori:allowedValues bp:LanguageValues ;
+    cori:storeAs cori:ConceptIri ;
+    bp:explanationPhrase "es auf {value} erschienen ist"@de ;
+    bp:linkedToIndex [
+        bp:labelField "language"
+    ] .
+
+# Media types are catalogue jargon ("Druckschrift"), so the picker concepts carry
+# user labels plus the raw token(s) as bp:indexValue — combo values like "Buch + CD"
+# fold into their base medium. Also a filter, not a lane (see bp:preferredLanguage).
+bp:preferredMedium a rdf:Property, bp:RecommendationFilter ;
+    rdfs:label "preferred medium"@en, "Medienart"@de ;
+    cori:pluralLabel "preferred media"@en, "Medienarten"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range bf:Carrier ;
+    cori:inSection bp:TasteSection ;
+    cori:order 60 ;
+    cori:allowedValues bp:MediumValues ;
+    cori:storeAs cori:ConceptIri ;
+    bp:explanationPhrase "es als {value} vorliegt"@de ;
+    bp:linkedToIndex [
+        bp:labelField "format"
+    ] .
+
 bp:savedBook a rdf:Property ; # SOPAC identifier
     rdfs:label "saved book"@en, "Gemerktes Buch"@de ;
     cori:pluralLabel "saved books"@en, "Gemerkte Bücher"@de ;
@@ -143,6 +178,10 @@ bp:linkedToIndex a rdf:Property .
 bp:labelField a rdf:Property .
 bp:iriField a rdf:Property .
 
+# On a picker concept: the raw index token(s) it stands for, when they differ from the
+# display label ("Deutsch" queries language:"ger"). Several tokens OR into one clause.
+bp:indexValue a rdf:Property .
+
 # ----- Interactions -----
 
 bp:followUpQuestion a rdf:Property ;
@@ -157,6 +196,12 @@ bp:BookSelection a cori:UserAction ;
 # ----- Recommendations -----
 
 bp:RecommendationStrategy a rdfs:Class .
+
+# Profile properties typed bp:RecommendationFilter don't form lanes of their own —
+# their values narrow every Solr strategy's query as fq clauses: OR within a property,
+# AND across properties ("auf Deutsch oder Englisch, und als E-Book"). The inspira
+# engine can't be filtered this way, so its lanes ignore these preferences.
+bp:RecommendationFilter a rdfs:Class .
 
 bp:usesProfileProperty a rdf:Property ;
     rdfs:domain bp:RecommendationStrategy ;

@@ -2,7 +2,7 @@
     "name": "bib-src",
     "type": "module",
     "scripts": {
-        "ttl-to-js": "ttl-to-js definitions/vocabulary.ttl definitions/config.ttl definitions/profile.shapes.ttl resources/genre-values.ttl resources/place-values.ttl",
+        "ttl-to-js": "ttl-to-js definitions/vocabulary.ttl definitions/config.ttl definitions/profile.shapes.ttl resources/genre-values.ttl resources/place-values.ttl resources/language-values.ttl resources/medium-values.ttl",
         "extract-value-sets": "node scripts/extract-value-sets.js && npm run ttl-to-js",
         "prepare": "npm run ttl-to-js"
     },

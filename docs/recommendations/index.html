@@ -197,9 +197,15 @@
                         a.appendChild(code)
                         queryCell.appendChild(a)
                         if (query.fq.length > 0) {
+                            // -id: fq's exclude saved books, the rest are preference
+                            // filters (bp:RecommendationFilter: Sprache, Medienart)
+                            const excluded = query.fq.filter(f => f.startsWith("-id:")).length
+                            const parts = []
+                            if (excluded > 0) parts.push(`${excluded} fq-Ausschlüsse (gemerkte Bücher)`)
+                            if (excluded < query.fq.length) parts.push(`${query.fq.length - excluded} fq-Präferenzfilter`)
                             const fqNote = document.createElement("span")
                             fqNote.className = "no-query"
-                            fqNote.textContent = ` + ${query.fq.length} fq-Ausschlüsse (gemerkte Bücher)`
+                            fqNote.textContent = ` + ${parts.join(" + ")}`
                             queryCell.appendChild(fqNote)
                         }
                     }

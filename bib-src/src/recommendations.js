@@ -129,15 +129,21 @@ export function explainDocMatches(doc, profileStore, profileSubject, properties 
 }
 
 // Does the doc carry this profile fact in any of the property's index fields?
-// Authority IRIs check the iriField, literals the labelField; locally minted URNs
-// (urn:bibpods:…) never appear in the index, so they check the labelField via their
-// preserved raw index form (bp:sourceLabel). Exact matches only — a near-miss
+// Authority IRIs check the iriField, literals the labelField; picker concepts carrying
+// bp:indexValue check the labelField via their raw catalogue token(s); locally minted
+// URNs (urn:bibpods:…) never appear in the index, so they check the labelField via
+// their preserved raw index form (bp:sourceLabel). Exact matches only — a near-miss
 // (e.g. a differing name-date variant) counts as "not traceable", not as a match.
 function docMatchesFact(doc, mappings, obj, profileStore) {
     const inField = (field, value) => field && [].concat(doc[field] ?? []).includes(value)
+    const indexValues = obj.termType === "NamedNode"
+        ? getVocab().getObjects(obj.value, BP + "indexValue", null).map(t => t.value)
+        : []
     for (const m of mappings) {
         if (obj.termType !== "NamedNode") {
             if (inField(m.labelField, obj.value)) return true
+        } else if (indexValues.length > 0) {
+            if (indexValues.some(t => inField(m.labelField, t))) return true
         } else if (obj.value.startsWith(LOCAL)) {
             const raw = germanText(profileStore, obj.value, BP + "sourceLabel")
                 ?? germanText(profileStore, obj.value, RDFS_LABEL)
@@ -165,21 +171,18 @@ function combinatorOf(v, iri) {
 }
 
 // Builds the Solr query for a strategy from the user's profile store.
-//   Returns { q, fq: [exclusion-strings] } or null if no clauses applied.
+//   Returns { q, fq: [filter-strings] } or null if no clauses applied.
 // Each profile fact becomes a group OR-ing across all of its bp:linkedToIndex fields
 // (e.g. author + author2). Groups are then combined via the strategy's bp:combine.
-// bp:savedBook entries become -id: filters rather than match clauses.
+// The fq carries what constrains rather than matches: -id: exclusions for bp:savedBook
+// entries and the profile's preference filters (see preferenceFilters).
 export function buildQuery(strategy, profileStore, profileSubject) {
     const v = getVocab()
     const factGroups = []
     for (const prop of strategy.properties) {
         const mappings = getLinkedIndices(v, prop)
         for (const obj of profileStore.getObjects(profileSubject, prop, null)) {
-            const clauses = []
-            for (const m of mappings) {
-                const field = obj.termType === "NamedNode" ? m.iriField : m.labelField
-                if (field) clauses.push(`${field}:"${escapeSolr(obj.value)}"`)
-            }
+            const clauses = factClauses(v, mappings, obj)
             if (clauses.length > 0) {
                 factGroups.push(clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`)
             }
@@ -189,7 +192,44 @@ export function buildQuery(strategy, profileStore, profileSubject) {
     const op = strategy.combine?.iri === BP + "And" ? " AND " : " OR "
     const q = factGroups.length === 1 ? factGroups[0] : `(${factGroups.join(op)})`
     const savedIds = profileStore.getObjects(profileSubject, BP + "savedBook", null).map(o => o.value)
-    return { q, fq: savedIds.map(id => `-id:"${escapeSolr(id)}"`) }
+    return { q, fq: [...savedIds.map(id => `-id:"${escapeSolr(id)}"`), ...preferenceFilters(v, profileStore, profileSubject)] }
+}
+
+// The Solr clauses one profile fact contributes, across the property's index mappings:
+// authority IRIs hit the iriField, literals the labelField, and picker concepts carrying
+// bp:indexValue expand to their raw catalogue token(s) on the labelField — "Deutsch"
+// becomes language:"ger", merged media concepts OR all their tokens.
+function factClauses(v, mappings, obj) {
+    const indexValues = obj.termType === "NamedNode"
+        ? v.getObjects(obj.value, BP + "indexValue", null).map(t => t.value)
+        : []
+    const clauses = []
+    for (const m of mappings) {
+        if (indexValues.length > 0) {
+            if (m.labelField) clauses.push(...indexValues.map(t => `${m.labelField}:"${escapeSolr(t)}"`))
+        } else {
+            const field = obj.termType === "NamedNode" ? m.iriField : m.labelField
+            if (field) clauses.push(`${field}:"${escapeSolr(obj.value)}"`)
+        }
+    }
+    return clauses
+}
+
+// fq clauses from the profile's preference properties (bp:RecommendationFilter — e.g.
+// Sprache, Medienart): one fq per property OR-ing its values. Solr ANDs separate fq
+// params, so "auf Deutsch oder Englisch, und als E-Book" comes out right. They apply
+// to every Solr lane; the inspira engine has no query to attach them to.
+function preferenceFilters(v, profileStore, profileSubject) {
+    const fqs = []
+    for (const prop of v.getSubjects(RDF_TYPE, BP + "RecommendationFilter", null)) {
+        const clauses = []
+        const mappings = getLinkedIndices(v, prop.value)
+        for (const obj of profileStore.getObjects(profileSubject, prop.value, null)) {
+            clauses.push(...factClauses(v, mappings, obj))
+        }
+        if (clauses.length > 0) fqs.push(clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`)
+    }
+    return fqs
 }
 
 // Total pool behind a strategy for this profile: how many index records its query
