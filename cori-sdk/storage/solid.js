@@ -2,6 +2,7 @@
 import { getResource, parseToN3, createContainer, putResource, getContainerItems, getLinkHeader, SPACE, SOLID, RDF } from "@uvdsl/solid-requests"
 import { parseTurtle, serializeTurtle } from "../utils.js"
 import { Session } from "@uvdsl/solid-oidc-client-browser"
+import { universalAccess } from "@inrupt/solid-client"
 import { setChoice, getStorageConfig } from "./index.js"
 
 const DEBUG = true
@@ -254,4 +255,34 @@ export async function getInfo() {
 
 export function getEntryName() {
     return profileFilename()
+}
+
+// --- Publishing ---
+
+// Published resources live beside the profile file in the same cori/ container.
+async function siblingUri(filename) {
+    const profileUri = await ensurePodSetup()
+    return profileUri.slice(0, profileUri.length - profileFilename().length) + filename
+}
+
+// Two access-control mechanisms are in circulation across the Solid ecosystem — WAC
+// (acl:Authorization documents) and ACP (acp:AccessControlResource) — and a given pod
+// server implements one or the other. universalAccess detects which the server speaks
+// and writes the matching rules, so this expresses the intent (readable by anyone)
+// rather than the mechanism.
+export async function publish(filename, turtle) {
+    const uri = await siblingUri(filename)
+    await putResource(uri, turtle, session)
+    await universalAccess.setPublicAccess(uri, { read: true }, { fetch: session.authFetch })
+    log("published", uri)
+    return uri
+}
+
+// Withdraws public read. The resource stays in the pod and readable by its owner —
+// so re-publishing later is a permission change, not a re-upload.
+export async function unpublish(filename) {
+    const uri = await siblingUri(filename)
+    await universalAccess.setPublicAccess(uri, { read: false }, { fetch: session.authFetch })
+    log("unpublished", uri)
+    return uri
 }

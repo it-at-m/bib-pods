@@ -82,6 +82,19 @@ export function getStorageEntryName() {
     return getStorage().getEntryName()
 }
 
+// --- Publishing ---
+// Deliberately not part of the backend interface: publishing means handing out a URL
+// anyone can read, and only a pod has a public URL space — local and session storage
+// have nothing to expose. Callers gate on canPublish() and address the pod directly.
+
+export function canPublish() {
+    return getChoice() === "solid" && isStorageReady()
+}
+
+export const publishTurtle = (filename, turtle) => solidBackend.publish(filename, turtle)
+
+export const unpublishTurtle = (filename) => solidBackend.unpublish(filename)
+
 // --- Reading ---
 
 export async function loadAsTurtle() {

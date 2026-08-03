@@ -1,4 +1,4 @@
-import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, warmupStorage, loadStore, listMessages, markMessageRead, addMessageIfNew, replaceSubjectObjects } from "cori-sdk/storage/index.js"
+import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, warmupStorage, loadStore, listMessages, markMessageRead, addMessageIfNew, replaceSubjectObjects } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
 import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
@@ -6,6 +6,7 @@ import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl, fetchBook } from "./catalogue.js"
 import { cleanAuthorName } from "./book-prompt.js"
+import { publishMerkliste, unpublishMerkliste } from "./publish.js"
 import { BP } from "./vocab.js"
 import styleCss from "./ui/style.css?inline"
 import entryHtml from "./ui/entry.html?raw"
@@ -438,7 +439,10 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const chooser = root.querySelector("#bp-chooser")
     const solidSetup = root.querySelector("#bp-solid-setup")
     const solidInput = root.querySelector("#bp-solid-input")
-    const storageLabel = root.querySelector("#bp-storage-label")
+    const storageLabel = root.querySelector("#bp-storage-label-text")
+    const publishBlock = root.querySelector("#bp-publish")
+    const publishLink = root.querySelector("#bp-publish-link")
+    const unpublishLink = root.querySelector("#bp-unpublish-link")
     const logoutBtn = root.querySelector(".bp-logout")
     const activatedBlocks = root.querySelectorAll(".bp-when-activated")
     const profileEl = root.querySelector("cori-profile")
@@ -548,12 +552,14 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
-    // The Konto block's one-line "where your data lives".
+    // The Konto block's one-line "where your data lives", plus the publish actions
+    // that only a pod can offer.
     function renderStorageLabel() {
         const choice = getChoice()
         storageLabel.textContent = choice === "solid" && !isStorageReady()
             ? "Solid Pod – Sitzung unterbrochen"
             : STORAGE_LABELS[choice] ?? ""
+        publishBlock.hidden = !canPublish()
     }
 
     // The Schaufenster: one carousel per strategy of unread recommendations (seen ones drop
@@ -780,6 +786,24 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             window.alert(`Verbindung zu ${issuer} fehlgeschlagen:\n${err?.message ?? err}`)
         }
     })
+    // Pod round-trips take a moment and both links hit the same resource, so a run
+    // locks the pair; outcome goes to the console until there's a UI for it.
+    function wirePublishAction(link, action, label) {
+        link.addEventListener("click", async (e) => {
+            e.preventDefault()
+            if (publishBlock.dataset.busy) return
+            publishBlock.dataset.busy = "1"
+            try {
+                console.log(`[bib-pods] ${label}:`, await action())
+            } catch (err) {
+                console.error(`[bib-pods] ${label} fehlgeschlagen:`, err)
+            } finally {
+                delete publishBlock.dataset.busy
+            }
+        })
+    }
+    wirePublishAction(publishLink, publishMerkliste, "Merkliste veröffentlicht (öffentlich lesbar)")
+    wirePublishAction(unpublishLink, unpublishMerkliste, "Merkliste zurückgezogen (wieder privat)")
     // "Abmelden" → back to the Anmelden CTA. Deactivating un-mounts the widget on non-main
     // pages on the next load. To switch storage location, log out and choose again.
     logoutBtn.addEventListener("click", async () => { await endSession(); loginStep = "cta"; applyState() })

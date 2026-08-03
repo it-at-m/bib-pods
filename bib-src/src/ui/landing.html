@@ -39,7 +39,13 @@
     </section>
 
     <section id="bp-account" class="bp-block bp-when-activated" hidden>
-        <p id="bp-storage-label" class="bp-storage-label"></p>
+        <p id="bp-storage-label" class="bp-storage-label">
+            <span id="bp-storage-label-text"></span>
+            <!-- Copies the Merkliste to a world-readable merkliste.ttl beside the profile.
+                 Needs a pod's public URL space, so applyState hides it for local/session
+                 storage and while a Solid session is interrupted. -->
+            <span id="bp-publish" class="bp-publish" hidden>(dev: <a id="bp-publish-link" href="#">publish</a> · <a id="bp-unpublish-link" href="#">unpublish</a>)</span>
+        </p>
         <button class="button bp-logout" type="button">Abmelden</button>
     </section>
 

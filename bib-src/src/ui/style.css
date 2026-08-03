@@ -199,6 +199,10 @@ dialog.bp-pods-modal {
 }
 /* Konto block: a concise "where stored" line above the Abmelden button. */
 .bp-storage-label { margin: 0 0 0.75rem; color: #555; }
+/* Merkliste publishing: a quiet dev-only aside inline with the storage line. */
+.bp-publish { font-size: 0.85em; color: #888; }
+.bp-publish a { color: #888; text-decoration: underline; }
+.bp-publish a:hover { color: var(--contrastcolor, #d14900); }
 /* The bib-pods modal is a small, plain account panel: a close ✕ in the corner, the
    title, the unread-recommendations line + a link to the main page, and a quiet
    Abmelden action set off by a hairline. */
