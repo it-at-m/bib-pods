@@ -17,6 +17,7 @@ export const currentPageUrl = () => window.location.origin + window.location.pat
 let session = null
 let readyPromise = null
 let setupPromise = null
+let modePromise = null
 let cachedWebId = null
 
 // URL of the worker emitted by emitRefreshWorker — see refresh-worker-plugin.js
@@ -46,6 +47,14 @@ export function initSession({ redirectUri }) {
 export function isLoggedIn() {
     return session?.isActive ?? false
 }
+
+export function getWebId() {
+    return session?.webId ?? null
+}
+
+// The session's authenticated fetch, for callers reading resources outside the
+// storage interface (e.g. checking what another pod lets this WebID see).
+export const authFetch = (url, init) => session.authFetch(url, init)
 
 export async function login(oidcIssuer, { redirectUri, returnUrl } = {}) {
     if (returnUrl) localStorage.setItem(returnUrlKey(), returnUrl)
@@ -191,6 +200,7 @@ function ensurePodSetup() {
     if (webId !== cachedWebId) {
         cachedWebId = webId
         setupPromise = null
+        modePromise = null
     }
     if (!setupPromise) {
         setupPromise = doEnsurePodSetup().catch(err => {
@@ -267,22 +277,105 @@ async function siblingUri(filename) {
 
 // Two access-control mechanisms are in circulation across the Solid ecosystem — WAC
 // (acl:Authorization documents) and ACP (acp:AccessControlResource) — and a given pod
-// server implements one or the other. universalAccess detects which the server speaks
-// and writes the matching rules, so this expresses the intent (readable by anyone)
-// rather than the mechanism.
-export async function publish(filename, turtle) {
+// server implements one or the other. getAccessControlMode is the only place they are
+// told apart: agent and public grants go through universalAccess, which speaks both,
+// and group grants are WAC-only.
+const ACP_RESOURCE_TYPE = "http://www.w3.org/ns/solid/acp#AccessControlResource"
+
+const head = (uri) => session.authFetch(uri, { method: "HEAD", cache: "no-store" })
+
+// Every pod links its access-control document with rel="acl", whichever mechanism it
+// speaks. Read straight off the response rather than via getLinkHeader: that document is
+// routinely absent — servers create it on first write — and even a 404 carries the
+// headers describing it.
+const aclUrlOf = async (uri) => extractLinkRel((await head(uri)).headers.get("Link"), "acl", uri)
+
+// "wac" | "acp" — the two differ in what that document says about itself: an ACP server
+// types it acp:AccessControlResource, a WAC server types it nothing. Memoized like the
+// pod setup it rides on: a pod does not switch mechanism underneath us, and the Konto
+// block asks on every re-render.
+export async function getAccessControlMode() {
+    const profile = await ensurePodSetup()   // clears the memo when the WebID changes
+    modePromise ??= aclUrlOf(profile)
+        .then(async (url) => ((await head(url)).headers.get("Link") ?? "").includes(ACP_RESOURCE_TYPE) ? "acp" : "wac")
+        .catch(err => { modePromise = null; throw err })
+    return modePromise
+}
+
+// An audience is null (everyone), { agent: webId }, or { group: groupUri }.
+// universalAccess writes whichever mechanism the pod speaks, so agent and public grants
+// state the intent (who may read) rather than the mechanism. It resolves rather than
+// rejects when it cannot address a pod's access control at all — seen on CSS in ACP
+// mode, whose control documents are created lazily, which defeats the library's own
+// detection — so the outcome is verified instead of assumed. Only grants are checked:
+// after a withdrawal a broader rule (public read, say) can legitimately leave the agent
+// still able to read.
+async function setReadAccess(uri, audience, read) {
+    const options = { fetch: session.authFetch }
+    const applied = audience?.agent
+        ? await universalAccess.setAgentAccess(uri, audience.agent, { read }, options)
+        : await universalAccess.setPublicAccess(uri, { read }, options)
+    if (applied === null || (read && !applied.read)) {
+        throw new Error("Der Pod hat die Freigabe nicht übernommen — sein Zugriffsverfahren wird nicht unterstützt")
+    }
+}
+
+// acl:agentGroup points at a vcard:Group document held elsewhere — typically the
+// organisation's own pod — which the pod server dereferences on every request. That
+// indirection is the whole point: membership changes take effect at once and without
+// touching this pod, so the owner consents once and is never asked again.
+// The document is stated whole rather than edited, which keeps the owner's own
+// authorization in it by construction and makes withdrawal simply the version without
+// the group — at the price that a group grant replaces a public or single-WebID grant
+// on the same file instead of joining it.
+const groupAcl = (uri, groupUri) => `@prefix acl: <http://www.w3.org/ns/auth/acl#>.
+
+<#owner> a acl:Authorization;
+    acl:agent <${session.webId}>;
+    acl:accessTo <${uri}>;
+    acl:mode acl:Read, acl:Write, acl:Control.
+${groupUri ? `
+<#group> a acl:Authorization;
+    acl:agentGroup <${groupUri}>;
+    acl:accessTo <${uri}>;
+    acl:mode acl:Read.
+` : ""}`
+
+async function setGroupAccess(uri, groupUri, read) {
+    if (await getAccessControlMode() !== "wac") throw new Error("Gruppen-Freigaben gibt es nur auf WAC-Pods")
+    await putResource(await aclUrlOf(uri), groupAcl(uri, read && groupUri), session)
+}
+
+const applyAccess = (uri, audience, read) => audience?.group
+    ? setGroupAccess(uri, audience.group, read)
+    : setReadAccess(uri, audience, read)
+
+const describe = (audience) => audience?.agent ?? audience?.group ?? "public"
+
+// Grants read on the resource to the given audience (see applyAccess).
+export async function publish(filename, turtle, audience = null) {
     const uri = await siblingUri(filename)
     await putResource(uri, turtle, session)
-    await universalAccess.setPublicAccess(uri, { read: true }, { fetch: session.authFetch })
-    log("published", uri)
+    await applyAccess(uri, audience, true)
+    log("granted read on", uri, "to", describe(audience))
     return uri
 }
 
-// Withdraws public read. The resource stays in the pod and readable by its owner —
-// so re-publishing later is a permission change, not a re-upload.
-export async function unpublish(filename) {
+// The pod's own access-control document for a published resource, verbatim — the
+// artefact that actually carries the grant, worth showing rather than describing.
+// null while the pod has none yet, i.e. before anything was ever granted.
+export async function readAccessControl(filename) {
+    const url = await aclUrlOf(await siblingUri(filename))
+    if (!url) return null
+    const response = await session.authFetch(url, { cache: "no-store" })
+    return response.ok ? await response.text() : null
+}
+
+// Withdraws that same read grant. The resource stays in the pod and readable by its
+// owner — so re-granting later is a permission change, not a re-upload.
+export async function unpublish(filename, audience = null) {
     const uri = await siblingUri(filename)
-    await universalAccess.setPublicAccess(uri, { read: false }, { fetch: session.authFetch })
-    log("unpublished", uri)
+    await applyAccess(uri, audience, false)
+    log("revoked read on", uri, "from", describe(audience))
     return uri
 }

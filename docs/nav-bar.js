@@ -19,6 +19,7 @@ const CHILDREN = {
         { slug: "api", label: "API" },
         { slug: "search", label: "Search" },
         { slug: "parking-lot", label: "Parking Lot" },
+        { slug: "team-access", label: "Team-Zugriff" },
     ],
 }
 

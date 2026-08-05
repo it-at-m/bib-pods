@@ -83,17 +83,26 @@ export function getStorageEntryName() {
 }
 
 // --- Publishing ---
-// Deliberately not part of the backend interface: publishing means handing out a URL
-// anyone can read, and only a pod has a public URL space — local and session storage
+// Deliberately not part of the backend interface: publishing means handing someone a URL
+// they can read, and only a pod has an addressable URL space — local and session storage
 // have nothing to expose. Callers gate on canPublish() and address the pod directly.
+// An audience narrows the grant: null means everyone, { agent: webId } one person,
+// { group: groupUri } everyone the group document currently lists.
 
 export function canPublish() {
     return getChoice() === "solid" && isStorageReady()
 }
 
-export const publishTurtle = (filename, turtle) => solidBackend.publish(filename, turtle)
+export const publishTurtle = (filename, turtle, audience) => solidBackend.publish(filename, turtle, audience)
 
-export const unpublishTurtle = (filename) => solidBackend.unpublish(filename)
+export const unpublishTurtle = (filename, audience) => solidBackend.unpublish(filename, audience)
+
+// "wac" | "acp" — group grants exist only in WAC, so callers offer that option
+// conditionally. See solid.js for how the pod is asked.
+export const getAccessControlMode = () => solidBackend.getAccessControlMode()
+
+// The pod's access-control document for a published file, as text (null if none yet).
+export const readAccessControl = (filename) => solidBackend.readAccessControl(filename)
 
 // --- Reading ---
 

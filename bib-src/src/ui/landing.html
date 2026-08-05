@@ -41,13 +41,44 @@
     <section id="bp-account" class="bp-block bp-when-activated" hidden>
         <p id="bp-storage-label" class="bp-storage-label">
             <span id="bp-storage-label-text"></span>
-            <!-- Copies the Merkliste to a world-readable merkliste.ttl beside the profile.
-                 Needs a pod's public URL space, so applyState hides it for local/session
-                 storage and while a Solid session is interrupted. -->
-            <span id="bp-publish" class="bp-publish" hidden>(dev: <a id="bp-publish-link" href="#">publish</a> · <a id="bp-unpublish-link" href="#">unpublish</a>)</span>
+            <!-- Copies the Merkliste to a merkliste.ttl beside the profile and grants
+                 read on it — to everyone, to one WebID, or to a group, chosen in the
+                 dialog below. Needs a pod's URL space, so applyState hides it for
+                 local/session storage and while a Solid session is interrupted. -->
+            <span id="bp-publish" class="bp-publish" hidden>(dev: <a id="bp-grant-link" href="#">grant access</a> · <a id="bp-revoke-link" href="#">revoke access</a>)</span>
         </p>
         <button class="button bp-logout" type="button">Abmelden</button>
     </section>
+
+    <!-- One dialog for both directions; the link that opened it sets the verb. -->
+    <dialog id="bp-access-dialog" class="bp-modal bp-access-dialog">
+        <div class="bp-modal-content">
+            <h3 id="bp-access-title"></h3>
+            <p class="bp-access-what">Betrifft die Merkliste.</p>
+            <label class="bp-access-option"><input type="radio" name="bp-access-scope" value="public" checked> Alle</label>
+            <label class="bp-access-option"><input type="radio" name="bp-access-scope" value="agent"> Eine WebID</label>
+            <!-- Hidden unless the pod speaks WAC — acl:agentGroup has no ACP equivalent. -->
+            <label class="bp-access-option" id="bp-access-group-option" hidden><input type="radio" name="bp-access-scope" value="group"> Eine Gruppe</label>
+            <input type="url" id="bp-access-webid" value="http://localhost:3000/team/profile/card#me" hidden>
+            <input type="url" id="bp-access-group" value="http://localhost:3000/team/members.ttl#team" hidden>
+            <!-- The reason to prefer the group: consent once, and let the team's own
+                 roster decide who that currently is. -->
+            <p id="bp-access-group-note" class="bp-access-what" hidden>Wer auf der Liste der Gruppe steht, darf lesen.</p>
+            <!-- A pod can decline a grant without failing the request, so say so here
+                 rather than leaving the console as the only sign. -->
+            <p id="bp-access-error" class="bp-access-error" hidden></p>
+            <p class="bp-access-actions">
+                <button id="bp-access-confirm" class="button" type="button"></button>
+                <button id="bp-access-cancel" class="button" type="button">Abbrechen</button>
+            </p>
+            <!-- What the pod actually enforces right now, straight from its own access
+                 control document — the artefact behind the wording above. -->
+            <details class="bp-access-doc">
+                <summary>Zugriffsregeln im Pod</summary>
+                <pre id="bp-access-doc-body"></pre>
+            </details>
+        </div>
+    </dialog>
 
     <section id="bp-showcase" class="bp-block bp-showcase bp-when-activated" aria-labelledby="bp-showcase-heading" hidden>
         <h3 id="bp-showcase-heading">Schaufenster</h3>

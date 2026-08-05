@@ -199,10 +199,38 @@ dialog.bp-pods-modal {
 }
 /* Konto block: a concise "where stored" line above the Abmelden button. */
 .bp-storage-label { margin: 0 0 0.75rem; color: #555; }
-/* Merkliste publishing: a quiet dev-only aside inline with the storage line. */
+/* Merkliste sharing: a quiet dev-only aside inline with the storage line. */
 .bp-publish { font-size: 0.85em; color: #888; }
 .bp-publish a { color: #888; text-decoration: underline; }
 .bp-publish a:hover { color: var(--contrastcolor, #d14900); }
+/* The grant/revoke dialog: a narrow prompt. px box sizing for the TYPO3 root-font
+   mismatch (see dialog.bp-pods-modal). */
+dialog.bp-access-dialog {
+    max-width: min(440px, 92vw) !important;
+    width: min(440px, 92vw) !important;
+}
+.bp-access-dialog .bp-modal-content { padding: 22px 26px; }
+.bp-access-dialog h3 { margin: 0 0 6px; font-size: 18px; }
+.bp-access-what { margin: 0 0 14px; color: #888; font-size: 0.9em; }
+.bp-access-option { display: block; margin: 6px 0; cursor: pointer; }
+/* Both the WebID and the group URI field — full width, so a long URI is readable. */
+.bp-access-dialog input[type="url"] {
+    width: 100%; box-sizing: border-box; margin: 10px 0 18px; padding: 8px 10px;
+    border: 1px solid #ccc; border-radius: 6px; font: inherit; font-size: 0.9em;
+}
+.bp-access-actions { display: flex; gap: 10px; margin: 18px 0 0; }
+.bp-access-error {
+    margin: 14px 0 0; padding: 8px 10px; border-radius: 6px;
+    background: #fdeceb; color: #a91b12; font-size: 0.88em;
+}
+/* The pod's own access-control document: a dev aside, folded away by default. */
+.bp-access-doc { margin: 18px 0 0; border-top: 1px solid #eee; padding-top: 12px; }
+.bp-access-doc > summary { cursor: pointer; font-size: 0.85em; color: #888; }
+.bp-access-doc pre {
+    margin: 10px 0 0; padding: 10px; max-height: 220px; overflow: auto;
+    background: #f7f8fa; border: 1px solid #e2e5ea; border-radius: 6px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 11px; line-height: 1.5;
+}
 /* The bib-pods modal is a small, plain account panel: a close ✕ in the corner, the
    title, the unread-recommendations line + a link to the main page, and a quiet
    Abmelden action set off by a hairline. */

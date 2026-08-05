@@ -5,5 +5,26 @@
     "pods": [
       { "name": "citizen-pod" }
     ]
+  },
+  {
+    "email": "team@example.com",
+    "password": "abc123",
+    "pods": [
+      { "name": "team" }
+    ]
+  },
+  {
+    "email": "anna@example.com",
+    "password": "abc123",
+    "pods": [
+      { "name": "team-anna" }
+    ]
+  },
+  {
+    "email": "peter@example.com",
+    "password": "abc123",
+    "pods": [
+      { "name": "team-peter" }
+    ]
   }
 ]

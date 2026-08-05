@@ -1,4 +1,4 @@
-import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, warmupStorage, loadStore, listMessages, markMessageRead, addMessageIfNew, replaceSubjectObjects } from "cori-sdk/storage/index.js"
+import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, getAccessControlMode, warmupStorage, loadStore, listMessages, markMessageRead, addMessageIfNew, replaceSubjectObjects } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
 import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
@@ -6,7 +6,7 @@ import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl, fetchBook } from "./catalogue.js"
 import { cleanAuthorName } from "./book-prompt.js"
-import { publishMerkliste, unpublishMerkliste } from "./publish.js"
+import { grantMerklisteAccess, revokeMerklisteAccess, readMerklisteAccessControl } from "./publish.js"
 import { BP } from "./vocab.js"
 import styleCss from "./ui/style.css?inline"
 import entryHtml from "./ui/entry.html?raw"
@@ -441,8 +441,17 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const solidInput = root.querySelector("#bp-solid-input")
     const storageLabel = root.querySelector("#bp-storage-label-text")
     const publishBlock = root.querySelector("#bp-publish")
-    const publishLink = root.querySelector("#bp-publish-link")
-    const unpublishLink = root.querySelector("#bp-unpublish-link")
+    const grantLink = root.querySelector("#bp-grant-link")
+    const revokeLink = root.querySelector("#bp-revoke-link")
+    const accessDialog = root.querySelector("#bp-access-dialog")
+    const accessTitle = root.querySelector("#bp-access-title")
+    const accessConfirm = root.querySelector("#bp-access-confirm")
+    const accessWebIdInput = root.querySelector("#bp-access-webid")
+    const accessGroupInput = root.querySelector("#bp-access-group")
+    const accessGroupOption = root.querySelector("#bp-access-group-option")
+    const accessGroupNote = root.querySelector("#bp-access-group-note")
+    const accessError = root.querySelector("#bp-access-error")
+    const accessDocBody = root.querySelector("#bp-access-doc-body")
     const logoutBtn = root.querySelector(".bp-logout")
     const activatedBlocks = root.querySelectorAll(".bp-when-activated")
     const profileEl = root.querySelector("cori-profile")
@@ -560,6 +569,13 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             ? "Solid Pod – Sitzung unterbrochen"
             : STORAGE_LABELS[choice] ?? ""
         publishBlock.hidden = !canPublish()
+        // Ask the pod which access-control mechanism it speaks: acl:agentGroup exists
+        // only in WAC, so on an ACP pod the group option must not be offered at all.
+        if (canPublish()) {
+            getAccessControlMode()
+                .then(mode => { accessGroupOption.hidden = mode !== "wac" })
+                .catch(err => console.error("[bib-pods] access-control mode unknown:", err))
+        }
     }
 
     // The Schaufenster: one carousel per strategy of unread recommendations (seen ones drop
@@ -786,24 +802,68 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             window.alert(`Verbindung zu ${issuer} fehlgeschlagen:\n${err?.message ?? err}`)
         }
     })
-    // Pod round-trips take a moment and both links hit the same resource, so a run
-    // locks the pair; outcome goes to the console until there's a UI for it.
-    function wirePublishAction(link, action, label) {
-        link.addEventListener("click", async (e) => {
-            e.preventDefault()
-            if (publishBlock.dataset.busy) return
-            publishBlock.dataset.busy = "1"
-            try {
-                console.log(`[bib-pods] ${label}:`, await action())
-            } catch (err) {
-                console.error(`[bib-pods] ${label} fehlgeschlagen:`, err)
-            } finally {
-                delete publishBlock.dataset.busy
-            }
+    // Grant/revoke read on the Merkliste copy. Both links open the same dialog, which
+    // asks who the change applies to: everyone, one specific WebID, or the team's group.
+    // The counterpart view is the docs team-access page, where such a WebID logs in and
+    // sees the pod's answer. A pod that declines reports back into the dialog.
+    const ACCESS_DIALOG_TEXT = {
+        grant: { title: "Zugriff geben: für wen?", confirm: "Zugriff geben" },
+        revoke: { title: "Zugriff widerrufen: für wen?", confirm: "Widerrufen" },
+    }
+    const accessActions = { grant: grantMerklisteAccess, revoke: revokeMerklisteAccess }
+    // Scope → the input supplying its URI. The SDK's audience is { [scope]: uri };
+    // "public" has no input and no audience at all.
+    const SCOPE_INPUTS = { agent: accessWebIdInput, group: accessGroupInput }
+    let accessMode = "grant"
+    // Read back after every change too, so the document on display is the one the pod
+    // is enforcing rather than the one we believe we wrote. Always shown, including the
+    // "nothing granted yet" state — on a fresh pod there is no such document at all, and
+    // saying so is more use during development than an empty space.
+    function renderAccessDoc() {
+        accessDocBody.textContent = "…"
+        readMerklisteAccessControl()
+            .then(doc => { accessDocBody.textContent = doc ?? "Noch keine Regeln — die Merkliste wurde nie freigegeben." })
+            .catch(err => { accessDocBody.textContent = `Nicht lesbar: ${err?.message ?? err}` })
+    }
+    function openAccessDialog(mode) {
+        accessMode = mode
+        accessTitle.textContent = ACCESS_DIALOG_TEXT[mode].title
+        accessConfirm.textContent = ACCESS_DIALOG_TEXT[mode].confirm
+        accessError.hidden = true
+        renderAccessDoc()
+        accessDialog.showModal()
+    }
+    grantLink.addEventListener("click", (e) => { e.preventDefault(); openAccessDialog("grant") })
+    revokeLink.addEventListener("click", (e) => { e.preventDefault(); openAccessDialog("revoke") })
+    for (const radio of accessDialog.querySelectorAll('input[name="bp-access-scope"]')) {
+        radio.addEventListener("change", () => {
+            for (const [scope, input] of Object.entries(SCOPE_INPUTS)) input.hidden = radio.value !== scope
+            accessGroupNote.hidden = radio.value !== "group"
         })
     }
-    wirePublishAction(publishLink, publishMerkliste, "Merkliste veröffentlicht (öffentlich lesbar)")
-    wirePublishAction(unpublishLink, unpublishMerkliste, "Merkliste zurückgezogen (wieder privat)")
+    root.querySelector("#bp-access-cancel").addEventListener("click", () => accessDialog.close())
+    accessDialog.addEventListener("click", (e) => { if (e.target === accessDialog) accessDialog.close() })
+    accessConfirm.addEventListener("click", async () => {
+        const scope = accessDialog.querySelector('input[name="bp-access-scope"]:checked').value
+        const input = SCOPE_INPUTS[scope]
+        const uri = input?.value.trim()
+        if (input && !uri) return
+        const audience = input ? { [scope]: uri } : null
+        accessConfirm.disabled = true
+        accessError.hidden = true
+        const label = `${ACCESS_DIALOG_TEXT[accessMode].confirm} (${uri ?? "öffentlich"})`
+        try {
+            console.log(`[bib-pods] ${label}:`, await accessActions[accessMode](audience))
+            accessDialog.close()
+        } catch (err) {
+            console.error(`[bib-pods] ${label} fehlgeschlagen:`, err)
+            accessError.textContent = err?.message ?? String(err)
+            accessError.hidden = false
+        } finally {
+            accessConfirm.disabled = false
+            renderAccessDoc()   // matters when the attempt failed and the dialog stays open
+        }
+    })
     // "Abmelden" → back to the Anmelden CTA. Deactivating un-mounts the widget on non-main
     // pages on the next load. To switch storage location, log out and choose again.
     logoutBtn.addEventListener("click", async () => { await endSession(); loginStep = "cta"; applyState() })

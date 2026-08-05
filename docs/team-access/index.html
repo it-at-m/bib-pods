@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Team-Zugriff — bib-pods</title>
+        <link rel="stylesheet" href="../styles.css">
+        <style>
+            .hint { color: #777; font-size: 0.9rem; }
+            .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 1rem 1.2rem; margin: 1.2rem 0; }
+            .row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+            .row input { flex: 1; min-width: 260px; padding: 0.45rem 0.6rem; border: 1px solid #ccc; border-radius: 5px; font: inherit; }
+            #http-status { font-weight: 600; padding: 0.5rem 0.7rem; border-radius: 6px; display: inline-block; }
+            #http-status.ok { background: #e6f4ea; color: #12692f; }
+            #http-status.no { background: #fdeceb; color: #a91b12; }
+            #webid { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; }
+            pre { background: #f7f8fa; border: 1px solid #e5e5e5; border-radius: 5px; padding: 0.7rem; overflow-x: auto; font-size: 0.85rem; }
+            #logout-btn { margin-left: 0.5rem; }
+            #group-section h2 { font-size: 1rem; margin: 0 0 0.6rem; }
+            #members { list-style: none; margin: 0 0 0.6rem; padding: 0; }
+            #members li { display: flex; align-items: center; gap: 0.6rem; padding: 0.35rem 0; border-bottom: 1px solid #eee; }
+            #members li:last-child { border-bottom: 0; }
+            #members button { margin-left: auto; }
+        </style>
+        <script src="../nav-bar.js"></script>
+    </head>
+    <body>
+        <nav-bar current="team-access"></nav-bar>
+        <main>
+            <h1>Team-Zugriff</h1>
+            <p>Die Gegenseite der Freigabe: hier sieht das Team, was ein Pod ihm zeigt.</p>
+            <p><strong>In einem anderen Browser öffnen</strong> (oder im Inkognito-Fenster)
+                als die Haupt-Session: ein Browser hält pro Webapp nur eine Solid-Anmeldung.</p>
+            <p class="hint">Konten: <code>team@example.com</code>, <code>anna@example.com</code>,
+                <code>peter@example.com</code>.</p>
+
+            <section id="login-section" class="card" hidden>
+                <div class="row">
+                    <input id="issuer" type="url" value="http://localhost:3000">
+                    <button id="login-btn">Anmelden</button>
+                </div>
+            </section>
+
+            <section id="access-section" class="card" hidden>
+                <p>Angemeldet als <span id="webid"></span><button id="logout-btn">Abmelden</button></p>
+                <p id="membership" class="hint"></p>
+                <div class="row">
+                    <input id="resource" type="url" value="http://localhost:3000/citizen-pod/cori/merkliste.ttl">
+                    <button id="check-btn">Prüfen</button>
+                </div>
+                <p id="http-status"></p>
+                <pre id="content" hidden></pre>
+            </section>
+
+            <section id="group-section" class="card" hidden>
+                <h2>Team-Liste</h2>
+                <ul id="members"></ul>
+                <!-- Any name works: the WebID is minted as team-<name> on this pod. -->
+                <div id="group-actions" class="row" hidden>
+                    <input id="new-member" type="text" placeholder="Vorname, z. B. anna">
+                    <button id="add-member">Neues Mitglied aufnehmen</button>
+                </div>
+                <pre id="group-raw" hidden></pre>
+            </section>
+        </main>
+        <script type="module" src="../dist/team-access.js"></script>
+    </body>
+</html>
