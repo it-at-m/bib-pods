@@ -39,14 +39,18 @@
     </section>
 
     <section id="bp-account" class="bp-block bp-when-activated" hidden>
-        <p id="bp-storage-label" class="bp-storage-label">
-            <span id="bp-storage-label-text"></span>
-            <!-- Copies the Merkliste to a merkliste.ttl beside the profile and grants
-                 read on it — to everyone, to one WebID, or to a group, chosen in the
-                 dialog below. Needs a pod's URL space, so applyState hides it for
-                 local/session storage and while a Solid session is interrupted. -->
-            <span id="bp-publish" class="bp-publish" hidden>(dev: <a id="bp-grant-link" href="#">grant access</a> · <a id="bp-revoke-link" href="#">revoke access</a>)</span>
+        <p id="bp-storage-label" class="bp-storage-label"><span id="bp-storage-label-text"></span></p>
+        <!-- The optional step after connecting a pod: bring in what already exists
+             elsewhere. Same pod-only gate as the Merkliste line below. -->
+        <p id="bp-import" class="bp-import bp-aside" hidden>
+            import: <span class="bp-soon" title="noch nicht verfügbar">goodreads</span>
+            | <a id="bp-scan-pod-link" href="#">scan pod</a>
         </p>
+        <!-- Copies the Merkliste to a merkliste.ttl beside the profile and grants
+             read on it — to everyone, to one WebID, or to a group, chosen in the
+             dialog below. Needs a pod's URL space, so applyState hides it for
+             local/session storage and while a Solid session is interrupted. -->
+        <p id="bp-publish" class="bp-publish bp-aside" hidden>merkliste access: <a id="bp-grant-link" href="#">grant</a> | <a id="bp-revoke-link" href="#">revoke</a></p>
         <button class="button bp-logout" type="button">Abmelden</button>
     </section>
 

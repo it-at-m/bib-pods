@@ -197,12 +197,16 @@ dialog.bp-pods-modal {
 .bp-modal-content {
     padding: 2rem 2.5rem;
 }
-/* Konto block: a concise "where stored" line above the Abmelden button. */
-.bp-storage-label { margin: 0 0 0.75rem; color: #555; }
-/* Merkliste sharing: a quiet dev-only aside inline with the storage line. */
-.bp-publish { font-size: 0.85em; color: #888; }
-.bp-publish a { color: #888; text-decoration: underline; }
-.bp-publish a:hover { color: var(--contrastcolor, #d14900); }
+/* Konto block: a concise "where stored" line, then one quiet aside line per group of
+   secondary actions, then the Abmelden button. px spacing so the stack reads the same
+   on both hosts (see dialog.bp-pods-modal for the TYPO3 root-font mismatch). */
+.bp-storage-label { margin: 0; color: #555; }
+.bp-aside { margin: 4px 0 0; font-size: 0.85em; color: #888; }
+.bp-aside a { color: #888; text-decoration: underline; }
+.bp-aside a:hover { color: var(--contrastcolor, #d14900); }
+#bp-account .bp-logout { margin-top: 12px; }
+/* Not yet implemented — listed so the step is discoverable, but not a link. */
+.bp-soon { cursor: default; }
 /* The grant/revoke dialog: a narrow prompt. px box sizing for the TYPO3 root-font
    mismatch (see dialog.bp-pods-modal). */
 dialog.bp-access-dialog {

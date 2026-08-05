@@ -7,6 +7,7 @@ import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategy
 import { sopacCatalogueUrl, fetchBook } from "./catalogue.js"
 import { cleanAuthorName } from "./book-prompt.js"
 import { grantMerklisteAccess, revokeMerklisteAccess, readMerklisteAccessControl } from "./publish.js"
+import { scanPod } from "./scan.js"
 import { BP } from "./vocab.js"
 import styleCss from "./ui/style.css?inline"
 import entryHtml from "./ui/entry.html?raw"
@@ -17,9 +18,9 @@ import modalHtml from "./ui/modal.html?raw"
 // the login; once a location is picked this just states it — switching means logging
 // out and choosing again, so there's no separate "switch location" control.
 const STORAGE_LABELS = {
-    local: "Gespeichert: lokal im Browser",
-    session: "Gespeichert: nur in dieser Sitzung",
-    solid: "Gespeichert: in deinem Solid Pod",
+    local: "Speicherort: lokal im Browser",
+    session: "Speicherort: nur in dieser Sitzung",
+    solid: "Speicherort: in deinem Solid Pod",
 }
 
 // The "+N weitere" lane hint deep-links into the docs query page — a power-user
@@ -443,6 +444,8 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const publishBlock = root.querySelector("#bp-publish")
     const grantLink = root.querySelector("#bp-grant-link")
     const revokeLink = root.querySelector("#bp-revoke-link")
+    const importBlock = root.querySelector("#bp-import")
+    const scanPodLink = root.querySelector("#bp-scan-pod-link")
     const accessDialog = root.querySelector("#bp-access-dialog")
     const accessTitle = root.querySelector("#bp-access-title")
     const accessConfirm = root.querySelector("#bp-access-confirm")
@@ -561,14 +564,15 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
-    // The Konto block's one-line "where your data lives", plus the publish actions
-    // that only a pod can offer.
+    // The Konto block's one-line "where your data lives", plus the publish and import
+    // actions that only a pod can offer.
     function renderStorageLabel() {
         const choice = getChoice()
         storageLabel.textContent = choice === "solid" && !isStorageReady()
             ? "Solid Pod – Sitzung unterbrochen"
             : STORAGE_LABELS[choice] ?? ""
         publishBlock.hidden = !canPublish()
+        importBlock.hidden = !canPublish()
         // Ask the pod which access-control mechanism it speaks: acl:agentGroup exists
         // only in WAC, so on an ACP pod the group option must not be offered at all.
         if (canPublish()) {
@@ -835,6 +839,17 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     }
     grantLink.addEventListener("click", (e) => { e.preventDefault(); openAccessDialog("grant") })
     revokeLink.addEventListener("click", (e) => { e.preventDefault(); openAccessDialog("revoke") })
+    // Findings go to the console for now; the link only guards against a second run
+    // while the first is still going.
+    let scanBusy = false
+    scanPodLink.addEventListener("click", async (e) => {
+        e.preventDefault()
+        if (scanBusy) return
+        scanBusy = true
+        try { await scanPod() }
+        catch (err) { console.error("[bib-pods] scan fehlgeschlagen:", err) }
+        finally { scanBusy = false }
+    })
     for (const radio of accessDialog.querySelectorAll('input[name="bp-access-scope"]')) {
         radio.addEventListener("change", () => {
             for (const [scope, input] of Object.entries(SCOPE_INPUTS)) input.hidden = radio.value !== scope
