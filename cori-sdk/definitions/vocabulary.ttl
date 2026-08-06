@@ -1,4 +1,5 @@
 @prefix cori:    <https://cori.systems/core#> .
+@prefix as:      <https://www.w3.org/ns/activitystreams#> .
 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
@@ -115,3 +116,37 @@ cori:profileFilename a rdf:Property ;
     rdfs:label "profile filename"@en ;
     rdfs:comment "Filename used for the user's profile resource inside the cori/ container of their Solid pod." ;
     rdfs:range xsd:string .
+
+cori:provenanceFilename a rdf:Property ;
+    rdfs:label "provenance filename"@en ;
+    rdfs:comment "Filename used for the provenance log beside the profile resource. Empty string switches provenance recording off." ;
+    rdfs:range xsd:string .
+
+cori:provenanceGenerator a rdf:Property ;
+    rdfs:label "provenance generator"@en ;
+    rdfs:comment "The system a change is recorded as coming from — the 'origin' of a fact, written as as:generator in the log. Apps set their own; cori:unknownGenerator is the fallback." ;
+    rdfs:range as:Application .
+
+# =================================================================================
+# Provenance — terms of the provenance log (see storage/provenance.js)
+# =================================================================================
+
+# Every triple entering or leaving the profile gets one record: an RDF 1.2 reifier
+# naming the triple, carrying what happened to it, when, and which system did it.
+#
+#   [] rdf:reifies <<( cori:defaultProfile cori:username "Anna" )>> ;
+#       cori:operation as:Add ;
+#       prov:atTime "2026-08-06T09:12:44.310Z"^^xsd:dateTime ;
+#       as:generator bp:MSBwebapp .
+#
+# The log is append-only: a fact leaving the profile adds an as:Remove record rather
+# than editing the as:Add that put it there. Records appear in the order they happened,
+# so the file itself carries the timeline.
+
+cori:operation a rdf:Property ;
+    rdfs:label "operation"@en ;
+    rdfs:comment "What happened to the reified triple: as:Add when it entered the profile, as:Remove when it left." .
+
+cori:unknownGenerator a as:Application ;
+    rdfs:label "unknown"@en, "unbekannt"@de ;
+    rdfs:comment "Fallback for apps that record provenance without configuring a cori:provenanceGenerator." .

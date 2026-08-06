@@ -4,5 +4,5 @@
 // web-storage.js for the implementation.
 import { createWebStorageBackend } from "./web-storage.js"
 
-export const { isReady, warmup, load, save, getInfo, getEntryName } =
+export const { isReady, warmup, load, save, appendDoc, getInfo, getEntryName } =
     createWebStorageBackend({ storage: sessionStorage, kind: "session", info: "nur für diese Sitzung" })

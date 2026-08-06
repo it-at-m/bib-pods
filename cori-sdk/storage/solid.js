@@ -232,6 +232,34 @@ export async function save(store) {
     await putResource(uri, await serializeTurtle(store), session)
 }
 
+// --- Append-only documents ---
+// Documents the app only ever adds to, kept beside the profile in the same cori/
+// container (currently just the provenance log). Text rather than a store: their
+// content is the caller's to serialize.
+//
+// A pod has no append — LDP writes whole representations — so this reads and rewrites.
+// The caller is handed what is stored and returns only its own new text, so nothing is
+// reparsed however long the document has grown.
+export async function appendDoc(filename, chunkFor) {
+    const uri = await siblingUri(filename)
+    const existing = await readText(uri)
+    await putResource(uri, existing + await chunkFor(existing), session)
+}
+
+// "" when the pod has no such resource yet — a 404 is the ordinary first-run case
+// rather than the failure getResource would raise.
+//
+// Accept: text/turtle must stay exactly that. Asked for Turtle a pod returns the stored
+// bytes untouched; asked for any other RDF syntax it re-serializes, and a parser that
+// predates RDF 1.2 (CSS 7 among them) reads `<<(` as the start of a collection and
+// answers with a couple of nonsense triples instead of the log, without failing.
+async function readText(uri) {
+    const resp = await session.authFetch(uri, { headers: { Accept: "text/turtle" }, cache: "no-store" })
+    if (resp.status === 404) return ""
+    if (!resp.ok) throw new Error(`Action on \`${uri}\` failed: \`${resp.status}\` \`${resp.statusText}\`.`)
+    return await resp.text()
+}
+
 export async function getInfo() {
     const base = { Speicherung: "in deinem Solid Pod" }
     if (!session?.webId) {

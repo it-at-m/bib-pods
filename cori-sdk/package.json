@@ -12,6 +12,7 @@
         "@foerderfunke/sem-ops-utils": "0.5.1",
         "@inrupt/solid-client": "3.0.0",
         "@uvdsl/solid-oidc-client-browser": "0.2.3",
-        "@uvdsl/solid-requests": "0.0.7"
+        "@uvdsl/solid-requests": "0.0.7",
+        "n3": "2.0.3"
     }
 }

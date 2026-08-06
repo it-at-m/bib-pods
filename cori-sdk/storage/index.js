@@ -1,8 +1,10 @@
-// Storage abstraction. The app reads/writes an RDF graph via the active backend;
-// each backend (local, solid, …) implements { isReady, warmup, load, save, getInfo }.
+// Storage abstraction. The app reads/writes an RDF graph via the active backend; each
+// backend (local, solid, …) implements
+// { isReady, warmup, load, save, appendDoc, getInfo, getEntryName }.
 // Adding a new backend means dropping in a new module here and wiring it in BACKENDS.
-import { serializeTurtle, mintMessageUri, subjectsOfType, getOne, replaceProperty, getProfileSubject, CORI, RDF_TYPE } from "../utils.js"
-import { addTriple as addTripleToStore, newStore } from "@foerderfunke/sem-ops-utils/core"
+import { serializeTurtle, mintMessageUri, subjectsOfType, getOne, replaceProperty, getProfileSubject, quadKey, CORI, RDF_TYPE } from "../utils.js"
+import { addTriple as addTripleToStore } from "@foerderfunke/sem-ops-utils/core"
+import { recordChange } from "./provenance.js"
 import * as localBackend from "./local-storage.js"
 import * as sessionBackend from "./session-storage.js"
 import * as solidBackend from "./solid.js"
@@ -18,8 +20,10 @@ const REFERS_TO_ENTITY_PRED = CORI + "refersToEntity"
 // --- App-level configuration ---
 // Generic defaults; apps call setStorageConfig() to overwrite
 const storageConfig = {
-    appName: "cori",                  // localStorage key prefix + Solid OIDC consent screen identity
-    profileFilename: "profile.ttl",   // filename used inside the user's pod
+    appName: "cori",                                 // localStorage key prefix + Solid OIDC consent screen identity
+    profileFilename: "profile.ttl",                  // filename used inside the user's pod
+    provenanceFilename: "provenance.ttl",            // sibling of the profile; "" switches provenance recording off
+    provenanceGenerator: CORI + "unknownGenerator",  // the system every change made through this app is recorded as coming from
 }
 
 export function setStorageConfig(partial) {
@@ -116,12 +120,30 @@ export async function loadStore() {
 }
 
 // --- Mutation ---
+// The single place the profile graph changes. Provenance is derived from the diff, so
+// it covers what a mutation actually did — including removals no call site declares,
+// like a replaced property dropping its old value.
 
 async function mutate(fn) {
-    const store = await getStorage().load()
+    const storage = getStorage()
+    const store = await storage.load()
+    const before = store.getQuads()
     await fn(store)
     ensureProfileTyped(store)
-    await getStorage().save(store)
+    const { added, removed } = diff(before, store.getQuads())
+    if (!added.length && !removed.length) return
+    await storage.save(store)
+    // After the save: provenance may only claim what is stored.
+    await recordChange({ added, removed })
+}
+
+function diff(before, after) {
+    const index = (quads) => new Map(quads.map(q => [quadKey(q), q]))
+    const [b, a] = [index(before), index(after)]
+    return {
+        added: [...a].filter(([key]) => !b.has(key)).map(([, quad]) => quad),
+        removed: [...b].filter(([key]) => !a.has(key)).map(([, quad]) => quad),
+    }
 }
 
 // Otherwise the SHACL-shapes won't work
@@ -145,13 +167,12 @@ export const removeProfileFact = (predicate, object) => mutate(store => {
     }
 })
 
-export const clearStorage = () => getStorage().save(baseProfileStore())
-
-function baseProfileStore() {
-    const store = newStore()
+// Empties the profile down to its bare typing triple. A mutation of the loaded graph,
+// not a save of a fresh one, so the facts being dropped show up in the diff.
+export const clearStorage = () => mutate(store => {
+    for (const q of store.getQuads()) store.removeQuad(q)
     addTripleToStore(store, getProfileSubject(), RDF_TYPE, PROFILE_TYPE)
-    return store
-}
+})
 
 // --- Messages / recommendations ---
 
@@ -187,12 +208,11 @@ export const addMessageIfNew = (content, refersTo = null) => mutate(store => {
     if (refersTo) addTripleToStore(store, uri, REFERS_TO_ENTITY_PRED, refersTo)
 })
 
-export async function markMessageRead(uri) {
-    const store = await getStorage().load()
-    if (getOne(store, uri, READ_PRED) === "true") return
+// A replacement, not an addition — cori:read goes false → true, and the log records
+// that as a removal plus an addition.
+export const markMessageRead = (uri) => mutate(store => {
     replaceProperty(store, uri, READ_PRED, true)
-    await getStorage().save(store)
-}
+})
 
 export const addInquiryFacts = (facts) => mutate(store => {
     const defaultSubject = getProfileSubject()

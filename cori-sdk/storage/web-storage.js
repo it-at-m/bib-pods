@@ -9,6 +9,9 @@ const DEBUG = true
 
 export function createWebStorageBackend({ storage, kind, info }) {
     const key = () => `${getStorageConfig().appName}.${kind}.ttl`
+    // Append-only documents (the provenance log) get their own key alongside the
+    // profile's, named after the filename a pod would give them.
+    const docKey = (filename) => `${getStorageConfig().appName}.${kind}.${filename}`
 
     return {
         isReady: () => true,
@@ -25,6 +28,13 @@ export function createWebStorageBackend({ storage, kind, info }) {
         load: async () => parseTurtle(storage.getItem(key()) ?? ""),
 
         save: async (store) => storage.setItem(key(), await serializeTurtle(store)),
+
+        // Text rather than a store: the caller owns the serialization. It is handed
+        // what is stored and returns only its own new text.
+        async appendDoc(filename, chunkFor) {
+            const existing = storage.getItem(docKey(filename)) ?? ""
+            storage.setItem(docKey(filename), existing + await chunkFor(existing))
+        },
 
         getInfo: () => ({ Speicherung: info }),
 

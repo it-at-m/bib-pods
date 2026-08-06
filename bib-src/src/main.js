@@ -12,6 +12,8 @@ const configLookup = (iri) => configStore.getObjects(null, iri, null)[0]?.value
 setStorageConfig({
     appName: configLookup(CORI + "appName"),
     profileFilename: configLookup(CORI + "profileFilename"),
+    provenanceFilename: configLookup(CORI + "provenanceFilename"),
+    provenanceGenerator: configLookup(CORI + "provenanceGenerator"),
 })
 
 export async function mount(root, { solrEndpoint, qdrantEndpoint, solidCallbackUrl, landing, mainHref } = {}) {

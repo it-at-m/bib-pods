@@ -1,6 +1,7 @@
 @prefix bp:      <https://www.muenchner-stadtbibliothek.de/bib-pods#> .
 @prefix cori:    <https://cori.systems/core#> .
 @prefix bf:      <http://id.loc.gov/ontologies/bibframe/> . # https://id.loc.gov/ontologies/bibframe.html
+@prefix as:      <https://www.w3.org/ns/activitystreams#> .
 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
@@ -294,3 +295,11 @@ bp:savedBookSimilarity a bp:RecommendationStrategy ;
     bp:combine bp:AverageVector ;
     bp:maxSuggestions 5 ;
     bp:enabledByDefault true .
+
+# =================================================================================
+# Provenance generators — the "origin" side of the change log (see cori-sdk/storage/provenance.js)
+# =================================================================================
+
+bp:MSBwebapp a as:Application ;
+    rdfs:label "bib-pods web app"@en, "Bibliotheks-Pods-Webanwendung"@de ;
+    rdfs:comment "The bib-pods widget of the Münchner Stadtbibliothek, wherever it is embedded: the demo pages, the TYPO3 extension on the library website."@en .
