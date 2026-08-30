@@ -12,6 +12,6 @@
     "solr:import-incremental": "node solr/import-incremental.js"
   },
   "dependencies": {
-    "fast-xml-parser": "5.10.1"
+    "fast-xml-parser": "5.11.1"
   }
 }
