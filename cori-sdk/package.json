@@ -13,6 +13,6 @@
         "@inrupt/solid-client": "3.0.0",
         "@uvdsl/solid-oidc-client-browser": "0.2.3",
         "@uvdsl/solid-requests": "0.0.7",
-        "n3": "2.0.3"
+        "n3": "2.7.4"
     }
 }
