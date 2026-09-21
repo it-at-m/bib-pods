@@ -1,15 +1,5 @@
 import { isActivated } from "cori-sdk/storage/index.js"
-import { fetchBook, fetchBookByOnleiheId } from "./catalogue.js"
-
-// aDIS/BMS SOPAC URLs use `sp=S<key>` where the leading `S` is a service-param
-// type tag and the numeric portion is zero-padded to 8 digits. Solr stores the
-// bare MARC 001 (e.g. "AK4250109"), so strip both.
-const SOPAC_RE = /[?&]sp=S(AK)0*(\d+)/
-
-// Onleihe mediaInfo URLs carry the divibib media id as the third dash-segment
-// after the comma; the surrounding segments are navigation/view state and vary
-// between pages, so only the media id is a stable key.
-const ONLEIHE_RE = /onleihe\.de\/.+\/mediaInfo,\d+-\d+-(\d+)-/
+import { fetchBook, fetchBookByOnleiheId, SOPAC_RE, ONLEIHE_RE } from "./catalogue.js"
 
 // Event detail slugs end in "<title>-<uid>"; the trailing numeric uid is the
 // stable identifier, the title part can change with edits.

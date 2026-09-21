@@ -84,6 +84,35 @@
         </div>
     </dialog>
 
+    <!-- Opened from the launcher beside "Profil ausfüllen". Takes whatever identifies a
+         title in a catalogue the widget can't be mounted on: the aDIS OPAC's Zitierlink
+         (the OPAC copies it to the clipboard itself), an Onleihe link, an ISBN in any
+         printed form, or a bare Datensatznummer. Resolution and saving are the same
+         path a card's "+" uses. -->
+    <dialog id="bp-add-title-dialog" class="bp-modal bp-add-title-dialog" aria-labelledby="bp-add-title-heading">
+        <div class="bp-modal-content">
+            <h3 id="bp-add-title-heading">Titel hinzufügen</h3>
+            <p class="bp-add-title-lead">Link oder ISBN einfügen. Der Titel wird im Katalog gesucht.</p>
+            <input type="text" id="bp-add-title-input" autocomplete="off" spellcheck="false"
+                aria-labelledby="bp-add-title-heading">
+            <!-- Each source links to where a patron would find it. A bare Datensatznummer
+                 also resolves (same path as the Zitierlink's tail) but isn't listed: nobody
+                 copies it, and the Zitierlink sits right beside it on the same OPAC page. -->
+            <ul class="bp-add-title-kinds">
+                <li>Zitierlink aus dem <a href="https://ssl.muenchen.de/aDISWeb/app/opac" target="_blank" rel="noopener">Katalog (OPAC)</a></li>
+                <li>Link zu einem Titel in der <a href="https://muenchen.onleihe.de/" target="_blank" rel="noopener">Onleihe</a></li>
+                <li>ISBN, mit oder ohne Bindestriche</li>
+            </ul>
+            <!-- aria-live so the outcome reaches a screen reader: success moves focus into
+                 the save dialog, but every failure only swaps this line's text. -->
+            <p id="bp-add-title-msg" class="bp-add-title-msg" role="status" aria-live="polite" hidden></p>
+            <p class="bp-add-title-actions">
+                <button id="bp-add-title-submit" class="button" type="button">Suchen</button>
+                <button id="bp-add-title-cancel" class="button" type="button">Abbrechen</button>
+            </p>
+        </div>
+    </dialog>
+
     <section id="bp-showcase" class="bp-block bp-showcase bp-when-activated" aria-labelledby="bp-showcase-heading" hidden>
         <h3 id="bp-showcase-heading">Schaufenster</h3>
         <div id="bp-strategy-settings">

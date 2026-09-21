@@ -4,7 +4,7 @@ import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
-import { sopacCatalogueUrl, fetchBook } from "./catalogue.js"
+import { sopacCatalogueUrl, fetchBook, parseCatalogueRef, resolveCatalogueRef } from "./catalogue.js"
 import { cleanAuthorName } from "./book-prompt.js"
 import { grantMerklisteAccess, revokeMerklisteAccess, readMerklisteAccessControl } from "./publish.js"
 import { scanPod } from "./scan.js"
@@ -22,6 +22,12 @@ const STORAGE_LABELS = {
     session: "Speicherort: nur in dieser Sitzung",
     solid: "Speicherort: in deinem Solid Pod",
 }
+
+// Shown on the "Titel hinzufügen" launcher. The label says what the button does; this
+// says what it accepts, which is the part nobody would guess — a catalogue link is only
+// one of several handles on a title. Everything named here actually resolves.
+const ADD_TITLE_TIP = "<strong>Titel von anderswo übernehmen</strong>"
+    + "<br>Zitierlink aus dem Katalog (OPAC), Link aus der Onleihe oder ISBN einfügen. Der Titel wird im Katalog gesucht."
 
 // The "+N weitere" lane hint deep-links into the docs query page — a power-user
 // affordance. On the docs site itself (recognizable by its <nav-bar>) the link stays
@@ -446,6 +452,11 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const revokeLink = root.querySelector("#bp-revoke-link")
     const importBlock = root.querySelector("#bp-import")
     const scanPodLink = root.querySelector("#bp-scan-pod-link")
+    const addTitleDialog = root.querySelector("#bp-add-title-dialog")
+    const addTitleInput = root.querySelector("#bp-add-title-input")
+    const addTitleSubmit = root.querySelector("#bp-add-title-submit")
+    const addTitleCancel = root.querySelector("#bp-add-title-cancel")
+    const addTitleMsg = root.querySelector("#bp-add-title-msg")
     const accessDialog = root.querySelector("#bp-access-dialog")
     const accessTitle = root.querySelector("#bp-access-title")
     const accessConfirm = root.querySelector("#bp-access-confirm")
@@ -548,6 +559,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
 
         if (active) {
             renderStorageLabel()
+            mountAddTitleLauncher()
             profileEl.refresh()
             renderStrategyToggles()
             renderLanes()
@@ -561,6 +573,97 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         if (active !== lastActivation) {
             for (const d of landingRoot.querySelectorAll(".bp-collapsible")) d.open = !active
             lastActivation = active
+        }
+    }
+
+    // The launcher sits in the profile primitive's header, which the SDK owns; bib-pods
+    // adds this one app-specific action beside "Profil ausfüllen". refresh() replaces
+    // only .cori-profile-sections, so the button survives re-renders — the guard covers
+    // repeated applyState calls.
+    function mountAddTitleLauncher() {
+        const header = profileEl.querySelector(".cori-profile-header")
+        if (!header || header.querySelector(".bp-add-title-open")) return
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = "bp-add-title-open"
+        btn.textContent = "Titel hinzufügen"
+        header.appendChild(btn)
+        btn.addEventListener("click", openAddTitle)
+        // show(), not schedule(): the label says what the button does but not what it
+        // accepts, and that list is the whole point — so it arrives on contact rather
+        // than after the hover delay the cards use.
+        const reveal = () => tip.show(ADD_TITLE_TIP, btn)
+        btn.addEventListener("mouseenter", reveal)
+        btn.addEventListener("focus", reveal)
+        btn.addEventListener("mouseleave", () => tip.hide())
+        btn.addEventListener("blur", () => tip.hide())
+    }
+
+    function openAddTitle() {
+        tip.hide()
+        addTitleInput.value = ""
+        showAddTitleMsg(null)
+        addTitleSubmit.disabled = false
+        addTitleDialog.showModal()
+        addTitleInput.focus()
+    }
+
+    function closeAddTitle() {
+        addTitleInput.value = ""
+        showAddTitleMsg(null)
+        addTitleDialog.close()
+    }
+
+    function showAddTitleMsg(text, isError = true) {
+        addTitleMsg.hidden = !text
+        addTitleMsg.textContent = text ?? ""
+        addTitleMsg.classList.toggle("is-error", Boolean(text) && isError)
+    }
+
+    // Paste-a-link counterpart to a card's "+", for catalogues the widget can't be
+    // mounted on. It only resolves the reference — the shared book prompt still owns
+    // what gets saved, so a pasted title and a clicked one land identically.
+    async function submitCatalogueRef() {
+        const ref = parseCatalogueRef(addTitleInput.value)
+        // Recognised but unresolvable: the new Onleihe frontend keys titles by a product
+        // id the catalogue has never seen, so name the format and point at the way out
+        // rather than letting the lookup report the title as missing.
+        if (ref?.kind === "goodreads") {
+            showAddTitleMsg("Goodreads-Links enthalten keine ISBN, nur eine Goodreads-eigene Nummer. Bitte die ISBN des Titels einfügen.")
+            return
+        }
+        if (ref?.kind === "onleihe-v3") {
+            showAddTitleMsg("Dieser Link stammt aus der neuen Onleihe (Onleihe 3.0). Solche Links kennt der Katalog noch nicht. Bitte stattdessen die ISBN des Titels einfügen.")
+            return
+        }
+        if (!ref) {
+            showAddTitleMsg("Damit kann ich nichts anfangen. Erwartet werden ein Katalog- oder Onleihe-Link, eine ISBN oder eine Datensatznummer.")
+            return
+        }
+        addTitleSubmit.disabled = true
+        showAddTitleMsg("Titel wird im Katalog gesucht …", false)
+        try {
+            const { id, book } = await resolveCatalogueRef(solrEndpoint, ref)
+            if (!book) {
+                showAddTitleMsg("Dazu wurde im Katalog kein Titel gefunden.")
+                return
+            }
+            closeAddTitle()
+            openBookPrompt(id, book)
+        } catch (err) {
+            console.error("[bib-pods] catalogue lookup failed:", err)
+            // The catalogue is unreachable, not the title unknown — reporting "nicht
+            // gefunden" would misdescribe a link that parsed fine. A SOPAC id stands on
+            // its own, so offer the same degraded save a card click falls back to; an
+            // unresolved Onleihe id has no AK id to save under.
+            if (ref.kind === "sopac") {
+                closeAddTitle()
+                openBookPrompt(ref.id, null)
+            } else {
+                showAddTitleMsg("Der Katalog ist gerade nicht erreichbar. Bitte versuche es später erneut.")
+            }
+        } finally {
+            addTitleSubmit.disabled = false
         }
     }
 
@@ -884,6 +987,19 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     logoutBtn.addEventListener("click", async () => { await endSession(); loginStep = "cta"; applyState() })
     // A profile mutation (add / clear) can wipe the whole store, so re-run the broad state.
     profileEl.addEventListener("cori-profile:change", () => applyState())
+
+    addTitleSubmit.addEventListener("click", submitCatalogueRef)
+    addTitleCancel.addEventListener("click", closeAddTitle)
+    addTitleDialog.addEventListener("click", (e) => { if (e.target === addTitleDialog) closeAddTitle() })
+    // Enter submits. The row is deliberately not a <form> — the host page (TYPO3) may
+    // already have one open around our mount point, and nesting forms is invalid.
+    addTitleInput.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return
+        e.preventDefault()
+        submitCatalogueRef()
+    })
+    // Editing after a rejection retracts the complaint about the previous input.
+    addTitleInput.addEventListener("input", () => { if (!addTitleMsg.hidden) showAddTitleMsg(null) })
     checkRecLink.addEventListener("click", (e) => { e.preventDefault(); checkRecommendations() })
 
     applyState()

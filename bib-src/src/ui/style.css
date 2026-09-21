@@ -291,7 +291,8 @@ cori-profile .cori-profile-header .cori-profile-heading { margin: 0; }
 /* Launchers as quiet outlined pills; explicit background/border so host button
    styling can't leak in. */
 cori-profile .cori-profile-fill,
-cori-profile .cori-profile-add {
+cori-profile .cori-profile-add,
+cori-profile .bp-add-title-open {
     padding: 3px 14px;
     background: #fff;
     border: 1px solid #ccc;
@@ -304,7 +305,8 @@ cori-profile .cori-profile-add {
     white-space: nowrap;
 }
 cori-profile .cori-profile-fill:hover,
-cori-profile .cori-profile-add:hover {
+cori-profile .cori-profile-add:hover,
+cori-profile .bp-add-title-open:hover {
     background: #fff;
     border-color: var(--contrastcolor, #d14900);
     color: var(--contrastcolor, #d14900);
@@ -519,6 +521,52 @@ cori-profile .cori-assistant-existing[hidden] { display: none; }
     box-shadow: none !important;
 }
 .bp-solid-connect input { flex: 1; min-width: 0; }
+/* "Titel hinzufügen": a launcher beside "Profil ausfüllen" plus the dialog it opens.
+   The header is space-between for its usual two children; a third would spread them
+   apart, so the heading takes the slack and the two launchers stay grouped right. */
+cori-profile .cori-profile-header { justify-content: flex-start; }
+cori-profile .cori-profile-header .cori-profile-heading { margin-right: auto; }
+
+/* A narrow prompt, like the grant/revoke dialog — the shared dialog.bp-modal default
+   (60rem) is sized for the lane views, not a single field. */
+dialog.bp-add-title-dialog {
+    max-width: min(520px, 92vw) !important;
+    width: min(520px, 92vw) !important;
+}
+.bp-add-title-dialog .bp-modal-content { padding: 22px 26px; }
+.bp-add-title-dialog h3 { margin: 0 0 6px; font-size: 18px; }
+.bp-add-title-lead { margin: 0 0 14px; color: #888; font-size: 0.9em; }
+/* px, not rem: the field inherits the host's body text (18px on TYPO3, 16px on docs)
+   while rem tracks the root (10px vs 16px), so rem padding would shrink exactly where
+   the text grows. The box has to scale with what it contains. */
+.bp-add-title-dialog input[type="text"] {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px !important;
+    border: 1px solid #ccc !important;
+    border-radius: 4px !important;
+    background: #fff !important;
+    color: inherit !important;
+    font: inherit !important;
+    box-shadow: none !important;
+}
+.bp-add-title-kinds {
+    margin: 12px 0 0;
+    padding-left: 1.2em;
+    color: #888;
+    font-size: 0.85em;
+    line-height: 1.6;
+}
+.bp-add-title-kinds li { margin: 0; }
+/* Same quiet-link treatment as .bp-aside: stays in the list's grey, underline marks it
+   as a link, brand colour only on hover. Pinned so host anchor rules can't recolour it. */
+.bp-add-title-kinds a { color: #888; text-decoration: underline; }
+.bp-add-title-kinds a:hover { color: var(--contrastcolor, #d14900); }
+.bp-add-title-actions { display: flex; gap: 10px; margin: 18px 0 0; }
+.bp-add-title-actions .button:disabled { opacity: 0.35; cursor: default; }
+.bp-add-title-msg { margin: 12px 0 0; font-size: 0.85em; color: #888; }
+.bp-add-title-msg.is-error { color: #b3261e; }
 /* Chooser buttons stack vertically; the <p> still stretches naturally. */
 #bp-chooser {
     display: flex;
