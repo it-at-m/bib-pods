@@ -154,6 +154,21 @@ async function discoverStorageRoot(webId) {
     return null
 }
 
+// Read another app's Turtle document from the connected pod, without creating cori/
+// or writing a profile. Missing documents are an ordinary scan outcome.
+export async function readPodTurtle(path) {
+    if (!isLoggedIn()) throw new Error("Keine Verbindung zum Pod (Sitzung nicht aktiv)")
+    const root = await discoverStorageRoot(session.webId)
+    if (!root) throw new Error(`Could not discover storage root for ${session.webId}`)
+    const url = new URL(path, root).href
+    if (!url.startsWith(root)) throw new Error(`Scan path is outside the connected pod: ${path}`)
+    const response = await session.authFetch(url, { headers: { Accept: "text/turtle" }, cache: "no-store" })
+    if (response.status === 404) return null
+    if (!response.ok) throw new Error(`Could not read ${url}: HTTP ${response.status}`)
+    const { store } = await parseToN3(await response.text(), url)
+    return { url, store }
+}
+
 // --- Pod setup ---
 
 async function doEnsurePodSetup() {

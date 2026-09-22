@@ -1,0 +1,93 @@
+@prefix bp:   <https://www.muenchner-stadtbibliothek.de/bib-pods#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+bp:wuppertalHealthQuestionnaire a bp:ScanSource ;
+    rdfs:label "Wuppertaler Solid-Gesundheitsfragebogen"@de ;
+    bp:podPath "solid-health-questionnaire/latest.ttl" ;
+    bp:formatDescription "HealthQuestionnaireAssessment aus dem solid-health-questionnaire-Vokabular mit verknüpften Antworten oder Kategorieergebnissen"@de ;
+    bp:ruleSet bp:wuppertalHealthRules ;
+    bp:recognitionQuery """
+PREFIX hq: <https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#>
+
+ASK WHERE {
+    ?assessment a hq:HealthQuestionnaireAssessment .
+    {
+        ?assessment hq:hasAnswer ?answer .
+        ?answer hq:questionId ?question ; hq:optionId ?option .
+    } UNION {
+        ?assessment hq:hasCategoryScore ?category .
+        ?category hq:categoryId ?categoryId .
+    }
+}
+""" .
+
+# Recognize the known Wuppertal export format, not just a file name or survey label.
+# This identifies the data format; it does not authenticate the document's origin.
+bp:wuppertalHealthRules a bp:ScanRuleSet ;
+    rdfs:label "Wuppertal: Solid-Gesundheitsfragebogen"@de ;
+    bp:scanRule bp:wuppertalWellbeing, bp:wuppertalDomains .
+
+# The file name or assessment type alone is insufficient: require some results.
+bp:wuppertalWellbeing a bp:ScanRule ;
+    rdfs:label "Wuppertaler Gesundheitsfragebogen → Themenvorschlag Selbstfürsorge"@de ;
+    bp:action bp:Derive ;
+    bp:constructQuery """
+PREFIX bp:   <https://www.muenchner-stadtbibliothek.de/bib-pods#>
+PREFIX cori: <https://cori.systems/core#>
+PREFIX hq:   <https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#>
+PREFIX gnd:  <https://d-nb.info/gnd/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+CONSTRUCT {
+    cori:defaultProfile bp:interestedIn gnd:4782241-7 .
+    gnd:4782241-7 rdfs:label "Selbstfürsorge" .
+}
+WHERE {
+    ?assessment a hq:HealthQuestionnaireAssessment .
+    {
+        ?assessment hq:hasAnswer ?answer .
+        ?answer hq:questionId ?question ; hq:optionId ?option .
+    } UNION {
+        ?assessment hq:hasCategoryScore ?category .
+        ?category hq:categoryId ?categoryId .
+    }
+}
+""" .
+
+# Propose values for the existing topics category; adoption requires confirmation.
+# Vegetarian food is a reading suggestion, not a claim about the person's diet.
+# Labels accompany authority IRIs just as they do for manually selected topics.
+# Answer values and scores do not decide whether a domain supplies suggestions.
+# Recognized answer-ID prefixes also work when the category summaries are absent.
+bp:wuppertalDomains a bp:ScanRule ;
+    rdfs:label "Beantwortete Themenbereiche → konkrete Leseanregungen"@de ;
+    bp:action bp:Derive ;
+    bp:constructQuery """
+PREFIX bp:   <https://www.muenchner-stadtbibliothek.de/bib-pods#>
+PREFIX cori: <https://cori.systems/core#>
+PREFIX hq:   <https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#>
+PREFIX gnd:  <https://d-nb.info/gnd/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+CONSTRUCT {
+    cori:defaultProfile bp:interestedIn ?topic .
+    ?topic rdfs:label ?label .
+}
+WHERE {
+    ?assessment a hq:HealthQuestionnaireAssessment .
+    {
+        ?assessment hq:hasCategoryScore ?category .
+        ?category hq:categoryId ?domain .
+    } UNION {
+        ?assessment hq:hasAnswer ?answer .
+        ?answer hq:questionId ?question ; hq:optionId ?option .
+        BIND(STRBEFORE(STR(?question), "-") AS ?domain)
+    }
+    VALUES (?domain ?topic ?label) {
+        ("movement"  gnd:4064532-0 "Wandern")
+        ("nutrition" gnd:4062436-5 "Vegetarische Kost")
+        ("mental"    gnd:4014917-1 "Entspannung")
+        ("sleep"     gnd:4014917-1 "Entspannung")
+    }
+}
+""" .

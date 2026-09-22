@@ -1,0 +1,19 @@
+@prefix bp:   <https://www.muenchner-stadtbibliothek.de/bib-pods#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# Shared vocabulary for declaring scan sources and their mapping rules.
+# Rules describe preview additions using the existing profile vocabulary.
+# Each query runs against the source document, never another rule's output.
+bp:ScanSource a rdfs:Class .
+bp:ScanRuleSet a rdfs:Class .
+bp:ScanRule a rdfs:Class .
+bp:podPath a rdf:Property .
+bp:formatDescription a rdf:Property .
+bp:recognitionQuery a rdf:Property .
+bp:ruleSet a rdf:Property .
+bp:scanRule a rdf:Property .
+bp:constructQuery a rdf:Property .
+bp:action a rdf:Property .
+bp:Derive rdfs:label "Ableiten"@de .
+bp:Copy rdfs:label "Direkt kopieren"@de .
