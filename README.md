@@ -127,6 +127,11 @@ textNode["<div align='left'>
 - **`typo3/bib_pods/`**: bündelt `bib-src` zur TYPO3-Extension, die in der lokalen Instanz und auf der Webseite der Münchner Stadtbibliothek eingebunden wird.
 - **`api/`**: minimaler HTTP-Server, der `bib-src` headless einbindet: Nutzer*innen senden ihr Profil-Turtle und erhalten Empfehlungen als JSON zurück. Dieselbe Empfehlungslogik wie im Plugin, nur anders ausgeliefert.
 
+### Wie Empfehlungen ausgewählt werden
+
+Das Vokabular definiert die Empfehlungsstrategien; die gemeinsame Implementierung bestimmt Auswahl und Reihenfolge der Bücher.
+Die [Strategieseite](https://it-at-m.github.io/bib-pods/recommendations/) erklärt die verwendeten Profileinträge, Kombinationsvorschläge, Balancierung, Sortierung und den Umgang mit früheren Empfehlungen.
+
 ### Hilfsskripte
 
 - **`repo.sh {install|build|clean}`**: Sammelaktion über alle npm-Pakete im Repo: `cori-sdk`, `bib-src`, `docs`, `typo3/bib_pods`, `api`, `solid-server`, `interim-index`.

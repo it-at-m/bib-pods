@@ -1,13 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Recommendations — bib-pods</title>
+        <title>Empfehlungsstrategien — bib-pods</title>
         <link rel="stylesheet" href="../styles.css">
         <style>
-            /* five columns incl. the query need more room than the docs default */
-            main { max-width: 1100px; }
+            main { max-width: 1280px; }
             .table-scroll { overflow-x: auto; }
             .strategy-table {
                 width: 100%;
@@ -20,6 +19,7 @@
             }
             .strategy-table th, .strategy-table td {
                 text-align: left;
+                vertical-align: top;
                 padding: 0.6rem 0.9rem;
                 border-bottom: 1px solid #eee;
             }
@@ -51,7 +51,7 @@
             .query-cell a:hover code { text-decoration: underline; }
             .query-cell code {
                 display: inline-block;
-                max-width: 24rem;
+                max-width: 16rem;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
@@ -67,12 +67,20 @@
                 font-size: 0.85rem;
                 max-width: 60rem;
             }
+            .selection-cell { min-width: 11rem; }
+            .selection-cell small { display: block; margin-top: 0.4rem; color: #555; }
+            .rules { max-width: 54rem; line-height: 1.6; }
+            .rules h2 { margin-top: 2rem; scroll-margin-top: 1rem; }
+            .rules li + li { margin-top: 0.6rem; }
         </style>
         <script src="../nav-bar.js"></script>
     </head>
     <body>
         <nav-bar current="recommendations"></nav-bar>
         <main>
+            <h1>Empfehlungsstrategien</h1>
+            <p class="rules">Welche Profileinträge fließen ein und wie wählen wir passende Bücher aus?
+                Die Tabelle zeigt die Strategien mit ihren Auswahlregeln.</p>
             <div class="table-scroll">
             <table class="strategy-table" id="strategy-table">
                 <thead>
@@ -80,21 +88,89 @@
                         <th>Strategie</th>
                         <th>Profil-Properties</th>
                         <th>Verknüpfung</th>
-                        <th title="bp:enabledByDefault — diese Lanes laufen ohne eigene Einstellung">on&nbsp;by&nbsp;default</th>
-                        <th>Solr-Query</th>
+                        <th>Auswahl &amp; Reihenfolge</th>
+                        <th title="bp:enabledByDefault — diese Strategien laufen ohne eigene Einstellung">Standardmäßig aktiv</th>
+                        <th>Katalogabfrage</th>
                     </tr>
                 </thead>
                 <tbody id="strategy-tbody"></tbody>
             </table>
             </div>
-            <p class="table-hint">Die Solr-Query wird aus dem Profil gebaut, das gerade im Browser
-                gespeichert ist (Anmeldung „Lokal im Browser" bzw. „Nur in dieser Sitzung" auf der
-                Plugin-Seite; ein Profil im Solid Pod kann diese Seite nicht lesen). Klick auf eine
-                Query öffnet sie auf der Query-Seite.</p>
+            <p class="table-hint">Ein Klick auf die Katalogabfrage zeigt alle passenden Titel samt
+                Filtern; die Auswahl der Vorschläge folgt den Regeln unten. Diese Seite liest
+                dein lokal oder in der Sitzung gespeichertes Profil. Solid-Pod-Profile sind hier nicht zugänglich.</p>
+
+            <div class="rules">
+                <h2 id="matching">Gemeinsam für alle Solr-Strategien</h2>
+                <p>Die Profileinträge werden über die Indexzuordnungen im Vokabular gesucht.
+                    Neue Vorschläge schließen gemerkte Bücher und bereits in derselben Strategie
+                    gespeicherte Empfehlungen aus, auch weggeklickte. Sprach- und Medienartpräferenzen
+                    gelten zusätzlich, etwa „Deutsch oder Englisch, und als E-Book“.</p>
+
+                <h2 id="solr-or">Solr mit OR: Kombination zuerst, dann ausgleichen</h2>
+                <p>Für Themen, Autor*innen, Genres sowie Orte und Regionen genügt ein passender
+                    Profileintrag (OR).</p>
+                <ol>
+                    <li><strong>Einzeln und kombiniert suchen:</strong> Je unterschiedlicher
+                        Suchbedingung entsteht eine Ergebnisliste; ab zwei Einträgen zusätzlich
+                        eine für Bücher, die mindestens zwei davon treffen.</li>
+                    <li><strong>Sortieren:</strong> Innerhalb jeder Liste zählt zuerst der
+                        Solr-Score, bei Gleichstand das neuere gültige Erscheinungsjahr,
+                        dann die Katalog-ID aufsteigend.</li>
+                    <li><strong>Kombination zuerst:</strong> Der erste Kombinationstreffer,
+                        dessen Katalogdaten mindestens zwei Einträge bestätigen, erhält
+                        den ersten Platz, sofern vorhanden.</li>
+                    <li><strong>Ausgleichen:</strong> Danach kommen Einträge mit weniger bisherigen
+                        und gerade ausgewählten Vorschlägen zum Zug; Mehrfachtreffer zählen
+                        für jeden passenden Eintrag. Bei Gleichstand entscheidet der Anzeigename.</li>
+                    <li><strong>Dopplungen vermeiden:</strong> Gleiche Katalog-IDs oder gleiche
+                        Kombinationen aus normalisiertem Titel und erstem Autor werden innerhalb
+                        der neuen Auswahl nur einmal berücksichtigt.</li>
+                </ol>
+                <p>Der Solr-Score bewertet die Suchübereinstimmung, nicht die persönliche Eignung;
+                    auch innerhalb eines Themas können die Scores unterschiedlich sein.
+                    Pro Ergebnisliste werden höchstens doppelt so viele Kandidaten wie das
+                    Vorschlagslimit geladen, weshalb weniger Vorschläge entstehen können.</p>
+                <p><strong>Beispiel:</strong> Ein Profil enthält Bewegung, Gesunde Ernährung und
+                    Schlaf. Ein gefundenes Buch zu Bewegung und Ernährung kommt zuerst und zählt
+                    für beide Themen. Ohne frühere Empfehlungen ist anschließend Schlaf an der
+                    Reihe.</p>
+
+                <h2 id="solr-and">Solr mit AND: alle Angaben zusammen</h2>
+                <p>Ein Titel muss alle vorhandenen, abfragbaren Angaben der Strategie zugleich
+                    erfüllen. Neue Treffer folgen dem Solr-Score, bei Gleichstand der Katalog-ID;
+                    Einzelangaben werden nicht ausgeglichen.</p>
+
+                <h2 id="shelf">Wie entsteht die Reihenfolge im Schaufenster?</h2>
+                <p>Gespeicherte Vorschläge enthalten keine Scores oder Rangpositionen;
+                    OR-Regale werden deshalb beim Anzeigen neu geordnet.
+                    Ein Titel mit den meisten passenden Einträgen steht vorn, sofern er mindestens
+                    zwei trifft; danach wird innerhalb des sichtbaren Regals ausgeglichen.
+                    Bei Gleichstand und innerhalb der einzelnen Listen entscheiden das neuere
+                    gültige Erscheinungsjahr und die Katalog-ID.
+                    Nicht mehr passende Vorschläge bleiben am Ende; AND und inspira_BIB erhalten
+                    keine solche Neusortierung.</p>
+                <p>Das Limit gilt <strong>je Prüfung</strong>; weitere Prüfungen ergänzen die
+                    vorhandenen Vorschläge. Die Katalogtrefferzahl umfasst alle unter den aktuellen
+                    Filtern passenden, nicht gemerkten Bücher, einschließlich früherer Vorschläge.</p>
+
+                <h2 id="inspira">inspira_BIB: Ähnlichkeit zur Merkliste</h2>
+                <p>Der gesonderte inspira_BIB-Dienst erhält die IDs deiner gemerkten Bücher und
+                    liefert ähnliche Titel; gemerkte Bücher werden aus den Ergebnissen entfernt.
+                    Solr-Balancierung, frühere Vorschläge und Sprach-/Medienartfilter werden dort
+                    nicht berücksichtigt, sodass der Dienst dieselben Titel erneut liefern kann.</p>
+
+                <h2 id="implementation">Definitionen und Implementierung</h2>
+                <p><a href="https://github.com/it-at-m/bib-pods/blob/main/bib-src/definitions/vocabulary.ttl">vocabulary.ttl</a>
+                    deklariert Engine, Profil-Properties, Verknüpfung, Limit und Standardaktivierung.
+                    Auswahl und Reihenfolge sind fest in
+                    <a href="https://github.com/it-at-m/bib-pods/blob/main/bib-src/src/recommendations.js">recommendations.js</a>
+                    umgesetzt.</p>
+            </div>
         </main>
         <script type="module">
             import {
-                getStrategies, buildQuery, contractTerm, getProfileSubject,
+                getStrategies, buildQuery, DEFAULT_RECOMMENDATION_LIMIT, BP, contractTerm, getProfileSubject,
                 getChoice, isStorageReady, loadStore, SOLR_ENDPOINT,
             } from "../dist/recommendations.js"
 
@@ -110,13 +186,13 @@
                 ? "Profil liegt im Solid Pod — hier nicht lesbar"
                 : "kein Profil im Browser-Speicher"
 
-            // Deep-link into the query page (see its param-handover block): the very
-            // query the runner would send, incl. the saved-book exclusions as fq params.
+            // Browse the whole catalogue pool, as in the widget's count link.
+            // Candidate retrieval, history and ranking are documented separately.
             function queryPageHref(strategy, { q, fq }) {
                 const params = new URLSearchParams()
                 params.set("q", q)
                 if (fq.length > 0) params.set("params", fq.map(f => `fq=${f}`).join("\n"))
-                params.set("rows", strategy.maxSuggestions ?? 3)
+                params.set("rows", 50)
                 params.set("label", strategy.label)
                 params.set("endpoint", SOLR_ENDPOINT)
                 return `../query/?${params.toString()}`
@@ -127,7 +203,7 @@
             if (strategies.length === 0) {
                 const tr = document.createElement("tr")
                 const td = document.createElement("td")
-                td.colSpan = 5
+                td.colSpan = 6
                 td.textContent = "Keine Strategien deklariert."
                 tr.appendChild(td)
                 tbody.appendChild(tr)
@@ -163,6 +239,19 @@
                 }
                 tr.appendChild(combineCell)
 
+                const isInspira = s.engine === BP + "InspiraEngine"
+                const isAnd = s.combine?.iri === BP + "And"
+                const selectionCell = document.createElement("td")
+                selectionCell.className = "selection-cell"
+                const selectionLink = document.createElement("a")
+                selectionLink.href = isInspira ? "#inspira" : isAnd ? "#solr-and" : "#solr-or"
+                selectionLink.textContent = isInspira ? "Ähnlichkeit zur Merkliste"
+                    : isAnd ? "Alle Angaben zusammen" : "Kombination zuerst, dann ausgleichen"
+                const limit = document.createElement("small")
+                limit.textContent = `${isInspira ? "inspira_BIB" : "Solr"} · bis zu ${s.maxSuggestions ?? DEFAULT_RECOMMENDATION_LIMIT} Ergebnisse je Prüfung`
+                selectionCell.append(selectionLink, limit)
+                tr.appendChild(selectionCell)
+
                 const defaultCell = document.createElement("td")
                 defaultCell.className = "default-cell"
                 defaultCell.textContent = s.defaultEnabled ? "✓" : "–"
@@ -180,7 +269,7 @@
                     em.textContent = text
                     queryCell.appendChild(em)
                 }
-                if (!s.engine.endsWith("SolrEngine")) {
+                if (isInspira) {
                     note("keine Solr-Query (Inspira-Engine)")
                 } else if (!profileStore) {
                     note(noProfileNote)

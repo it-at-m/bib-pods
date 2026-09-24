@@ -196,7 +196,9 @@ bp:BookSelection a cori:UserAction ;
 
 # ----- Recommendations -----
 
-bp:RecommendationStrategy a rdfs:Class .
+bp:RecommendationStrategy a rdfs:Class ;
+    rdfs:comment "Legt Engine, Profil-Properties, Verknüpfung, Vorschlagslimit und Standardaktivierung fest. Die gemeinsame Implementierung bestimmt die weitere Auswahl und Reihenfolge; diese sind auf der Strategieseite beschrieben."@de ;
+    rdfs:seeAlso <https://it-at-m.github.io/bib-pods/recommendations/> .
 
 # Profile properties typed bp:RecommendationFilter don't form lanes of their own —
 # their values narrow every Solr strategy's query as fq clauses: OR within a property,
@@ -209,6 +211,7 @@ bp:usesProfileProperty a rdf:Property ;
     rdfs:range rdf:Property .
 
 bp:combine a rdf:Property ;
+    rdfs:comment "Verknüpft die Profileinträge für die Suche. Auswahl und Reihenfolge der Vorschläge werden zusätzlich von der jeweiligen Engine bestimmt."@de ;
     rdfs:domain bp:RecommendationStrategy ;
     rdfs:range bp:Combinator .
 
@@ -216,7 +219,7 @@ bp:engine a rdf:Property ; # which backend computes the strategy's results
     rdfs:domain bp:RecommendationStrategy ;
     rdfs:range bp:RecommendationEngine .
 
-bp:maxSuggestions a rdf:Property ; # how many results a strategy may return; without it the runner's default applies
+bp:maxSuggestions a rdf:Property ; # results per check, not the total size of the saved shelf; default: runner limit (normally 3)
     rdfs:domain bp:RecommendationStrategy ;
     rdfs:range xsd:integer .
 

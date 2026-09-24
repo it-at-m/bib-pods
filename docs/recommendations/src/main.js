@@ -1,4 +1,5 @@
-export { getStrategies, buildQuery } from "bib-src/src/recommendations.js"
+export { getStrategies, buildQuery, DEFAULT_RECOMMENDATION_LIMIT } from "bib-src/src/recommendations.js"
+export { BP } from "bib-src/src/vocab.js"
 export { contractTerm, getProfileSubject } from "cori-sdk/utils.js"
 export { getChoice, isStorageReady, loadStore } from "cori-sdk/storage/index.js"
 

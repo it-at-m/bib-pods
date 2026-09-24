@@ -4,6 +4,7 @@ import { BP, LOCAL } from "./vocab.js"
 import { recommendFromSavedBooks } from "./qdrant.js"
 
 const INSPIRA_ENGINE = BP + "InspiraEngine"
+export const DEFAULT_RECOMMENDATION_LIMIT = 3
 
 // Explicit per-user strategy choices, overriding the vocab's bp:enabledByDefault
 // seed. Only deviations from the seed are persisted (see resolveStrategyEnabled).
@@ -419,7 +420,7 @@ export async function countStrategyMatches(strategy, profileStore, profileSubjec
 // matched": it's true when no strategy reached a backend. When nothing was attempted at
 // all we never touched a backend, so probe Solr directly — otherwise an unreachable index
 // would be indistinguishable from an empty profile.
-export async function runRecommendations(profileStore, profileSubject, { solrEndpoint, qdrantEndpoint }, limit = 3) {
+export async function runRecommendations(profileStore, profileSubject, { solrEndpoint, qdrantEndpoint }, limit = DEFAULT_RECOMMENDATION_LIMIT) {
     const choices = readStrategyChoices(profileStore)
     const results = []
     let attempted = 0

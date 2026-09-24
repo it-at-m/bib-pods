@@ -19,13 +19,9 @@ the rules, and explains that adopting the findings into the library profile
 requires the user's consent.
 
 The proposed additions use existing profile categories and feed the existing
-recommendation strategies. Topic suggestions appear together in the normal topic
-recommendations, with a book connecting multiple accepted topics first when available,
-followed by a selection across the topics. Cards identify these connections using
-the book's catalogue subjects. Later checks favour topics with fewer past
-recommendations and offer books not yet suggested in that recommendation category,
-including when earlier suggestions were dismissed. Catalogue counts
-describe all matching records, not the size of the selected shelf.
+[recommendation strategies](https://it-at-m.github.io/bib-pods/recommendations/).
+Accepted entries participate in the same matching, selection and ordering as
+manually added profile entries. The scan does not select books itself.
 
 Select individual entries in the preview and confirm to add them to the profile.
 Each scan offers all findings again; accepting the same entry does not duplicate it.
