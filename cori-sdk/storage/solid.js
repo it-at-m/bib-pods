@@ -201,8 +201,17 @@ async function doEnsurePodSetup() {
         log(`${filename} already exists:`, fileUri)
     } else {
         log(`creating ${filename} at`, fileUri)
-        const resp = await putResource(fileUri, "", session)
-        log(`${filename} created, server response status =`, resp.status)
+        // Container listings may be cached or another tab may have created the
+        // profile meanwhile. Setup must never overwrite an existing profile.
+        const resp = await session.authFetch(fileUri, {
+            method: "PUT",
+            headers: { "Content-Type": "text/turtle", "If-None-Match": "*" },
+            body: "",
+        })
+        if (!resp.ok && resp.status !== 412) {
+            throw new Error(`Could not create ${fileUri}: HTTP ${resp.status}`)
+        }
+        log(`${filename} ${resp.status === 412 ? "already exists" : "created"}, server response status =`, resp.status)
     }
     log("ensurePodSetup done, file URI =", fileUri)
     return fileUri

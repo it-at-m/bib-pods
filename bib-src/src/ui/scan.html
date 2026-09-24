@@ -1,0 +1,17 @@
+<dialog id="bp-scan-dialog" class="bp-modal bp-scan-dialog" aria-labelledby="bp-scan-heading" aria-describedby="bp-scan-intro">
+    <div class="bp-modal-content">
+        <h3 id="bp-scan-heading">Vorschläge aus deinem Pod</h3>
+        <p id="bp-scan-intro">Was möchtest du in dein Profil übernehmen?</p>
+        <div id="bp-scan-sources" class="bp-scan-sources"></div>
+        <p id="bp-scan-status" class="bp-scan-status" role="status" aria-live="polite"></p>
+        <div id="bp-scan-review" hidden>
+            <div id="bp-scan-options" class="bp-scan-options" role="group" aria-label="Vorgeschlagene Profileinträge"></div>
+        </div>
+        <p id="bp-scan-error" class="bp-scan-error" role="alert" hidden></p>
+        <div class="bp-scan-actions">
+            <button id="bp-scan-accept" class="button" type="button" disabled hidden>Auswahl übernehmen</button>
+            <button id="bp-scan-retry" class="button" type="button" hidden>Erneut suchen</button>
+            <button id="bp-scan-cancel" class="button" type="button" autofocus>Schließen</button>
+        </div>
+    </div>
+</dialog>

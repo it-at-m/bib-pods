@@ -121,11 +121,21 @@ export function explainDocMatches(doc, profileStore, profileSubject, properties 
                 : obj.value)
         }
         if (matched.size === 0) continue
-        const bolded = [...matched].map(x => `<strong>${escapeHtml(x)}</strong>`).join(", ")
+        const bolded = new Intl.ListFormat("de", { type: "conjunction" })
+            .format([...matched].map(x => `<strong>${escapeHtml(x)}</strong>`))
         fragments.push(phrase.replace("{value}", bolded))
     }
     if (fragments.length === 0) return null
     return `Wird empfohlen, weil ${fragments.join(" und ")}.`
+}
+
+export function countDocMatches(doc, profileStore, profileSubject, properties) {
+    const v = getVocab()
+    return [...new Set(properties)].reduce((count, prop) => {
+        const mappings = getLinkedIndices(v, prop)
+        return count + profileStore.getObjects(profileSubject, prop, null)
+            .filter(obj => docMatchesFact(doc, mappings, obj, profileStore)).length
+    }, 0)
 }
 
 // Does the doc carry this profile fact in any of the property's index fields?
@@ -178,21 +188,110 @@ function combinatorOf(v, iri) {
 // entries and the profile's preference filters (see preferenceFilters).
 export function buildQuery(strategy, profileStore, profileSubject) {
     const v = getVocab()
-    const factGroups = []
-    for (const prop of strategy.properties) {
-        const mappings = getLinkedIndices(v, prop)
-        for (const obj of profileStore.getObjects(profileSubject, prop, null)) {
-            const clauses = factClauses(v, mappings, obj)
-            if (clauses.length > 0) {
-                factGroups.push(clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`)
-            }
-        }
-    }
+    const factGroups = profileFactGroups(strategy, profileStore, profileSubject)
     if (factGroups.length === 0) return null
     const op = strategy.combine?.iri === BP + "And" ? " AND " : " OR "
     const q = factGroups.length === 1 ? factGroups[0] : `(${factGroups.join(op)})`
     const savedIds = profileStore.getObjects(profileSubject, BP + "savedBook", null).map(o => o.value)
     return { q, fq: [...savedIds.map(id => `-id:"${escapeSolr(id)}"`), ...preferenceFilters(v, profileStore, profileSubject)] }
+}
+
+// RDF has no order. Use the displayed labels so saving/reloading a profile cannot
+// change which interests get the remaining places on a bounded shelf.
+function orderedProfileFacts(strategy, profileStore, profileSubject) {
+    const v = getVocab()
+    return strategy.properties.flatMap(prop => {
+        const mappings = getLinkedIndices(v, prop)
+        const label = obj => obj.termType === "NamedNode"
+            ? germanText(profileStore, obj.value, RDFS_LABEL) ?? labelOf(v, obj.value)
+            : obj.value
+        return profileStore.getObjects(profileSubject, prop, null)
+            .sort((a, b) => label(a).localeCompare(label(b), "de") || a.value.localeCompare(b.value))
+            .map(obj => ({ obj, mappings }))
+    })
+}
+
+function profileFactGroups(strategy, profileStore, profileSubject) {
+    const v = getVocab()
+    const factGroups = []
+    for (const { obj, mappings } of orderedProfileFacts(strategy, profileStore, profileSubject)) {
+        const clauses = factClauses(v, mappings, obj)
+        if (clauses.length > 0) {
+            factGroups.push(clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`)
+        }
+    }
+    return [...new Set(factGroups)]
+}
+
+// Retrieve each alternative separately so a high-scoring topic cannot crowd out
+// the others. AND strategies still require the full conjunction. Every request
+// retains the same exclusions and explicit language/medium filters as the pool.
+export function buildRecommendationQueries(strategy, profileStore, profileSubject) {
+    const query = buildQuery(strategy, profileStore, profileSubject)
+    if (!query) return []
+    if (strategy.combine?.iri === BP + "And") return [query]
+    return profileFactGroups(strategy, profileStore, profileSubject).map(q => ({ ...query, q }))
+}
+
+// One extra pool for books connecting at least two distinct profile facts.
+// A fact's alternative index fields stay inside one clause. Parameter references
+// keep literal profile values out of the local-parameter syntax.
+export function buildCombinedQuery(strategy, profileStore, profileSubject) {
+    if (strategy.combine?.iri === BP + "And") return null
+    const queries = buildRecommendationQueries(strategy, profileStore, profileSubject)
+    if (queries.length < 2) return null
+    const params = Object.fromEntries(queries.map(({ q }, i) => [`profileMatch${i}`, q]))
+    return {
+        q: `{!bool ${Object.keys(params).map(key => `should=$${key}`).join(" ")} mm=2}`,
+        fq: queries[0].fq,
+        params,
+    }
+}
+
+// Take turns across the alternatives, skipping duplicate records and editions
+// with the same title/author. A sparse pool doesn't waste the remaining slots.
+export function selectDiverseDocs(pools, limit) {
+    const selected = []
+    const ids = new Set()
+    const works = new Set()
+    const positions = pools.map(() => 0)
+    const normalize = value => String(value ?? "").normalize("NFKC").toLocaleLowerCase("de-DE").replace(/\s+/g, " ").trim()
+    while (selected.length < limit) {
+        let advanced = false
+        for (let i = 0; i < pools.length && selected.length < limit; i++) {
+            while (positions[i] < pools[i].length) {
+                const doc = pools[i][positions[i]++]
+                const title = normalize(doc.title?.[0])
+                const work = title ? `${title}\n${normalize(doc.author?.[0])}` : null
+                if (ids.has(doc.id) || (work && works.has(work))) continue
+                selected.push(doc)
+                ids.add(doc.id)
+                if (work) works.add(work)
+                advanced = true
+                break
+            }
+        }
+        if (!advanced) break
+    }
+    return selected
+}
+
+// RDF message storage has no result order. Rebuild a varied shelf from the
+// catalogue facts on read, including after a reload. Keep older/unmatched
+// messages at the end so changing interests never silently discards them.
+export function orderDocsByProfile(docs, strategy, profileStore, profileSubject) {
+    if (strategy?.combine?.iri !== BP + "Or") return docs
+    const year = doc => Number([].concat(doc.publishDateSort ?? 0)[0]) || 0
+    const sorted = [...docs].sort((a, b) => year(b) - year(a) || a.id.localeCompare(b.id))
+    const pools = orderedProfileFacts(strategy, profileStore, profileSubject)
+        .map(({ obj, mappings }) => sorted.filter(doc => docMatchesFact(doc, mappings, obj, profileStore)))
+    const matches = new Map(sorted.map(doc => [doc.id,
+        countDocMatches(doc, profileStore, profileSubject, strategy.properties)]))
+    const combined = sorted.filter(doc => matches.get(doc.id) >= 2)
+        .sort((a, b) => matches.get(b.id) - matches.get(a.id)).slice(0, 1)
+    const ordered = selectDiverseDocs([combined, ...pools], docs.length)
+    const ids = new Set(ordered.map(doc => doc.id))
+    return [...ordered, ...docs.filter(doc => !ids.has(doc.id))]
 }
 
 // The Solr clauses one profile fact contributes, across the property's index mappings:
@@ -297,23 +396,40 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
             continue
         }
 
-        const query = buildQuery(strategy, profileStore, profileSubject)
-        if (!query) continue
-        attempted++
-        const url = solrUrl(solrEndpoint, query, strategy.maxSuggestions ?? limit)
-        console.log(`[bib-pods] ${strategy.label}: ${url}`)
-        try {
-            const res = await fetch(url)
-            if (!res.ok) {
-                console.warn(`[bib-pods] ${strategy.label}: Solr ${res.status}`)
-                continue
+        const queries = buildRecommendationQueries(strategy, profileStore, profileSubject)
+        if (!queries.length) continue
+        const wanted = strategy.maxSuggestions ?? limit
+        const combinedQuery = buildCombinedQuery(strategy, profileStore, profileSubject)
+        // Each alternative is already a match for one accepted fact: prefer
+        // recent editions within it. The combined pool keeps relevance first.
+        // Extra candidates absorb duplicate editions; ids settle remaining ties.
+        const requests = [
+            ...(combinedQuery ? [{ ...combinedQuery, sort: "score desc,publishDateSort desc,id asc" }] : []),
+            ...queries.map(query => ({ ...query, sort: "publishDateSort desc,score desc,id asc" })),
+        ]
+        const pools = await Promise.all(requests.map(async query => {
+            attempted++
+            const url = solrUrl(solrEndpoint, query, wanted * 2)
+            console.log(`[bib-pods] ${strategy.label}: ${url}`)
+            try {
+                const res = await fetch(url)
+                if (!res.ok) {
+                    console.warn(`[bib-pods] ${strategy.label}: Solr ${res.status}`)
+                    return []
+                }
+                reached++
+                return (await res.json()).response?.docs ?? []
+            } catch (err) {
+                console.error(`[bib-pods] ${strategy.label} failed:`, err)
+                return []
             }
-            reached++
-            const json = await res.json()
-            results.push({ strategy, docs: json.response?.docs ?? [] })
-        } catch (err) {
-            console.error(`[bib-pods] ${strategy.label} failed:`, err)
-        }
+        }))
+        // Reserve just one leading place for a verified combination; keep the
+        // remaining places varied. A failed/empty combined query changes nothing.
+        if (combinedQuery) pools[0] = pools[0]
+            .filter(doc => countDocMatches(doc, profileStore, profileSubject, strategy.properties) >= 2)
+            .slice(0, 1)
+        results.push({ strategy, docs: selectDiverseDocs(pools, wanted) })
     }
     const serverUnreachable = attempted > 0 ? reached === 0 : !(await solrReachable(solrEndpoint))
     return { results, serverUnreachable }
@@ -356,9 +472,11 @@ function escapeSolr(s) {
 
 // manual assembly with encodeURIComponent: URLSearchParams encodes spaces as `+`,
 // which Solr's Lucene parser misreads as the `+` must-match prefix operator. `%20` works
-function solrUrl(endpoint, { q, fq }, limit) {
+function solrUrl(endpoint, { q, fq, sort, params = {} }, limit) {
     const parts = [`q=${encodeURIComponent(q)}`]
     for (const f of fq) parts.push(`fq=${encodeURIComponent(f)}`)
+    for (const [key, value] of Object.entries(params)) parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    if (sort) parts.push(`sort=${encodeURIComponent(sort)}`)
     parts.push(`rows=${limit}`, `wt=json`)
     return `${endpoint}?${parts.join("&")}`
 }

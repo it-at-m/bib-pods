@@ -12,10 +12,10 @@ const strategy = getStrategies().find(s => s.iri === BP + "topicMatch")
 const profile = async () => {
     const input = parseTurtle(`
         @prefix h: <https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#> .
-        <urn:assessment> a h:HealthQuestionnaireAssessment ;
-            h:hasCategoryScore [ h:categoryId "movement" ], [ h:categoryId "nutrition" ],
-                [ h:categoryId "mental" ], [ h:categoryId "sleep" ] ;
-            h:hasAnswer [ h:questionId "movement-sport-frequency" ; h:optionId "under-1h" ] .
+        <urn:assessment> a h:HealthQuestionnaireAssessment ; h:hasAnswer
+            [ h:questionId "movement-active-days" ; h:optionId "1" ],
+            [ h:questionId "nutrition-fruit-vegetables" ; h:optionId "yes" ],
+            [ h:questionId "sleep-difficulties" ; h:optionId "yes" ] .
     `)
     const store = parseTurtle(`<${subject}> a <https://cori.systems/core#Profile> .`)
     for (const finding of await applyScanRules(source, input)) store.addQuads(finding.quads)
@@ -25,12 +25,12 @@ const profile = async () => {
 test("scanner proposals use only the existing topics category and its default strategy", async () => {
     const store = await profile()
     const topics = store.getObjects(subject, BP + "interestedIn", null).map(t => t.value).sort()
-    assert.deepEqual(topics, ["4782241-7", "4064532-0", "4062436-5", "4014917-1"].map(id => GND + id).sort())
-    assert.equal(store.getQuads(subject, null, null, null).length, 5) // type + four interests
+    assert.deepEqual(topics, ["4006311-2", "4340678-6", "4052580-6"].map(id => GND + id).sort())
+    assert.equal(store.getQuads(subject, null, null, null).length, 4) // type + three interests
     assert.equal(resolveStrategyEnabled(strategy, readStrategyChoices(store)), true)
     const query = buildQuery(strategy, store, subject)
     assert.deepEqual(query, {
-        q: `(${store.getObjects(subject, BP + "interestedIn", null).map(t => `topic_uri_str_mv:"${t.value}"`).join(" OR ")})`,
+        q: `(${["4006311-2", "4340678-6", "4052580-6"].map(id => `topic_uri_str_mv:"${GND + id}"`).join(" OR ")})`,
         fq: [],
     })
     assert.equal((await validateProfile(store)).conforms, true)
@@ -43,9 +43,9 @@ test("topic labels support the existing profile display and recommendation expla
         assert.equal(store.getObjects(topic, RDFS_LABEL, null).length, 1)
         assert.notEqual(scanLabel(topic.value, store.getQuads()), topic.value)
     }
-    assert.equal(scanLabel(GND + "4782241-7", store.getQuads()), "Selbstfürsorge")
-    const explanation = explainDocMatches({ topic_uri_str_mv: [GND + "4062436-5"] }, store, subject, strategy.properties)
-    assert.match(explanation, /Vegetarische Kost/)
+    assert.equal(scanLabel(GND + "4006311-2", store.getQuads()), "Bewegung")
+    const explanation = explainDocMatches({ topic_uri_str_mv: [GND + "4340678-6"] }, store, subject, strategy.properties)
+    assert.match(explanation, /Gesunde Ernährung/)
     assert.doesNotMatch(explanation, /gnd:|https:/)
 })
 

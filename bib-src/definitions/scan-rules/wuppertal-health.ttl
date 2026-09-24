@@ -21,15 +21,16 @@ ASK WHERE {
 }
 """ .
 
-# Recognize the known Wuppertal export format, not just a file name or survey label.
-# This identifies the data format; it does not authenticate the document's origin.
+# Recognize the known export format, not just a file name or survey label.
+# This identifies the data format; it does not authenticate its origin.
 bp:wuppertalHealthRules a bp:ScanRuleSet ;
     rdfs:label "Wuppertal: Solid-Gesundheitsfragebogen"@de ;
-    bp:scanRule bp:wuppertalWellbeing, bp:wuppertalDomains .
+    bp:scanRule bp:wuppertalQuestionTopics .
 
-# The file name or assessment type alone is insufficient: require some results.
-bp:wuppertalWellbeing a bp:ScanRule ;
-    rdfs:label "Wuppertaler Gesundheitsfragebogen → Themenvorschlag Selbstfürsorge"@de ;
+# One source-specific extraction query, with declarative field → topic mappings.
+# Evidence is separate from the proposed profile facts and is never saved there.
+bp:wuppertalQuestionTopics a bp:ScanRule ;
+    rdfs:label "Fragebogenangaben → Lesethemen"@de ;
     bp:action bp:Derive ;
     bp:constructQuery """
 PREFIX bp:   <https://www.muenchner-stadtbibliothek.de/bib-pods#>
@@ -37,57 +38,34 @@ PREFIX cori: <https://cori.systems/core#>
 PREFIX hq:   <https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#>
 PREFIX gnd:  <https://d-nb.info/gnd/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-CONSTRUCT {
-    cori:defaultProfile bp:interestedIn gnd:4782241-7 .
-    gnd:4782241-7 rdfs:label "Selbstfürsorge" .
-}
-WHERE {
-    ?assessment a hq:HealthQuestionnaireAssessment .
-    {
-        ?assessment hq:hasAnswer ?answer .
-        ?answer hq:questionId ?question ; hq:optionId ?option .
-    } UNION {
-        ?assessment hq:hasCategoryScore ?category .
-        ?category hq:categoryId ?categoryId .
-    }
-}
-""" .
-
-# Propose values for the existing topics category; adoption requires confirmation.
-# Vegetarian food is a reading suggestion, not a claim about the person's diet.
-# Labels accompany authority IRIs just as they do for manually selected topics.
-# Answer values and scores do not decide whether a domain supplies suggestions.
-# Recognized answer-ID prefixes also work when the category summaries are absent.
-bp:wuppertalDomains a bp:ScanRule ;
-    rdfs:label "Beantwortete Themenbereiche → konkrete Leseanregungen"@de ;
-    bp:action bp:Derive ;
-    bp:constructQuery """
-PREFIX bp:   <https://www.muenchner-stadtbibliothek.de/bib-pods#>
-PREFIX cori: <https://cori.systems/core#>
-PREFIX hq:   <https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#>
-PREFIX gnd:  <https://d-nb.info/gnd/>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX schema: <https://schema.org/>
 
 CONSTRUCT {
     cori:defaultProfile bp:interestedIn ?topic .
-    ?topic rdfs:label ?label .
+    ?topic rdfs:label ?topicLabel .
+    _:evidence a bp:ScanEvidence ;
+        bp:profileProperty bp:interestedIn ; bp:profileValue ?topic ;
+        bp:sourceField ?question ; bp:sourceFieldLabel ?fieldLabel ;
+        bp:sourceValue ?answerText ; bp:sourceNode ?answer .
 }
 WHERE {
-    ?assessment a hq:HealthQuestionnaireAssessment .
-    {
-        ?assessment hq:hasCategoryScore ?category .
-        ?category hq:categoryId ?domain .
-    } UNION {
-        ?assessment hq:hasAnswer ?answer .
-        ?answer hq:questionId ?question ; hq:optionId ?option .
-        BIND(STRBEFORE(STR(?question), "-") AS ?domain)
+    VALUES (?question ?option ?fieldLabel ?topic ?topicLabel) {
+        # Reported activity supplies a reading suggestion; low sport frequency does not.
+        ("movement-active-days" "1" "Körperlich aktiv (Tage pro Woche)" gnd:4006311-2 "Bewegung")
+        ("movement-active-days" "2" "Körperlich aktiv (Tage pro Woche)" gnd:4006311-2 "Bewegung")
+        ("movement-active-days" "3" "Körperlich aktiv (Tage pro Woche)" gnd:4006311-2 "Bewegung")
+        ("movement-active-days" "4" "Körperlich aktiv (Tage pro Woche)" gnd:4006311-2 "Bewegung")
+        ("movement-active-days" "5" "Körperlich aktiv (Tage pro Woche)" gnd:4006311-2 "Bewegung")
+        ("movement-active-days" "6" "Körperlich aktiv (Tage pro Woche)" gnd:4006311-2 "Bewegung")
+        ("movement-active-days" "7" "Körperlich aktiv (Tage pro Woche)" gnd:4006311-2 "Bewegung")
+        ("nutrition-fruit-vegetables" "yes"    "Täglich mindestens fünf Portionen Obst/Gemüse" gnd:4340678-6 "Gesunde Ernährung")
+        ("sleep-difficulties" "yes"            "Schlafschwierigkeiten" gnd:4052580-6 "Schlaf")
     }
-    VALUES (?domain ?topic ?label) {
-        ("movement"  gnd:4064532-0 "Wandern")
-        ("nutrition" gnd:4062436-5 "Vegetarische Kost")
-        ("mental"    gnd:4014917-1 "Entspannung")
-        ("sleep"     gnd:4014917-1 "Entspannung")
-    }
+    ?assessment a hq:HealthQuestionnaireAssessment ; hq:hasAnswer ?answer .
+    ?answer hq:questionId ?question ; hq:optionId ?option .
+    OPTIONAL { ?answer schema:text ?de . FILTER(LANGMATCHES(LANG(?de), "de")) }
+    OPTIONAL { ?answer schema:text ?plain . FILTER(LANG(?plain) = "") }
+    OPTIONAL { ?answer schema:text ?en . FILTER(LANGMATCHES(LANG(?en), "en")) }
+    BIND(COALESCE(?de, ?plain, ?en, ?option) AS ?answerText)
 }
 """ .

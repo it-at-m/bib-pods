@@ -15,5 +15,14 @@ bp:ruleSet a rdf:Property .
 bp:scanRule a rdf:Property .
 bp:constructQuery a rdf:Property .
 bp:action a rdf:Property .
+# Structured evidence for a proposed profile fact. Kept in the preview only.
+# The UI renders the same field/value/mapping structure for every source.
+bp:ScanEvidence a rdfs:Class .
+bp:profileProperty a rdf:Property .
+bp:profileValue a rdf:Property .
+bp:sourceField a rdf:Property .
+bp:sourceFieldLabel a rdf:Property .
+bp:sourceValue a rdf:Property .
+bp:sourceNode a rdf:Property .
 bp:Derive rdfs:label "Ableiten"@de .
 bp:Copy rdfs:label "Direkt kopieren"@de .

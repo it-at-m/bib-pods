@@ -60,7 +60,7 @@ bp:interestedIn a rdf:Property ;
     rdfs:range bf:Topic ;
     cori:inSection bp:TasteSection ;
     cori:order 40 ;
-    bp:explanationPhrase "dich {value} interessiert"@de ;
+    bp:explanationPhrase "du dich für {value} interessierst"@de ;
     bp:linkedToIndex [
         bp:labelField "topic" ;
         bp:iriField "topic_uri_str_mv"
@@ -273,6 +273,7 @@ bp:topicMatch a bp:RecommendationStrategy ;
     bp:engine bp:SolrEngine ;
     bp:usesProfileProperty bp:interestedIn ;
     bp:combine bp:Or ;
+    bp:maxSuggestions 6 ;
     bp:enabledByDefault true .
 
 bp:genreMatch a bp:RecommendationStrategy ;

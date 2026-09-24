@@ -54,7 +54,14 @@ async function scanSource(source) {
     console.log("[bib-pods] scan: Das würden wir jetzt zu deinem Profil hinzufügen, wenn du zustimmst:")
     console.log(additionsTtl)
     console.log("[bib-pods] scan: Dies ist eine Vorschau. Eine Übernahme benötigt deine Zustimmung; dein Profil wurde durch diese Vorschau nicht verändert.")
-    return { source: document.url, scanSource: source.iri, ruleSet: source.ruleSet.iri, findings }
+    return {
+        source: document.url,
+        scanSource: source.iri,
+        sourceLabel: source.label,
+        ruleSet: source.ruleSet.iri,
+        ruleSetLabel: source.ruleSet.label,
+        findings,
+    }
 }
 
 export async function scanPod() {

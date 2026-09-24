@@ -2,7 +2,7 @@
 // backend (local, solid, …) implements
 // { isReady, warmup, load, save, appendDoc, getInfo, getEntryName }.
 // Adding a new backend means dropping in a new module here and wiring it in BACKENDS.
-import { serializeTurtle, mintMessageUri, subjectsOfType, getOne, replaceProperty, getProfileSubject, quadKey, CORI, RDF_TYPE } from "../utils.js"
+import { serializeTurtle, mintMessageUri, subjectsOfType, getOne, replaceProperty, getProfileSubject, quadKey, CORI, RDF_TYPE, RDFS_LABEL } from "../utils.js"
 import { addTriple as addTripleToStore } from "@foerderfunke/sem-ops-utils/core"
 import { recordChange } from "./provenance.js"
 import * as localBackend from "./local-storage.js"
@@ -218,6 +218,15 @@ export const addInquiryFacts = (facts) => mutate(store => {
     const defaultSubject = getProfileSubject()
     for (const { subject, predicate, object } of facts) {
         addTripleToStore(store, subject ?? defaultSubject, predicate, object)
+    }
+})
+
+// Add an accepted RDF fragment in one mutation. Keep existing resource labels:
+// importing a second label could invalidate a profile with a single-label shape.
+export const mergeProfileQuads = (quads) => mutate(store => {
+    for (const quad of quads) {
+        if (quad.predicate.value === RDFS_LABEL && store.getObjects(quad.subject, RDFS_LABEL, null).length) continue
+        store.addQuad(quad)
     }
 })
 

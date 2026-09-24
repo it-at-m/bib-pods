@@ -4,11 +4,10 @@ import { parseTurtle, getProfileSubject, RDFS_LABEL } from "cori-sdk/utils.js"
 import { applyScanRules, getScanSources, matchesScanSource } from "../src/scan-rules.js"
 
 const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
-const SELFCARE = "https://d-nb.info/gnd/4782241-7"
-const VEGETARIAN_FOOD = "https://d-nb.info/gnd/4062436-5"
-const WALKING = "https://d-nb.info/gnd/4064532-0"
-const RELAXATION = "https://d-nb.info/gnd/4014917-1"
-const MOVEMENT_NUTRITION_TOPICS = [SELFCARE, VEGETARIAN_FOOD, WALKING].sort()
+const HEALTHY_EATING = "https://d-nb.info/gnd/4340678-6"
+const MOVEMENT = "https://d-nb.info/gnd/4006311-2"
+const SLEEP = "https://d-nb.info/gnd/4052580-6"
+const MOVEMENT_NUTRITION_TOPICS = [HEALTHY_EATING, MOVEMENT].sort()
 const prefixes = `
 @prefix h: <https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#> .
 @prefix s: <https://schema.org/> .
@@ -33,40 +32,65 @@ const run = async body => {
     }
 }
 
-test("category presence supplies themes despite changed answers, scores, labels and node names", async () => {
-    for (const option of ["under-1h", "some-new-option"]) {
-        const result = await run(`
-            x:changed a h:HealthQuestionnaireAssessment ;
-                h:hasCategoryScore x:food, x:activity ; h:hasAnswer x:reply .
-            x:food h:categoryId "nutrition" ; h:percentage 0 ; h:trafficLight "red" .
-            x:activity h:categoryId "movement" ; h:percentage 100 ; h:trafficLight "green" .
-            x:reply h:questionId "movement-sport-frequency" ; h:optionId "${option}" ;
-                s:position 400 ; s:text "Different wording"@en .
-        `)
-        assert.equal(result.recognized, true)
-        assert.deepEqual(result.themes, MOVEMENT_NUTRITION_TOPICS)
-    }
-})
-
-test("linked answers supply domains when category summaries are absent, without duplicate findings", async () => {
+test("explicit answers supply suggestions despite changed scores, labels and node names", async () => {
     const result = await run(`
-        x:result a h:HealthQuestionnaireAssessment ; h:hasAnswer x:a, x:b, x:c .
-        x:a h:questionId "movement-active-days" ; h:optionId "1" .
-        x:b h:questionId "movement-active-duration" ; h:optionId "10-30" .
-        x:c h:questionId "nutrition-fruit-vegetables" ; h:optionId "no" .
+        x:changed a h:HealthQuestionnaireAssessment ; h:hasAnswer x:active, x:food .
+        x:active h:questionId "movement-active-days" ; h:optionId "1" ;
+            s:position 400 ; s:text "Different wording"@en ; h:achievedScore 999 .
+        x:food h:questionId "nutrition-fruit-vegetables" ; h:optionId "yes" .
     `)
     assert.equal(result.recognized, true)
     assert.deepEqual(result.themes, MOVEMENT_NUTRITION_TOPICS)
 })
 
-test("unlinked answers and categories do not create observations or inferred themes", async () => {
+test("movement follows reported active days and its evidence names that answer", async () => {
+    for (const option of ["1", "2", "3", "4", "5", "6", "7"]) {
+        const result = await run(`
+            x:result a h:HealthQuestionnaireAssessment ; h:hasAnswer x:active .
+            x:active h:questionId "movement-active-days" ; h:optionId "${option}" .
+        `)
+        assert.deepEqual(result.themes, [MOVEMENT])
+        const evidence = result.findings.flatMap(f => f.evidence)
+        assert.equal(evidence.length, 1)
+        assert.equal(evidence[0].field.value, "movement-active-days")
+        assert.equal(evidence[0].sourceValue.value, option)
+        assert.equal(evidence[0].sourceNode.value, "https://different-pod.example/survey/active")
+    }
+})
+
+test("low sport frequency alone, zero, invalid or missing active days do not suggest movement", async () => {
+    for (const option of [null, "0", "-1", "8", "some-new-option"]) {
+        const result = await run(`
+            x:result a h:HealthQuestionnaireAssessment ; h:hasAnswer x:sport, x:active .
+            x:sport h:questionId "movement-sport-frequency" ; h:optionId "under-1h" .
+            x:active h:questionId "movement-active-days" ${option === null ? "" : `; h:optionId "${option}"`} .
+        `)
+        assert.equal(result.recognized, true)
+        assert.deepEqual(result.themes, [])
+        assert.deepEqual(result.findings.flatMap(f => f.evidence), [])
+    }
+})
+
+test("different, unknown and missing answers do not acquire the same interests", async () => {
+    for (const option of ["no", "some-new-option"]) {
+        const result = await run(`
+            x:result a h:HealthQuestionnaireAssessment ; h:hasAnswer x:food, x:sleep .
+            x:food h:questionId "nutrition-fruit-vegetables" ; h:optionId "${option}" .
+            x:sleep h:questionId "sleep-difficulties" ; h:optionId "${option}" .
+        `)
+        assert.equal(result.recognized, true)
+        assert.deepEqual(result.themes, [])
+    }
+})
+
+test("unlinked answers and category scores do not establish reading interests", async () => {
     const result = await run(`
-        x:result a h:HealthQuestionnaireAssessment ; h:hasAnswer x:mental .
-        x:mental h:questionId "mental-general" ; h:optionId "fair" .
-        x:orphan h:questionId "movement-sport-frequency" ; h:optionId "under-1h" .
-        x:orphanCategory h:categoryId "nutrition" .
+        x:result a h:HealthQuestionnaireAssessment ; h:hasCategoryScore x:category .
+        x:category h:categoryId "sleep" ; h:trafficLight "red" .
+        x:orphan h:questionId "movement-active-days" ; h:optionId "1" .
     `)
-    assert.deepEqual(result.themes, [RELAXATION, SELFCARE])
+    assert.equal(result.recognized, true)
+    assert.deepEqual(result.themes, [])
 })
 
 test("empty data, unrelated graphs and an assessment without results yield nothing", async () => {
@@ -80,7 +104,7 @@ test("empty data, unrelated graphs and an assessment without results yield nothi
 test("an unanswered question cannot activate a domain or a direct observation", async () => {
     const result = await run(`
         x:result a h:HealthQuestionnaireAssessment ; h:hasAnswer x:unanswered .
-        x:unanswered h:questionId "movement-sport-frequency" .
+        x:unanswered h:questionId "movement-active-days" .
     `)
     assert.equal(result.recognized, false)
     assert.deepEqual(result.themes, [])
@@ -93,10 +117,10 @@ test("findings keep their rule identities, including rules that found no matches
     `)
     assert.equal(result.recognized, true)
     assert.equal(source.ruleSet.iri, BP + "wuppertalHealthRules")
-    assert.equal(result.findings.length, 2)
+    assert.equal(result.findings.length, 1)
     assert.deepEqual(result.findings.map(f => f.rule), source.rules.map(r => r.iri))
-    assert.deepEqual(result.findings.map(f => f.action), [BP + "Derive", BP + "Derive"])
-    assert.deepEqual(result.findings.map(f => f.quads.length), [2, 0])
+    assert.deepEqual(result.findings.map(f => f.action), [BP + "Derive"])
+    assert.deepEqual(result.findings.map(f => f.quads.length), [0])
 })
 
 test("a similar health survey using another vocabulary is not recognized as Wuppertal data", async () => {
@@ -104,7 +128,7 @@ test("a similar health survey using another vocabulary is not recognized as Wupp
         x:result a x:HealthQuestionnaireAssessment ;
             s:name "Wuppertaler Gesundheitsfragebogen" ;
             x:hasAnswer x:a ; x:hasCategoryScore x:n .
-        x:a x:questionId "movement-sport-frequency" ; x:optionId "under-1h" .
+        x:a x:questionId "movement-active-days" ; x:optionId "1" .
         x:n x:categoryId "nutrition" .
     `)
     assert.equal(result.recognized, false)
@@ -114,8 +138,42 @@ test("a similar health survey using another vocabulary is not recognized as Wupp
 test("Wuppertal answer predicates alone do not identify a Wuppertal assessment", async () => {
     const result = await run(`
         x:result a s:Questionnaire ; h:hasAnswer x:a .
-        x:a h:questionId "movement-sport-frequency" ; h:optionId "under-1h" .
+        x:a h:questionId "movement-active-days" ; h:optionId "1" .
     `)
     assert.equal(result.recognized, false)
     assert.deepEqual(result.themes, [])
+})
+
+test("evidence records the matched field and answer, and never becomes a profile fact", async () => {
+    for (const option of ["yes", "no"]) {
+        const result = await run(`
+            x:result a h:HealthQuestionnaireAssessment ; h:hasAnswer x:sleep .
+            x:sleep h:questionId "sleep-difficulties" ; h:optionId "${option}" .
+        `)
+        assert.deepEqual(result.themes, option === "yes" ? [SLEEP] : [])
+        const evidence = result.findings.flatMap(f => f.evidence)
+        assert.equal(evidence.length, option === "yes" ? 1 : 0)
+        if (option === "yes") {
+            assert.equal(evidence[0].field.value, "sleep-difficulties")
+            assert.equal(evidence[0].fieldLabel, "Schlafschwierigkeiten")
+            assert.equal(evidence[0].sourceValue.value, "yes")
+            assert.equal(evidence[0].sourceNode.value, "https://different-pod.example/survey/sleep")
+            assert.equal(evidence[0].property.value, BP + "interestedIn")
+            assert.equal(evidence[0].value.value, SLEEP)
+        }
+        assert.equal(result.findings.flatMap(f => f.quads).length, option === "yes" ? 2 : 0)
+    }
+})
+
+test("evidence uses the source's answer text, preferring German to untagged and English labels", async () => {
+    const result = await run(`
+        x:result a h:HealthQuestionnaireAssessment ; h:hasAnswer x:active .
+        x:active h:questionId "movement-active-days" ; h:optionId "1" ;
+            s:text "One day"@en, "1 day", "An einem Tag"@de .
+    `)
+    const evidence = result.findings.flatMap(f => f.evidence)
+    assert.equal(evidence.length, 1)
+    assert.equal(evidence[0].sourceValue.value, "An einem Tag")
+    assert.equal(evidence[0].sourceValue.language, "de")
+    assert.equal(result.findings.flatMap(f => f.quads).length, 2)
 })

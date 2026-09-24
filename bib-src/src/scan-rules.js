@@ -48,7 +48,25 @@ export async function applyScanRules(source, sourceStore) {
     for (const rule of source.rules) {
         const result = newStore()
         await sparqlConstruct(rule.query, [sourceStore], result)
-        findings.push({ rule: rule.iri, label: rule.label, action: rule.action, quads: result.getQuads() })
+        const evidence = result.getSubjects(RDF_TYPE, BP + "ScanEvidence", null).map(node => {
+            const value = property => result.getObjects(node, BP + property, null)[0]
+            return {
+                property: value("profileProperty"),
+                value: value("profileValue"),
+                field: value("sourceField"),
+                fieldLabel: value("sourceFieldLabel")?.value,
+                sourceValue: value("sourceValue"),
+                sourceNode: value("sourceNode"),
+            }
+        })
+        for (const node of result.getSubjects(RDF_TYPE, BP + "ScanEvidence", null)) {
+            result.removeQuads(result.getQuads(node, null, null, null))
+        }
+        findings.push({
+            rule: rule.iri, label: rule.label, action: rule.action,
+            quads: result.getQuads(),
+            evidence,
+        })
     }
     return findings
 }

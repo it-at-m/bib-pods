@@ -567,6 +567,56 @@ dialog.bp-add-title-dialog {
 .bp-add-title-actions .button:disabled { opacity: 0.35; cursor: default; }
 .bp-add-title-msg { margin: 12px 0 0; font-size: 0.85em; color: #888; }
 .bp-add-title-msg.is-error { color: #b3261e; }
+
+/* Scan review uses the same native dialog and host buttons as other profile actions. */
+dialog.bp-scan-dialog {
+    width: min(600px, 92vw) !important;
+    max-width: min(600px, 92vw) !important;
+}
+.bp-scan-dialog .bp-modal-content { padding: 24px 28px; }
+.bp-scan-dialog h3 { margin: 0 0 10px; font-size: 22px; }
+#bp-scan-intro { margin: 0 0 20px; color: #555; line-height: 1.5; }
+.bp-scan-sources { display: grid; gap: 12px; margin-bottom: 16px; }
+.bp-scan-sources:empty { display: none; }
+.bp-scan-source { padding: 14px 16px; border-radius: 8px; background: #f4f1ea; }
+.bp-scan-source summary { font-size: 0.95em; font-weight: 600; cursor: pointer; }
+.bp-scan-source p { margin: 6px 0 0; font-size: 0.85em; line-height: 1.5; }
+.bp-scan-source-path { overflow-wrap: anywhere; color: #666; }
+.bp-scan-status { margin: 18px 0 10px; font-weight: 600; }
+.bp-scan-options { border: 1px solid #e4e0d7; border-radius: 8px; overflow: hidden; }
+.bp-scan-option { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; }
+.bp-scan-option + .bp-scan-option { border-top: 1px solid #e4e0d7; }
+.bp-scan-option:hover { background: #faf9f6; }
+.bp-scan-option:focus-within { outline: 2px solid var(--contrastcolor, #d14900); outline-offset: -2px; }
+.bp-scan-option input[type="checkbox"] {
+    appearance: auto; position: static; opacity: 1;
+    flex: 0 0 18px; width: 18px; height: 18px; margin: 3px 0 0;
+    accent-color: var(--contrastcolor, #d14900);
+}
+.bp-scan-option-text { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.bp-scan-option-text label { cursor: pointer; }
+.bp-scan-option-text strong { display: block; font-size: 1em; line-height: 1.4; }
+.bp-scan-reason { margin-top: 2px; font-size: 0.8em; color: #555; }
+.bp-scan-reason summary { cursor: pointer; }
+.bp-scan-reason p { margin: 8px 0 0; line-height: 1.5; }
+.bp-scan-inference { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 12px; align-items: center; margin-top: 10px; padding: 10px 12px; border-radius: 6px; background: #f4f1ea; }
+.bp-scan-inference-side { min-width: 0; display: flex; flex-direction: column; gap: 3px; line-height: 1.4; }
+.bp-scan-inference-step { font-size: 0.85em; font-weight: 600; color: #6b6256; }
+.bp-scan-inference-field { color: #555; }
+.bp-scan-inference-value { font-weight: 600; color: #222; }
+.bp-scan-error { font-size: 0.9em; color: #b3261e; margin: 16px 0 0; }
+.bp-scan-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.bp-scan-actions .button { min-width: 0; }
+.bp-scan-actions .button:disabled { opacity: 0.45; cursor: default; }
+.bp-scan-dialog [hidden] { display: none !important; }
+@media (max-width: 480px) {
+    .bp-scan-dialog .bp-modal-content { padding: 20px; }
+    .bp-scan-dialog h3 { font-size: 20px; }
+    .bp-scan-actions .button { flex: 1 1 auto; }
+    .bp-scan-inference { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}
+
 /* Chooser buttons stack vertically; the <p> still stretches naturally. */
 #bp-chooser {
     display: flex;

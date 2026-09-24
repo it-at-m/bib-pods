@@ -3,11 +3,11 @@ import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk
 import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
-import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
+import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, orderDocsByProfile, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl, fetchBook, parseCatalogueRef, resolveCatalogueRef } from "./catalogue.js"
 import { cleanAuthorName } from "./book-prompt.js"
 import { grantMerklisteAccess, revokeMerklisteAccess, readMerklisteAccessControl } from "./publish.js"
-import { scanPod } from "./scan.js"
+import { mountScanDialog } from "./scan-dialog.js"
 import { BP } from "./vocab.js"
 import styleCss from "./ui/style.css?inline"
 import entryHtml from "./ui/entry.html?raw"
@@ -124,7 +124,7 @@ function buildLane(label, items, ctx, buildSlide = buildCard) {
             // away that it opens the lane's query on the docs query page
             const more = document.createElement(ctx.moreHref ? "a" : "span")
             more.className = "bp-cf-more"
-            more.textContent = `+${ctx.more.toLocaleString("de-DE")} weitere im Katalog`
+            more.textContent = `${items.length} Vorschläge · ${(ctx.more + items.length).toLocaleString("de-DE")} Treffer im Katalog`
             if (ctx.moreHref) {
                 more.href = ctx.moreHref
                 more.target = "_blank"
@@ -451,7 +451,6 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const grantLink = root.querySelector("#bp-grant-link")
     const revokeLink = root.querySelector("#bp-revoke-link")
     const importBlock = root.querySelector("#bp-import")
-    const scanPodLink = root.querySelector("#bp-scan-pod-link")
     const addTitleDialog = root.querySelector("#bp-add-title-dialog")
     const addTitleInput = root.querySelector("#bp-add-title-input")
     const addTitleSubmit = root.querySelector("#bp-add-title-submit")
@@ -727,10 +726,15 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
                 // Per-card precision: check which profile facts the recommended book itself
                 // carries. The strategy-level text is the fallback — for docs that can't be
                 // fetched, and for non-symbolic matches (inspira's vector similarity).
+                const docs = []
                 for (const item of items) {
                     const doc = item.sopacId ? await fetchDocCached(item.sopacId) : null
+                    if (doc) docs.push(doc)
                     item.explanation = (doc && explainDocMatches(doc, profileStore, profileSubject, strategy?.properties)) ?? laneExplanation
                 }
+                const order = new Map(orderDocsByProfile(docs, strategy, profileStore, profileSubject)
+                    .map((doc, index) => [doc.id, index]))
+                items.sort((a, b) => (order.get(a.sopacId) ?? Infinity) - (order.get(b.sopacId) ?? Infinity))
                 frag.appendChild(buildLane(label, items, { onDismiss: dismissCard, tip, more, moreHref }))
             }
             lanes.replaceChildren(frag)
@@ -942,17 +946,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     }
     grantLink.addEventListener("click", (e) => { e.preventDefault(); openAccessDialog("grant") })
     revokeLink.addEventListener("click", (e) => { e.preventDefault(); openAccessDialog("revoke") })
-    // Findings go to the console for now; the link only guards against a second run
-    // while the first is still going.
-    let scanBusy = false
-    scanPodLink.addEventListener("click", async (e) => {
-        e.preventDefault()
-        if (scanBusy) return
-        scanBusy = true
-        try { await scanPod() }
-        catch (err) { console.error("[bib-pods] scan fehlgeschlagen:", err) }
-        finally { scanBusy = false }
-    })
+    mountScanDialog(root, { onSaved: () => profileEl.refresh() })
     for (const radio of accessDialog.querySelectorAll('input[name="bp-access-scope"]')) {
         radio.addEventListener("change", () => {
             for (const [scope, input] of Object.entries(SCOPE_INPUTS)) input.hidden = radio.value !== scope
