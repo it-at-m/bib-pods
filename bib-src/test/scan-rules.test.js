@@ -1,5 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import { parseTurtle, getProfileSubject, RDFS_LABEL } from "cori-sdk/utils.js"
 import { applyScanRules, getScanSources, matchesScanSource } from "../src/scan-rules.js"
 
@@ -31,6 +32,24 @@ const run = async body => {
         themes: topics.map(q => q.object.value).sort(),
     }
 }
+
+test("the anonymised real export is recognized with its original literal types and answer links", async () => {
+    const ttl = await readFile(new URL("./fixtures/wuppertal-health-export.ttl", import.meta.url), "utf8")
+    const result = await run(ttl)
+    assert.equal(result.recognized, true)
+    assert.deepEqual(result.themes, MOVEMENT_NUTRITION_TOPICS)
+    const evidence = result.findings.flatMap(f => f.evidence)
+    assert.deepEqual(evidence.map(e => [e.field.value, e.sourceValue.value]).sort(), [
+        ["movement-active-days", "An einem Tag"],
+        ["nutrition-fruit-vegetables", "Ja"],
+    ])
+    const hq = "https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#"
+    const input = parseTurtle(ttl)
+    const day = input.getQuads(null, hq + "optionId", null, null).find(q => q.object.value === "1").object
+    assert.equal(day.datatype.value, "http://www.w3.org/2001/XMLSchema#string")
+    assert.ok(input.getQuads(null, hq + "optionId", null, null).some(q => q.object.value === "no"))
+    assert.ok(!result.themes.includes(SLEEP), "the original export answers no to sleep difficulties")
+})
 
 test("explicit answers supply suggestions despite changed scores, labels and node names", async () => {
     const result = await run(`

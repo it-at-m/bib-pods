@@ -29,7 +29,7 @@ const STORAGE_LABELS = {
 const ADD_TITLE_TIP = "<strong>Titel von anderswo übernehmen</strong>"
     + "<br>Zitierlink aus dem Katalog (OPAC), Link aus der Onleihe oder ISBN einfügen. Der Titel wird im Katalog gesucht."
 
-// The "+N weitere" lane hint deep-links into the docs query page — a power-user
+// The catalogue count deep-links into the docs query page — a power-user
 // affordance. On the docs site itself (recognizable by its <nav-bar>) the link stays
 // in the local build; from any other host (TYPO3) it goes to the published docs.
 const QUERY_PAGE = document.querySelector("nav-bar")
@@ -124,7 +124,7 @@ function buildLane(label, items, ctx, buildSlide = buildCard) {
             // away that it opens the lane's query on the docs query page
             const more = document.createElement(ctx.moreHref ? "a" : "span")
             more.className = "bp-cf-more"
-            more.textContent = `${items.length} Vorschläge · ${(ctx.more + items.length).toLocaleString("de-DE")} Treffer im Katalog`
+            more.textContent = `${items.length} ${items.length === 1 ? "Vorschlag" : "Vorschläge"} · ${(ctx.more + items.length).toLocaleString("de-DE")} Treffer im Katalog`
             if (ctx.moreHref) {
                 more.href = ctx.moreHref
                 more.target = "_blank"
@@ -716,7 +716,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             for (const [label, items] of byStrategy) {
                 const strategy = strategyByLabel.get(label)
                 const laneExplanation = strategy ? await explainStrategy(strategy, profileStore, profileSubject) : null
-                // How deep the pool behind this lane is ("+N weitere im Katalog"). The
+                // How deep the matching catalogue pool behind this lane is. The
                 // count includes already-seen records — it sizes the catalogue pool, not
                 // an unseen queue.
                 const total = strategy ? await countStrategyMatches(strategy, profileStore, profileSubject, solrEndpoint) : null

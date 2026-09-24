@@ -1,0 +1,71 @@
+# Anonymised subset of the original questionnaire export supplied for the demo.
+# Retains three question/answer pairs, their links, IDs, literal types and wording.
+# Pod identity, creator, timestamp and assessment identifier have been removed.
+@prefix hq: <https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#> .
+@prefix schema: <https://schema.org/> .
+@prefix : <https://pod.example/solid-health-questionnaire/latest.ttl#> .
+
+:answer-1 a schema:Answer;
+  hq:achievedScore 3;
+  hq:answersQuestion :question-1;
+  hq:maximumScore 3;
+  hq:optionId "yes";
+  hq:questionId "nutrition-fruit-vegetables";
+  schema:position 1;
+  schema:text
+    "Ja"@de,
+    "Yes"@en.
+
+:answer-12 a schema:Answer;
+  hq:achievedScore 3;
+  hq:answersQuestion :question-12;
+  hq:maximumScore 3;
+  hq:optionId "no";
+  hq:questionId "sleep-difficulties";
+  schema:position 12;
+  schema:text
+    "Nein"@de,
+    "No"@en.
+
+:answer-9 a schema:Answer;
+  hq:achievedScore 1;
+  hq:answersQuestion :question-9;
+  hq:maximumScore 3;
+  hq:optionId "1";
+  hq:questionId "movement-active-days";
+  schema:position 9;
+  schema:text
+    "An einem Tag"@de,
+    "One day"@en.
+
+:assessment a hq:HealthQuestionnaireAssessment;
+  hq:hasAnswer
+    :answer-1,
+    :answer-12,
+    :answer-9;
+  hq:hasQuestion
+    :question-1,
+    :question-12,
+    :question-9;
+  hq:questionnaireVersion "2026-08-28".
+
+:question-1 a schema:Question;
+  hq:questionId "nutrition-fruit-vegetables";
+  schema:position 1;
+  schema:text
+    "Hast du in der letzten Woche täglich mindestens 5 Portionen Obst und Gemüse (auch Fruchtsäfte) gegessen bzw. getrunken?"@de,
+    "During the last week, did you eat or drink at least five portions of fruit and vegetables each day (including fruit juice)?"@en.
+
+:question-12 a schema:Question;
+  hq:questionId "sleep-difficulties";
+  schema:position 12;
+  schema:text
+    "Hast du manchmal Schlafschwierigkeiten?"@de,
+    "Do you sometimes have trouble sleeping?"@en.
+
+:question-9 a schema:Question;
+  hq:questionId "movement-active-days";
+  schema:position 9;
+  schema:text
+    "An wie vielen Tagen in der Woche bist du durchschnittlich so körperlich aktiv, dass du ins Schwitzen gerätst?"@de,
+    "On how many days per week are you usually active enough to break a sweat?"@en.

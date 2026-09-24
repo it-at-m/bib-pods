@@ -1,4 +1,4 @@
-import { getVocab, contractTerm, RDF_TYPE, RDFS_LABEL, RDFS } from "cori-sdk/utils.js"
+import { getVocab, contractTerm, RDF_TYPE, RDFS_LABEL, RDFS, CORI } from "cori-sdk/utils.js"
 import { sparqlSelect } from "@foerderfunke/sem-ops-utils/sparql"
 import { BP, LOCAL } from "./vocab.js"
 import { recommendFromSavedBooks } from "./qdrant.js"
@@ -211,24 +211,63 @@ function orderedProfileFacts(strategy, profileStore, profileSubject) {
     })
 }
 
-function profileFactGroups(strategy, profileStore, profileSubject) {
+function profileFactEntries(strategy, profileStore, profileSubject) {
     const v = getVocab()
-    const factGroups = []
+    const groups = new Map()
     for (const { obj, mappings } of orderedProfileFacts(strategy, profileStore, profileSubject)) {
         const clauses = factClauses(v, mappings, obj)
         if (clauses.length > 0) {
-            factGroups.push(clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`)
+            const q = clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`
+            if (!groups.has(q)) groups.set(q, { q, facts: [] })
+            groups.get(q).facts.push({ obj, mappings })
         }
     }
-    return [...new Set(factGroups)]
+    return [...groups.values()]
 }
 
-// Retrieve each alternative separately so a high-scoring topic cannot crowd out
-// the others. AND strategies still require the full conjunction. Every request
-// retains the same exclusions and explicit language/medium filters as the pool.
+function profileFactGroups(strategy, profileStore, profileSubject) {
+    return profileFactEntries(strategy, profileStore, profileSubject).map(entry => entry.q)
+}
+
+// Existing messages identify their lane in the first line of cori:content.
+// Include unread AND dismissed messages, deduplicated by catalogue id.
+function recommendedIds(strategy, store) {
+    return [...new Set(store.getSubjects(RDF_TYPE, CORI + "Message", null).flatMap(node => {
+        const content = store.getObjects(node, CORI + "content", null)[0]?.value
+        if (content?.split("\n")[0] !== strategy.label) return []
+        return store.getObjects(node, CORI + "refersToEntity", null).map(t => t.value)
+    }))]
+}
+
+// Terms queries avoid one Boolean clause per historical book. Values are passed
+// as parameters; even punctuation or a separator in an id cannot change the query.
+function historyQuery(ids) {
+    let separator = "\n"
+    while (ids.some(id => id.includes(separator))) separator += "\n"
+    return {
+        q: "{!terms f=id separator=$previousSeparator v=$previousIds}",
+        fq: [],
+        params: { previousSeparator: separator, previousIds: ids.join(separator) },
+    }
+}
+
+function excludeRecommended(query, ids) {
+    if (!ids.length) return query
+    const history = historyQuery(ids)
+    return {
+        ...query,
+        fq: [...query.fq, "{!bool must=$allBooks must_not=$previousBooks}"],
+        params: { ...query.params, ...history.params, allBooks: "*:*", previousBooks: history.q },
+    }
+}
+
+// Retrieve each alternative separately; AND strategies keep the full conjunction.
+// All requests exclude past
+// recommendations in this lane and retain the profile's preference filters.
 export function buildRecommendationQueries(strategy, profileStore, profileSubject) {
-    const query = buildQuery(strategy, profileStore, profileSubject)
-    if (!query) return []
+    const pool = buildQuery(strategy, profileStore, profileSubject)
+    if (!pool) return []
+    const query = excludeRecommended(pool, recommendedIds(strategy, profileStore))
     if (strategy.combine?.iri === BP + "And") return [query]
     return profileFactGroups(strategy, profileStore, profileSubject).map(q => ({ ...query, q }))
 }
@@ -244,36 +283,61 @@ export function buildCombinedQuery(strategy, profileStore, profileSubject) {
     return {
         q: `{!bool ${Object.keys(params).map(key => `should=$${key}`).join(" ")} mm=2}`,
         fq: queries[0].fq,
-        params,
+        params: { ...queries[0].params, ...params },
     }
 }
 
-// Take turns across the alternatives, skipping duplicate records and editions
-// with the same title/author. A sparse pool doesn't waste the remaining slots.
-export function selectDiverseDocs(pools, limit) {
+// Prefer the least represented input, including past recommendations and all
+// inputs covered by each new selection. Ties use the stable input order.
+export function selectDiverseDocs(pools, limit, { counts = [], matches = () => [], lead = null } = {}) {
     const selected = []
     const ids = new Set()
     const works = new Set()
     const positions = pools.map(() => 0)
+    const coverage = pools.map((_, i) => counts[i] ?? 0)
     const normalize = value => String(value ?? "").normalize("NFKC").toLocaleLowerCase("de-DE").replace(/\s+/g, " ").trim()
+    const workOf = doc => {
+        const title = normalize(doc.title?.[0])
+        return title ? `${title}\n${normalize(doc.author?.[0])}` : null
+    }
+    const take = (doc, pool) => {
+        const work = workOf(doc)
+        if (ids.has(doc.id) || (work && works.has(work))) return false
+        selected.push(doc)
+        ids.add(doc.id)
+        if (work) works.add(work)
+        const covered = matches(doc)
+        if (!covered.length && pool !== undefined) covered.push(pool)
+        for (const i of new Set(covered)) coverage[i]++
+        return true
+    }
+    if (lead && limit > 0) take(lead)
     while (selected.length < limit) {
-        let advanced = false
-        for (let i = 0; i < pools.length && selected.length < limit; i++) {
-            while (positions[i] < pools[i].length) {
-                const doc = pools[i][positions[i]++]
-                const title = normalize(doc.title?.[0])
-                const work = title ? `${title}\n${normalize(doc.author?.[0])}` : null
-                if (ids.has(doc.id) || (work && works.has(work))) continue
-                selected.push(doc)
-                ids.add(doc.id)
-                if (work) works.add(work)
-                advanced = true
-                break
-            }
+        const available = pools.map((_, i) => i).filter(i => positions[i] < pools[i].length)
+            .sort((a, b) => coverage[a] - coverage[b] || a - b)
+        if (!available.length) break
+        const i = available[0]
+        while (positions[i] < pools[i].length) {
+            if (take(pools[i][positions[i]++], i)) break
         }
-        if (!advanced) break
     }
     return selected
+}
+
+function matchingInputs(entries, doc, profileStore) {
+    return entries.flatMap(({ facts }, i) => facts.some(({ obj, mappings }) =>
+        docMatchesFact(doc, mappings, obj, profileStore)) ? [i] : [])
+}
+
+function publicationYear(doc) {
+    const years = [].concat(doc.publishDateSort ?? []).map(Number).filter(Number.isFinite)
+    const year = years.length ? Math.min(...years) : 0
+    return year >= 1 && year <= new Date().getFullYear() + 1 ? year : 0
+}
+
+function publicationYearSort() {
+    const field = "field(publishDateSort,min)"
+    return `if(and(gte(${field},1),lte(${field},${new Date().getFullYear() + 1})),${field},0) desc`
 }
 
 // RDF message storage has no result order. Rebuild a varied shelf from the
@@ -281,15 +345,13 @@ export function selectDiverseDocs(pools, limit) {
 // messages at the end so changing interests never silently discards them.
 export function orderDocsByProfile(docs, strategy, profileStore, profileSubject) {
     if (strategy?.combine?.iri !== BP + "Or") return docs
-    const year = doc => Number([].concat(doc.publishDateSort ?? 0)[0]) || 0
-    const sorted = [...docs].sort((a, b) => year(b) - year(a) || a.id.localeCompare(b.id))
-    const pools = orderedProfileFacts(strategy, profileStore, profileSubject)
-        .map(({ obj, mappings }) => sorted.filter(doc => docMatchesFact(doc, mappings, obj, profileStore)))
-    const matches = new Map(sorted.map(doc => [doc.id,
-        countDocMatches(doc, profileStore, profileSubject, strategy.properties)]))
-    const combined = sorted.filter(doc => matches.get(doc.id) >= 2)
-        .sort((a, b) => matches.get(b.id) - matches.get(a.id)).slice(0, 1)
-    const ordered = selectDiverseDocs([combined, ...pools], docs.length)
+    const sorted = [...docs].sort((a, b) => publicationYear(b) - publicationYear(a) || a.id.localeCompare(b.id))
+    const entries = profileFactEntries(strategy, profileStore, profileSubject)
+    const matches = doc => matchingInputs(entries, doc, profileStore)
+    const pools = entries.map((_, i) => sorted.filter(doc => matches(doc).includes(i)))
+    const lead = sorted.filter(doc => matches(doc).length >= 2)
+        .sort((a, b) => matches(b).length - matches(a).length)[0]
+    const ordered = selectDiverseDocs(pools, docs.length, { lead, matches })
     const ids = new Set(ordered.map(doc => doc.id))
     return [...ordered, ...docs.filter(doc => !ids.has(doc.id))]
 }
@@ -334,15 +396,13 @@ function preferenceFilters(v, profileStore, profileSubject) {
 // Total pool behind a strategy for this profile: how many index records its query
 // matches (rows=0, header only — cheap). null means "unknown", not zero: the strategy
 // has no Solr query (inspira engine, or the profile lacks the needed facts) or the
-// request failed. Callers use it for "+N weitere" hints, so unknown must stay silent.
+// request failed. Catalogue totals include previously recommended books.
 export async function countStrategyMatches(strategy, profileStore, profileSubject, solrEndpoint) {
     if (strategy.engine === INSPIRA_ENGINE) return null
     const query = buildQuery(strategy, profileStore, profileSubject)
     if (!query) return null
     try {
-        const res = await fetch(solrUrl(solrEndpoint, query, 0))
-        if (!res.ok) return null
-        return (await res.json()).response?.numFound ?? null
+        return (await fetchSolr(solrEndpoint, query, 0)).response?.numFound ?? null
     } catch {
         return null
     }
@@ -399,37 +459,52 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
         const queries = buildRecommendationQueries(strategy, profileStore, profileSubject)
         if (!queries.length) continue
         const wanted = strategy.maxSuggestions ?? limit
+        const separateInputs = strategy.combine?.iri !== BP + "And"
+        const previousIds = recommendedIds(strategy, profileStore)
+        const previous = new Set(previousIds)
         const combinedQuery = buildCombinedQuery(strategy, profileStore, profileSubject)
-        // Each alternative is already a match for one accepted fact: prefer
-        // recent editions within it. The combined pool keeps relevance first.
-        // Extra candidates absorb duplicate editions; ids settle remaining ties.
+        // Relevance leads every query; alternative pools use freshness to break
+        // ties. Implausible dates rank like missing dates.
         const requests = [
-            ...(combinedQuery ? [{ ...combinedQuery, sort: "score desc,publishDateSort desc,id asc" }] : []),
-            ...queries.map(query => ({ ...query, sort: "publishDateSort desc,score desc,id asc" })),
+            ...(combinedQuery ? [{ ...combinedQuery, sort: `score desc,${publicationYearSort()},id asc` }] : []),
+            ...queries.map(query => ({ ...query, sort: separateInputs
+                ? `score desc,${publicationYearSort()},id asc` : "score desc,id asc" })),
         ]
-        const pools = await Promise.all(requests.map(async query => {
+        const request = async (query, rows) => {
             attempted++
-            const url = solrUrl(solrEndpoint, query, wanted * 2)
-            console.log(`[bib-pods] ${strategy.label}: ${url}`)
+            console.log(`[bib-pods] ${strategy.label}: POST ${solrEndpoint}`, query.q)
             try {
-                const res = await fetch(url)
-                if (!res.ok) {
-                    console.warn(`[bib-pods] ${strategy.label}: Solr ${res.status}`)
-                    return []
-                }
+                const result = await fetchSolr(solrEndpoint, query, rows)
                 reached++
-                return (await res.json()).response?.docs ?? []
+                return result
             } catch (err) {
                 console.error(`[bib-pods] ${strategy.label} failed:`, err)
-                return []
+                return null
             }
-        }))
-        // Reserve just one leading place for a verified combination; keep the
-        // remaining places varied. A failed/empty combined query changes nothing.
-        if (combinedQuery) pools[0] = pools[0]
-            .filter(doc => countDocMatches(doc, profileStore, profileSubject, strategy.properties) >= 2)
-            .slice(0, 1)
-        results.push({ strategy, docs: selectDiverseDocs(pools, wanted) })
+        }
+        // One count-only query measures all inputs against this lane's history.
+        // A combined book contributes to each matching input, once per book id.
+        const history = separateInputs && previousIds.length ? historyQuery(previousIds) : null
+        if (history) history.params["json.facet"] = JSON.stringify(Object.fromEntries(
+            queries.map(({ q }, i) => [`input${i}`, { type: "query", q }]),
+        ))
+        const [pools, past] = await Promise.all([
+            Promise.all(requests.map(async query => {
+                const result = await request(query, separateInputs ? wanted * 2 : wanted)
+                return (result?.response?.docs ?? []).filter(doc => !previous.has(doc.id))
+            })),
+            history ? request(history, 0) : null,
+        ])
+        if (!separateInputs) {
+            results.push({ strategy, docs: pools[0].slice(0, wanted) })
+            continue
+        }
+        const entries = profileFactEntries(strategy, profileStore, profileSubject)
+        const matches = doc => matchingInputs(entries, doc, profileStore)
+        const combined = combinedQuery ? pools.shift() : []
+        const lead = combined.find(doc => matches(doc).length >= 2)
+        const counts = queries.map((_, i) => past?.facets?.[`input${i}`]?.count ?? 0)
+        results.push({ strategy, docs: selectDiverseDocs(pools, wanted, { counts, matches, lead }) })
     }
     const serverUnreachable = attempted > 0 ? reached === 0 : !(await solrReachable(solrEndpoint))
     return { results, serverUnreachable }
@@ -438,11 +513,9 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
 // Cheap liveness check: a match-all query asking for zero rows. true only on a
 // successful (2xx) Solr response; a thrown fetch or non-OK status means unreachable.
 async function solrReachable(solrEndpoint) {
-    const url = solrUrl(solrEndpoint, { q: "*:*", fq: [] }, 0)
     try {
-        const res = await fetch(url)
-        if (!res.ok) console.warn(`[bib-pods] Solr reachability probe: ${res.status}`)
-        return res.ok
+        await fetchSolr(solrEndpoint, { q: "*:*", fq: [] }, 0)
+        return true
     } catch (err) {
         console.error("[bib-pods] Solr reachability probe failed:", err)
         return false
@@ -470,13 +543,17 @@ function escapeSolr(s) {
     return s.replace(/(["\\])/g, "\\$1")
 }
 
-// manual assembly with encodeURIComponent: URLSearchParams encodes spaces as `+`,
-// which Solr's Lucene parser misreads as the `+` must-match prefix operator. `%20` works
-function solrUrl(endpoint, { q, fq, sort, params = {} }, limit) {
-    const parts = [`q=${encodeURIComponent(q)}`]
-    for (const f of fq) parts.push(`fq=${encodeURIComponent(f)}`)
-    for (const [key, value] of Object.entries(params)) parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    if (sort) parts.push(`sort=${encodeURIComponent(sort)}`)
-    parts.push(`rows=${limit}`, `wt=json`)
-    return `${endpoint}?${parts.join("&")}`
+// Form-encoded POST keeps growing history out of the URL and works through the
+// read proxy without a CORS preflight. Repeated fq parameters stay separate.
+async function fetchSolr(endpoint, { q, fq, sort, params = {} }, limit) {
+    const body = new URLSearchParams({ q, ...params, rows: String(limit), wt: "json" })
+    for (const f of fq) body.append("fq", f)
+    if (sort) body.set("sort", sort)
+    const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+    })
+    if (!response.ok) throw new Error(`Solr ${response.status}`)
+    return response.json()
 }
