@@ -1,5 +1,5 @@
 # Anonymised subset of the original questionnaire export supplied for the demo.
-# Retains three question/answer pairs, their links, IDs, literal types and wording.
+# Retains four question/answer pairs, their links, IDs, literal types and wording.
 # Pod identity, creator, timestamp and assessment identifier have been removed.
 @prefix hq: <https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#> .
 @prefix schema: <https://schema.org/> .
@@ -38,15 +38,28 @@
     "An einem Tag"@de,
     "One day"@en.
 
+:answer-18 a schema:Answer;
+  hq:achievedScore 3;
+  hq:answersQuestion :question-18;
+  hq:maximumScore 3;
+  hq:optionId "easy";
+  hq:questionId "social-neighbour-help";
+  schema:position 18;
+  schema:text
+    "Einfach"@de,
+    "Easy"@en.
+
 :assessment a hq:HealthQuestionnaireAssessment;
   hq:hasAnswer
     :answer-1,
     :answer-12,
-    :answer-9;
+    :answer-9,
+    :answer-18;
   hq:hasQuestion
     :question-1,
     :question-12,
-    :question-9;
+    :question-9,
+    :question-18;
   hq:questionnaireVersion "2026-08-28".
 
 :question-1 a schema:Question;
@@ -69,3 +82,10 @@
   schema:text
     "An wie vielen Tagen in der Woche bist du durchschnittlich so körperlich aktiv, dass du ins Schwitzen gerätst?"@de,
     "On how many days per week are you usually active enough to break a sweat?"@en.
+
+:question-18 a schema:Question;
+  hq:questionId "social-neighbour-help";
+  schema:position 18;
+  schema:text
+    "Wie einfach ist es für dich, praktische Hilfe von Nachbarn zu erhalten, wenn du diese benötigst?"@de,
+    "How easy is it for you to get practical help from neighbours when you need it?"@en.

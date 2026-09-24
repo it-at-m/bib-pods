@@ -60,6 +60,7 @@ WHERE {
         ("movement-active-days" "7" "Körperlich aktiv (Tage pro Woche)" gnd:4006311-2 "Bewegung")
         ("nutrition-fruit-vegetables" "yes"    "Täglich mindestens fünf Portionen Obst/Gemüse" gnd:4340678-6 "Gesunde Ernährung")
         ("sleep-difficulties" "yes"            "Schlafschwierigkeiten" gnd:4052580-6 "Schlaf")
+        ("social-neighbour-help" "easy"        "Praktische Hilfe von Nachbarn erhalten" gnd:4041030-4 "Nachbarschaft")
     }
     ?assessment a hq:HealthQuestionnaireAssessment ; hq:hasAnswer ?answer .
     ?answer hq:questionId ?question ; hq:optionId ?option .

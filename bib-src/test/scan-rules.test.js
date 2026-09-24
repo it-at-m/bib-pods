@@ -8,6 +8,7 @@ const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
 const HEALTHY_EATING = "https://d-nb.info/gnd/4340678-6"
 const MOVEMENT = "https://d-nb.info/gnd/4006311-2"
 const SLEEP = "https://d-nb.info/gnd/4052580-6"
+const NEIGHBOURHOOD = "https://d-nb.info/gnd/4041030-4"
 const MOVEMENT_NUTRITION_TOPICS = [HEALTHY_EATING, MOVEMENT].sort()
 const prefixes = `
 @prefix h: <https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#> .
@@ -37,11 +38,12 @@ test("the anonymised real export is recognized with its original literal types a
     const ttl = await readFile(new URL("./fixtures/wuppertal-health-export.ttl", import.meta.url), "utf8")
     const result = await run(ttl)
     assert.equal(result.recognized, true)
-    assert.deepEqual(result.themes, MOVEMENT_NUTRITION_TOPICS)
+    assert.deepEqual(result.themes, [...MOVEMENT_NUTRITION_TOPICS, NEIGHBOURHOOD].sort())
     const evidence = result.findings.flatMap(f => f.evidence)
     assert.deepEqual(evidence.map(e => [e.field.value, e.sourceValue.value]).sort(), [
         ["movement-active-days", "An einem Tag"],
         ["nutrition-fruit-vegetables", "Ja"],
+        ["social-neighbour-help", "Einfach"],
     ])
     const hq = "https://raw.githubusercontent.com/hoelk-f/solid-health-questionnaire/main/public/vocab.ttl#"
     const input = parseTurtle(ttl)
@@ -49,6 +51,27 @@ test("the anonymised real export is recognized with its original literal types a
     assert.equal(day.datatype.value, "http://www.w3.org/2001/XMLSchema#string")
     assert.ok(input.getQuads(null, hq + "optionId", null, null).some(q => q.object.value === "no"))
     assert.ok(!result.themes.includes(SLEEP), "the original export answers no to sleep difficulties")
+})
+
+test("neighbourhood follows easy access to neighbours' help, not other answers or social scores", async () => {
+    for (const option of ["easy", "difficult", "unknown", null]) {
+        const result = await run(`
+            x:result a h:HealthQuestionnaireAssessment ; h:hasAnswer x:help, x:close ; h:hasCategoryScore x:social .
+            x:help h:questionId "social-neighbour-help" ${option === null ? "" : `; h:optionId "${option}"`} ; s:text "Einfach"@de .
+            x:close h:questionId "social-close-people" ; h:optionId "over-6" .
+            x:social h:categoryId "social" ; h:trafficLight "green" .
+            x:orphan h:questionId "social-neighbour-help" ; h:optionId "easy" .
+        `)
+        assert.equal(result.recognized, true)
+        assert.deepEqual(result.themes, option === "easy" ? [NEIGHBOURHOOD] : [])
+        const evidence = result.findings.flatMap(f => f.evidence)
+        assert.equal(evidence.length, option === "easy" ? 1 : 0)
+        if (option === "easy") {
+            assert.equal(evidence[0].fieldLabel, "Praktische Hilfe von Nachbarn erhalten")
+            assert.equal(evidence[0].sourceValue.value, "Einfach")
+            assert.equal(evidence[0].sourceNode.value, "https://different-pod.example/survey/help")
+        }
+    }
 })
 
 test("explicit answers supply suggestions despite changed scores, labels and node names", async () => {
