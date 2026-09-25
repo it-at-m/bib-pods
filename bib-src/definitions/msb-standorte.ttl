@@ -3,6 +3,7 @@
 # Snapshot: 2026-09-25
 # Streets and contact notes are copied from the page; the city follows its Munich scope.
 # Postcodes are not supplied. Contact notes are not a complete record of current closures.
+# Coordinates: Nominatim / OpenStreetMap contributors (ODbL), https://www.openstreetmap.org/copyright
 
 @prefix schema: <https://schema.org/> .
 @prefix msb: <https://www.muenchner-stadtbibliothek.de/> .
@@ -12,14 +13,18 @@ msb:stadtbibliothek-allach-untermenzing
     schema:name "Allach-Untermenzing"@de ;
     schema:url msb:stadtbibliothek-allach-untermenzing ;
     schema:streetAddress "Pfarrer-Grimm-Str.1" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1796323 ;
+    schema:longitude 11.4633394 .
 
 msb:stadtbibliothek-am-westkreuz
     a schema:Library ;
     schema:name "Am Westkreuz"@de ;
     schema:url msb:stadtbibliothek-am-westkreuz ;
     schema:streetAddress "Radolfzeller Str. 13" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1493665 ;
+    schema:longitude 11.4347294 .
 
 msb:stadtbibliothek-berg-am-laim
     a schema:Library ;
@@ -27,14 +32,18 @@ msb:stadtbibliothek-berg-am-laim
     schema:url msb:stadtbibliothek-berg-am-laim ;
     schema:streetAddress "Schlüsselbergstr. 4" ;
     schema:addressLocality "München" ;
-    schema:description "Wegen Wasserschaden aktuell geschlossen"@de .
+    schema:description "Wegen Wasserschaden aktuell geschlossen"@de ;
+    schema:latitude 48.1295089 ;
+    schema:longitude 11.6223658 .
 
 msb:stadtbibliothek-bogenhausen
     a schema:Library ;
     schema:name "Bogenhausen"@de ;
     schema:url msb:stadtbibliothek-bogenhausen ;
     schema:streetAddress "Rosenkavalierplatz 16 / Arabellapark" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1517942 ;
+    schema:longitude 11.619633 .
 
 msb:stadtbibliothek-freiham
     a schema:Library ;
@@ -42,14 +51,18 @@ msb:stadtbibliothek-freiham
     schema:url msb:stadtbibliothek-freiham ;
     schema:streetAddress "Grete-Weil-Str. 24" ;
     schema:addressLocality "München" ;
-    schema:description "Im Bau"@de .
+    schema:description "Im Bau"@de ;
+    schema:latitude 48.147756 ;
+    schema:longitude 11.406575 .
 
 msb:stadtbibliothek-fuerstenried
     a schema:Library ;
     schema:name "Fürstenried"@de ;
     schema:url msb:stadtbibliothek-fuerstenried ;
     schema:streetAddress "Berner Straße 4" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.0958408 ;
+    schema:longitude 11.4945663 .
 
 msb:stadtbibliothek-am-gasteig
     a schema:Library ;
@@ -62,130 +75,168 @@ msb:stadtbibliothek-giesing
     schema:name "Giesing"@de ;
     schema:url msb:stadtbibliothek-giesing ;
     schema:streetAddress "Deisenhofener Str. 20" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1142365 ;
+    schema:longitude 11.582225 .
 
 msb:stadtbibliothek-hadern
     a schema:Library ;
     schema:name "Hadern"@de ;
     schema:url msb:stadtbibliothek-hadern ;
     schema:streetAddress "Guardinistr. 90" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1185264 ;
+    schema:longitude 11.4907901 .
 
 msb:stadtbibliothek-hasenbergl
     a schema:Library ;
     schema:name "Hasenbergl"@de ;
     schema:url msb:stadtbibliothek-hasenbergl ;
     schema:streetAddress "Blodigstraße 4" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.213521 ;
+    schema:longitude 11.5573461 .
 
 msb:stadtbibliothek-im-hp8
     a schema:Library ;
     schema:name "HP8 (Sendling)"@de ;
     schema:url msb:stadtbibliothek-im-hp8 ;
     schema:streetAddress "Hans-Preißinger-Straße 8" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1105494 ;
+    schema:longitude 11.5528249 .
 
 msb:stadtbibliothek-isarvorstadt
     a schema:Library ;
     schema:name "Isarvorstadt"@de ;
     schema:url msb:stadtbibliothek-isarvorstadt ;
     schema:streetAddress "Kapuzinerstr. 28" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1255576 ;
+    schema:longitude 11.559697 .
 
 msb:stadtbibliothek-laim
     a schema:Library ;
     schema:name "Laim"@de ;
     schema:url msb:stadtbibliothek-laim ;
     schema:streetAddress "Fürstenrieder Str. 53" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1363953 ;
+    schema:longitude 11.5032997 .
 
 msb:stadtbibliothek-maxvorstadt
     a schema:Library ;
     schema:name "Maxvorstadt"@de ;
     schema:url msb:stadtbibliothek-maxvorstadt ;
     schema:streetAddress "Augustenstr. 92" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.151772 ;
+    schema:longitude 11.5648447 .
 
 msb:stadtbibliothek-milbertshofen
     a schema:Library ;
     schema:name "Milbertshofen"@de ;
     schema:url msb:stadtbibliothek-milbertshofen ;
     schema:streetAddress "Schleißheimer Straße 340" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1829878 ;
+    schema:longitude 11.5669535 .
 
 msb:stadtbibliothek-moosach
     a schema:Library ;
     schema:name "Moosach"@de ;
     schema:url msb:stadtbibliothek-moosach ;
     schema:streetAddress "Hanauer Str. 61a" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1817334 ;
+    schema:longitude 11.5290416 .
 
 msb:stadtbibliothek-im-motorama
     a schema:Library ;
     schema:name "Motorama (Haidhausen)"@de ;
     schema:url msb:stadtbibliothek-im-motorama ;
     schema:streetAddress "Rosenheimer Straße 30-32" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1308057 ;
+    schema:longitude 11.5898573 .
 
 msb:stadtbibliothek-neuhausen
     a schema:Library ;
     schema:name "Neuhausen"@de ;
     schema:url msb:stadtbibliothek-neuhausen ;
     schema:streetAddress "Nymphenburger Str. 171b" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1553703 ;
+    schema:longitude 11.5319906 .
 
 msb:stadtbibliothek-neuperlach
     a schema:Library ;
     schema:name "Neuperlach"@de ;
     schema:url msb:stadtbibliothek-neuperlach ;
     schema:streetAddress "Charles-de-Gaulle-Str. 2a" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1016384 ;
+    schema:longitude 11.644128 .
 
 msb:stadtbibliothek-pasing
     a schema:Library ;
     schema:name "Pasing"@de ;
     schema:url msb:stadtbibliothek-pasing ;
     schema:streetAddress "Bäckerstr. 9" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1471763 ;
+    schema:longitude 11.4615969 .
 
 msb:stadtbibliothek-ramersdorf
     a schema:Library ;
     schema:name "Ramersdorf"@de ;
     schema:url msb:stadtbibliothek-ramersdorf ;
     schema:streetAddress "Führichstr. 43" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1177408 ;
+    schema:longitude 11.614746 .
 
 msb:stadtbibliothek-riem
     a schema:Library ;
     schema:name "Riem"@de ;
     schema:url msb:stadtbibliothek-riem ;
     schema:streetAddress "Elisabeth-Castonier-Platz 19" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1326667 ;
+    schema:longitude 11.704433 .
 
 msb:stadtbibliothek-schwabing
     a schema:Library ;
     schema:name "Schwabing"@de ;
     schema:url msb:stadtbibliothek-schwabing ;
     schema:streetAddress "Hohenzollernstr. 16" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1597445 ;
+    schema:longitude 11.5836112 .
 
 msb:stadtbibliothek-sendling
     a schema:Library ;
     schema:name "Sendling"@de ;
     schema:url msb:stadtbibliothek-sendling ;
     schema:streetAddress "Albert-Roßhaupter-Str. 8" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1170783 ;
+    schema:longitude 11.5379376 .
 
 msb:stadtbibliothek-waldtrudering
     a schema:Library ;
     schema:name "Waldtrudering"@de ;
     schema:url msb:stadtbibliothek-waldtrudering ;
     schema:streetAddress "Wasserburger Landstr. 241" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1122636 ;
+    schema:longitude 11.7066211 .
 
 msb:stadtbibliothek-westend
     a schema:Library ;
     schema:name "Westend"@de ;
     schema:url msb:stadtbibliothek-westend ;
     schema:streetAddress "Schießstättstr. 20 c" ;
-    schema:addressLocality "München" .
+    schema:addressLocality "München" ;
+    schema:latitude 48.1364498 ;
+    schema:longitude 11.5448796 .
