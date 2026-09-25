@@ -41,6 +41,10 @@ export async function matchesScanSource(source, sourceStore) {
     return sparqlAsk(source.recognitionQuery, [sourceStore])
 }
 
+export function isProfileScanFinding(finding) {
+    return finding.action === BP + "Copy" || finding.action === BP + "Derive"
+}
+
 // Preserve rule identity alongside the result so a preview can explain each finding.
 // A fresh store deduplicates repeated matches without changing the input graph.
 export async function applyScanRules(source, sourceStore) {

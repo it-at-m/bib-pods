@@ -1,0 +1,37 @@
+@prefix bp:   <https://www.muenchner-stadtbibliothek.de/bib-pods#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+bp:kielPrototypeContact a bp:ScanSource ;
+    rdfs:label "Digitale Ummeldung (Kiel)"@de ;
+    bp:podPath "personal/contact.ttl" ;
+    bp:formatDescription "vCard-Individual mit verknüpfter Wohnadresse (hasAddress, Home und Address)"@de ;
+    bp:ruleSet bp:kielPrototypeRules ;
+    bp:recognitionQuery """
+PREFIX vcard: <http://www.w3.org/2006/vcard/ns#>
+ASK WHERE {
+    ?person a vcard:Individual ; vcard:hasAddress ?address .
+    ?address a vcard:Home, vcard:Address .
+}
+""" .
+
+# Recognizes the prototype's structure, not an authenticated issuer or attestation.
+bp:kielPrototypeRules a bp:ScanRuleSet ;
+    rdfs:label "kiel-prototype" ;
+    bp:scanRule bp:kielPrototypeAddress .
+
+bp:kielPrototypeAddress a bp:ScanRule ;
+    rdfs:label "Wohnadresse für Filialsuche"@de ;
+    bp:action bp:FindNearestBranch ;
+    bp:constructQuery """
+PREFIX vcard: <http://www.w3.org/2006/vcard/ns#>
+
+# Temporary action input only; no profile triples are constructed.
+CONSTRUCT { ?address a vcard:Address ; ?field ?value . }
+WHERE {
+    ?person a vcard:Individual ; vcard:hasAddress ?address .
+    ?address a vcard:Home, vcard:Address ; ?field ?value .
+    VALUES ?field {
+        vcard:street-address vcard:postal-code vcard:locality vcard:country-name
+    }
+}
+""" .

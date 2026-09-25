@@ -1,0 +1,20 @@
+# Transcribed from the prototype screenshot, not a verified full export.
+# The clipped credential is replaced by a dummy value.
+@prefix vcard: <http://www.w3.org/2006/vcard/ns#> .
+@prefix schema: <http://schema.org/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<#me> a vcard:Individual ;
+    vcard:fn "Erika Mustermann" ;
+    vcard:hasAddress <#addr-current> .
+<#addr-current> a vcard:Home, vcard:Address ;
+    vcard:street-address "Fleethörn 9" ;
+    vcard:postal-code "24103" ;
+    vcard:locality "Kiel" ;
+    vcard:country-name "Deutschland" ;
+    schema:validFrom "2026-09-25"^^xsd:date ;
+    dct:modified "2026-09-25T09:19:23.414Z"^^xsd:dateTime ;
+    prov:wasAttributedTo <https://css.solid-sccon.danss.de/behoerde/profile/card#me> ;
+    <https://poc-ummeldung.example/vocab/credential#attestation> "dummy-test-credential" .

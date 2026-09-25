@@ -3,7 +3,7 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
 # Shared vocabulary for declaring scan sources and their mapping rules.
-# Rules describe preview additions using the existing profile vocabulary.
+# Rules describe profile additions or temporary inputs for a separate action.
 # Each query runs against the source document, never another rule's output.
 bp:ScanSource a rdfs:Class .
 bp:ScanRuleSet a rdfs:Class .
@@ -26,3 +26,5 @@ bp:sourceValue a rdf:Property .
 bp:sourceNode a rdf:Property .
 bp:Derive rdfs:label "Ableiten"@de .
 bp:Copy rdfs:label "Direkt kopieren"@de .
+# Action inputs stay in the scan dialog, never in the library profile.
+bp:FindNearestBranch rdfs:label "Nächstgelegene Bibliothek finden"@de .

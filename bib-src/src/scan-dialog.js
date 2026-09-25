@@ -2,7 +2,7 @@ import { getChoice, isStorageReady, mergeProfileQuads } from "cori-sdk/storage/i
 import { getWebId } from "cori-sdk/storage/solid.js"
 import { storageErrorMessage } from "cori-sdk/utils.js"
 import { scanPod } from "./scan.js"
-import { collectScanCandidates, scanReasonSteps } from "./scan-findings.js"
+import { collectScanCandidates, collectBranchLookups, scanReasonSteps } from "./scan-findings.js"
 import { scanLabel } from "./scan-rules.js"
 import { BP } from "./vocab.js"
 import dialogHtml from "./ui/scan.html?raw"
@@ -20,8 +20,6 @@ export function mountScanDialog(root, { onSaved }) {
     const dialog = get("dialog")
     const sources = get("sources")
     const status = get("status")
-    const review = get("review")
-    const options = get("options")
     const error = get("error")
     const accept = get("accept")
     const retry = get("retry")
@@ -46,6 +44,8 @@ export function mountScanDialog(root, { onSaved }) {
     function close() {
         if (saving) return
         generation++
+        sources.replaceChildren()
+        entries = []
         dialog.close()
     }
 
@@ -54,25 +54,49 @@ export function mountScanDialog(root, { onSaved }) {
         webId = getWebId()
         entries = []
         sources.replaceChildren()
-        options.replaceChildren()
-        review.hidden = accept.hidden = retry.hidden = error.hidden = true
+        accept.hidden = retry.hidden = error.hidden = true
         accept.disabled = true
         status.textContent = "Dein Pod wird durchsucht …"
         status.hidden = false
-        options.setAttribute("aria-busy", "true")
+        sources.setAttribute("aria-busy", "true")
         try {
             if (!webId || !connected()) throw new Error("Bitte verbinde deinen Pod erneut, um ihn zu durchsuchen.")
             const reports = await scanPod()
             if (run !== generation) return
             if (!connected()) throw new Error("Die Pod-Verbindung hat sich geändert. Bitte starte die Suche erneut.")
+            const groups = new Map()
             for (const { result } of reports) {
                 if (!result) continue
                 const source = element("details", "bp-scan-source", "")
-                source.append(element("summary", "", `Erkannt: ${result.sourceLabel}`))
-                source.append(element("p", "", `Vordefinierte Regeln: „${result.ruleSetLabel}“.`))
+                source.open = true
+                const heading = element("summary", "", `Erkannt: ${result.sourceLabel}`)
+                heading.id = `bp-scan-source-${groups.size}`
                 // Text only: source data and labels never become HTML.
-                source.append(element("p", "bp-scan-source-path", `Gefunden in: ${result.source}`))
+                heading.title = `Gefunden in: ${result.source}`
+                const content = element("div", "bp-scan-source-content", "")
+                source.append(heading, content)
                 sources.append(source)
+                groups.set(result.scanSource, { content, heading })
+            }
+            const branchLookups = collectBranchLookups(reports)
+            for (const lookup of branchLookups) {
+                const row = element("div", "bp-scan-lookup", "")
+                row.append(element("strong", "", "Bibliothek in deiner Nähe"))
+                row.append(element("p", "", lookup.label))
+                const button = element("button", "button", lookup.actionLabel)
+                button.type = "button"
+                button.addEventListener("click", () => {
+                    if (saving || !dialog.open || run !== generation) return
+                    if (!connected()) {
+                        showError("Die Pod-Verbindung hat sich geändert. Bitte starte die Suche erneut.")
+                        retry.hidden = false
+                        return
+                    }
+                    // Placeholder only: no lookup request or profile write yet.
+                    console.log(`[bib-pods] ${lookup.actionLabel}:`, lookup.address)
+                })
+                row.append(button)
+                groups.get(lookup.scanSource).content.append(row)
             }
             entries = collectScanCandidates(reports).map((candidate, index) => {
                 const row = element("div", "bp-scan-option", "")
@@ -118,26 +142,33 @@ export function mountScanDialog(root, { onSaved }) {
                 }
                 text.append(why)
                 row.append(checkbox, text)
-                options.append(row)
+                const group = groups.get(candidate.scanSource)
+                if (!group.options) {
+                    group.options = element("div", "bp-scan-options", "")
+                    group.options.setAttribute("role", "group")
+                    group.options.setAttribute("aria-labelledby", group.heading.id)
+                    group.content.append(group.options)
+                }
+                group.options.append(row)
                 return { candidate, checkbox }
             })
             const failed = reports.filter(r => r.error)
-            review.hidden = entries.length === 0
+            const hasFindings = entries.length > 0 || branchLookups.length > 0
             accept.hidden = entries.length === 0
             updateSelection()
-            status.hidden = entries.length > 0
-            status.textContent = failed.length ? "Die Suche konnte nicht vollständig abgeschlossen werden." : "Keine passenden Profileinträge gefunden."
+            status.hidden = hasFindings
+            status.textContent = failed.length ? "Die Suche konnte nicht vollständig abgeschlossen werden." : "Keine passenden Daten gefunden."
             if (failed.length) {
                 showError(`Nicht geprüft: ${failed.map(r => r.label).join(", ")}. Bitte versuche es erneut.${entries.length ? " Vorhandene Vorschläge kannst du trotzdem übernehmen." : ""}`)
             }
-            retry.hidden = !failed.length && entries.length > 0
+            retry.hidden = !failed.length && hasFindings
         } catch (err) {
             if (run !== generation) return
             status.textContent = "Die Suche konnte nicht abgeschlossen werden."
             showError(storageErrorMessage(err))
             retry.hidden = false
         } finally {
-            if (run === generation) options.setAttribute("aria-busy", "false")
+            if (run === generation) sources.setAttribute("aria-busy", "false")
         }
     }
 

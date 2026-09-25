@@ -6,7 +6,7 @@ import { loadStore, getStorageEntryName, getChoice, isStorageReady } from "cori-
 import { readPodTurtle } from "cori-sdk/storage/solid.js"
 import { getProfileSubject, serializeTurtle } from "cori-sdk/utils.js"
 import { newStore } from "@foerderfunke/sem-ops-utils/core"
-import { getScanSources, matchesScanSource, applyScanRules, scanLabel } from "./scan-rules.js"
+import { getScanSources, matchesScanSource, applyScanRules, isProfileScanFinding, scanLabel } from "./scan-rules.js"
 
 
 async function scanProfile() {
@@ -35,25 +35,28 @@ async function scanSource(source) {
     }
 
     const findings = await applyScanRules(source, document.store)
+    const profileFindings = findings.filter(isProfileScanFinding)
     const additions = newStore()
-    for (const finding of findings) additions.addQuads(finding.quads)
-    const additionsTtl = await serializeTurtle(additions)
+    for (const finding of profileFindings) additions.addQuads(finding.quads)
+    const additionsTtl = additions.size ? await serializeTurtle(additions) : null
     // Keep each source's explanation and findings together, even when scans run concurrently.
     console.log(`[bib-pods] scan: Daten im Format „${source.label}“ gefunden: ${document.url}`)
     console.log(`[bib-pods] scan: Erkannt an: ${source.formatDescription}.`)
     console.log(`[bib-pods] scan: Daher verwenden wir den vordefinierten Regelsatz „${source.ruleSet.label}“ für diese Vorschau.`)
-    console.log("[bib-pods] scan: Mit deiner Zustimmung würden wir die folgenden Vorschläge in dein Bibliotheksprofil übernehmen:")
-    console.table(findings.flatMap(finding => finding.quads
-        .filter(q => q.subject.value === getProfileSubject())
-        .map(({ predicate, object }) => ({
-            Aktion: scanLabel(finding.action),
-            Regel: finding.label,
-            Profilpunkt: scanLabel(predicate.value),
-            Wert: object.termType === "NamedNode" ? scanLabel(object.value, finding.quads) : object.value,
-        }))))
-    console.log("[bib-pods] scan: Das würden wir jetzt zu deinem Profil hinzufügen, wenn du zustimmst:")
-    console.log(additionsTtl)
-    console.log("[bib-pods] scan: Vorschau erstellt; noch nichts übernommen. Eine Übernahme benötigt deine Zustimmung.")
+    if (additions.size) {
+        console.log("[bib-pods] scan: Mit deiner Zustimmung würden wir die folgenden Vorschläge in dein Bibliotheksprofil übernehmen:")
+        console.table(profileFindings.flatMap(finding => finding.quads
+            .filter(q => q.subject.value === getProfileSubject())
+            .map(({ predicate, object }) => ({
+                Aktion: scanLabel(finding.action),
+                Regel: finding.label,
+                Profilpunkt: scanLabel(predicate.value),
+                Wert: object.termType === "NamedNode" ? scanLabel(object.value, finding.quads) : object.value,
+            }))))
+        console.log("[bib-pods] scan: Das würden wir jetzt zu deinem Profil hinzufügen, wenn du zustimmst:")
+        console.log(additionsTtl)
+        console.log("[bib-pods] scan: Vorschau erstellt; noch nichts übernommen. Eine Übernahme benötigt deine Zustimmung.")
+    }
     return {
         source: document.url,
         scanSource: source.iri,
