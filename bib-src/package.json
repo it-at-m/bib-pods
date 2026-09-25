@@ -5,10 +5,14 @@
         "ttl-to-js": "ttl-to-js definitions/vocabulary.ttl definitions/config.ttl definitions/profile.shapes.ttl resources/genre-values.ttl resources/place-values.ttl resources/language-values.ttl resources/medium-values.ttl && node scripts/build-scan-rules.js",
         "test:scan": "npm run ttl-to-js && node --test test/*.test.js",
         "extract-value-sets": "node scripts/extract-value-sets.js && npm run ttl-to-js",
+        "extract-msb-standorte": "node scripts/extract-msb-standorte.js",
         "prepare": "npm run ttl-to-js"
     },
     "dependencies": {
         "@foerderfunke/sem-ops-utils": "0.5.1",
         "cori-sdk": "file:../cori-sdk"
+    },
+    "devDependencies": {
+        "cheerio": "1.2.0"
     }
 }
