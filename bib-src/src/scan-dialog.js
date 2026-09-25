@@ -4,6 +4,7 @@ import { storageErrorMessage } from "cori-sdk/utils.js"
 import { scanPod } from "./scan.js"
 import { collectScanCandidates, collectBranchLookups, scanReasonSteps } from "./scan-findings.js"
 import { scanLabel } from "./scan-rules.js"
+import { geocodeAddress, NOMINATIM_ENDPOINT } from "./geocoding.js"
 import { BP } from "./vocab.js"
 import dialogHtml from "./ui/scan.html?raw"
 
@@ -80,22 +81,48 @@ export function mountScanDialog(root, { onSaved }) {
             }
             const branchLookups = collectBranchLookups(reports)
             for (const lookup of branchLookups) {
+                // Host HTML can switch Nominatim instances without rebuilding the app.
+                const endpoint = root.dataset.nominatimEndpoint || NOMINATIM_ENDPOINT
                 const row = element("div", "bp-scan-lookup", "")
                 row.append(element("strong", "", "Bibliothek in deiner Nähe"))
                 row.append(element("p", "", lookup.label))
+                const consent = document.createElement("input")
+                consent.type = "checkbox"
+                consent.checked = false
+                const consentLabel = element("label", "bp-scan-consent", "")
+                const service = endpoint === NOMINATIM_ENDPOINT ? "Nominatim (OpenStreetMap)" : `Nominatim (${new URL(endpoint).host})`
+                const consentText = element("span", "", `Ich stimme zu, dass diese Adresse zur Ermittlung der Koordinaten an ${service} gesendet wird.`)
+                consentLabel.append(consent, consentText)
                 const button = element("button", "button", lookup.actionLabel)
                 button.type = "button"
-                button.addEventListener("click", () => {
-                    if (saving || !dialog.open || run !== generation) return
-                    if (!connected()) {
-                        showError("Die Pod-Verbindung hat sich geändert. Bitte starte die Suche erneut.")
-                        retry.hidden = false
-                        return
-                    }
-                    // Placeholder only: no lookup request or profile write yet.
-                    console.log(`[bib-pods] ${lookup.actionLabel}:`, lookup.address)
+                button.disabled = true
+                const message = element("p", "bp-scan-lookup-error", "")
+                message.setAttribute("role", "alert")
+                message.hidden = true
+                let coordinates = null // Reuse the result for repeated clicks in this review.
+                consent.addEventListener("change", () => {
+                    message.hidden = true
+                    button.disabled = !consent.checked
                 })
-                row.append(button)
+                button.addEventListener("click", async () => {
+                    if (!consent.checked || button.disabled) return
+                    button.disabled = consent.disabled = true
+                    message.hidden = true
+                    button.textContent = "Koordinaten werden ermittelt …"
+                    try {
+                        coordinates ??= await geocodeAddress(lookup.address, { endpoint })
+                        console.log("[bib-pods] Geocoding:", coordinates)
+                    } catch (err) {
+                        console.warn("[bib-pods] Geocoding fehlgeschlagen:", err)
+                        message.textContent = "Die Koordinaten konnten nicht ermittelt werden. Bitte versuche es erneut."
+                        message.hidden = false
+                    } finally {
+                        consent.disabled = false
+                        button.disabled = !consent.checked
+                        button.textContent = lookup.actionLabel
+                    }
+                })
+                row.append(consentLabel, button, message)
                 groups.get(lookup.scanSource).content.append(row)
             }
             entries = collectScanCandidates(reports).map((candidate, index) => {
