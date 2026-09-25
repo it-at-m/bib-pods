@@ -41,11 +41,15 @@ bp:ProfileShape
     sh:property [
         sh:path bp:savedBook ;
         sh:datatype xsd:string
+    ] ;
+    sh:property [
+        sh:path bp:nearestLibrary ;
+        sh:nodeKind sh:IRI
     ] .
 
 bp:ProfileEntityShape
     a sh:NodeShape ;
-    sh:targetObjectsOf bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn, bp:interestedInPlace, bp:favoriteWork, bp:preferredLanguage, bp:preferredMedium ;
+    sh:targetObjectsOf bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn, bp:interestedInPlace, bp:favoriteWork, bp:preferredLanguage, bp:preferredMedium, bp:nearestLibrary ;
     sh:property [
         sh:path rdfs:label ;
         sh:maxCount 1 ;

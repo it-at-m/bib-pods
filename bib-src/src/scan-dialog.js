@@ -1,10 +1,11 @@
 import { getChoice, isStorageReady, mergeProfileQuads } from "cori-sdk/storage/index.js"
 import { getWebId } from "cori-sdk/storage/solid.js"
-import { storageErrorMessage } from "cori-sdk/utils.js"
+import { factory, getProfileSubject, RDFS_LABEL, storageErrorMessage } from "cori-sdk/utils.js"
 import { scanPod } from "./scan.js"
 import { collectScanCandidates, collectBranchLookups, scanReasonSteps } from "./scan-findings.js"
 import { scanLabel } from "./scan-rules.js"
 import { geocodeAddress, NOMINATIM_ENDPOINT } from "./geocoding.js"
+import { nearestLibrary } from "./nearest-library.js"
 import { BP } from "./vocab.js"
 import dialogHtml from "./ui/scan.html?raw"
 
@@ -14,6 +15,9 @@ const element = (tag, className, text) => {
     el.textContent = text
     return el
 }
+
+// SCCON demo: use this Munich address for the lookup without changing the Pod contact file.
+const DEMO_ADDRESS = { street: "Museumsinsel 1", postalCode: "80538", city: "München", country: "Deutschland" }
 
 export function mountScanDialog(root, { onSaved }) {
     root.insertAdjacentHTML("beforeend", dialogHtml)
@@ -83,9 +87,10 @@ export function mountScanDialog(root, { onSaved }) {
             for (const lookup of branchLookups) {
                 // Host HTML can switch Nominatim instances without rebuilding the app.
                 const endpoint = root.dataset.nominatimEndpoint || NOMINATIM_ENDPOINT
+                const address = DEMO_ADDRESS
                 const row = element("div", "bp-scan-lookup", "")
                 row.append(element("strong", "", "Bibliothek in deiner Nähe"))
-                row.append(element("p", "", lookup.label))
+                row.append(element("p", "", `${address.street}, ${address.postalCode} ${address.city}, ${address.country}`))
                 const consent = document.createElement("input")
                 consent.type = "checkbox"
                 consent.checked = false
@@ -99,10 +104,9 @@ export function mountScanDialog(root, { onSaved }) {
                 const message = element("p", "bp-scan-lookup-error", "")
                 message.setAttribute("role", "alert")
                 message.hidden = true
-                let coordinates = null // Reuse the result for repeated clicks in this review.
                 consent.addEventListener("change", () => {
                     message.hidden = true
-                    button.disabled = !consent.checked
+                    button.disabled = button.hidden || !consent.checked
                 })
                 button.addEventListener("click", async () => {
                     if (!consent.checked || button.disabled) return
@@ -110,15 +114,49 @@ export function mountScanDialog(root, { onSaved }) {
                     message.hidden = true
                     button.textContent = "Koordinaten werden ermittelt …"
                     try {
-                        coordinates ??= await geocodeAddress(lookup.address, { endpoint })
-                        console.log("[bib-pods] Geocoding:", coordinates)
+                        const coordinates = await geocodeAddress(address, { endpoint })
+                        if (!dialog.open || run !== generation || !connected()) return
+                        const library = nearestLibrary(coordinates)
+                        if (!library) throw new Error("Keine Bibliothek mit Koordinaten gefunden.")
+                        console.log("[bib-pods] Nächstgelegene Bibliothek:", library)
+                        if (!row.nextElementSibling?.classList.contains("bp-scan-branch-choice")) {
+                            const option = element("div", "bp-scan-option bp-scan-branch-choice", "")
+                            const checkbox = document.createElement("input")
+                            checkbox.type = "checkbox"
+                            checkbox.id = `bp-scan-library-${entries.length}`
+                            checkbox.checked = true
+                            checkbox.addEventListener("change", updateSelection)
+                            const text = element("div", "bp-scan-option-text", "")
+                            const label = element("label", "", "")
+                            label.htmlFor = checkbox.id
+                            label.append(element("strong", "", library.name))
+                            const details = element("p", "bp-scan-branch-reason",
+                                `Nächstgelegene Bibliothek · ${library.distanceKm.toLocaleString("de-DE", { maximumFractionDigits: 1 })} km Luftlinie · `)
+                            const link = element("a", "", "Mehr")
+                            link.href = library.uri
+                            link.target = "_blank"
+                            link.rel = "noopener noreferrer"
+                            details.append(link)
+                            text.append(label, details)
+                            option.append(checkbox, text)
+                            row.after(option)
+                            const branch = factory.namedNode(library.uri)
+                            entries.push({ checkbox, candidate: { quads: [
+                                factory.quad(factory.namedNode(getProfileSubject()), factory.namedNode(BP + "nearestLibrary"), branch),
+                                factory.quad(branch, factory.namedNode(RDFS_LABEL), factory.literal(library.name)),
+                            ] } })
+                            accept.hidden = false
+                            updateSelection()
+                        }
+                        row.classList.add("bp-scan-lookup-found")
+                        consentLabel.hidden = button.hidden = true
                     } catch (err) {
                         console.warn("[bib-pods] Geocoding fehlgeschlagen:", err)
                         message.textContent = "Die Koordinaten konnten nicht ermittelt werden. Bitte versuche es erneut."
                         message.hidden = false
                     } finally {
                         consent.disabled = false
-                        button.disabled = !consent.checked
+                        button.disabled = button.hidden || !consent.checked
                         button.textContent = lookup.actionLabel
                     }
                 })
