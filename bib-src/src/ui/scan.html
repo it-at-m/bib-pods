@@ -1,10 +1,16 @@
 <dialog id="bp-scan-dialog" class="bp-modal bp-scan-dialog" aria-labelledby="bp-scan-heading">
     <div class="bp-modal-content">
-        <h3 id="bp-scan-heading">Vorschläge aus deinem Pod</h3>
+        <h3 id="bp-scan-heading">Deinen Pod durchsuchen</h3>
+        <div id="bp-scan-permission" class="bp-scan-permission">
+            <p>Mit deiner Zustimmung suchen wir in deinem Pod nach Angaben, aus denen wir Vorschläge für dein Bibliotheksprofil ableiten können. Du entscheidest anschließend, was übernommen wird.</p>
+            <p>Die Auswertung findet in deinem Browser statt. Über die weitere Nutzung der Ergebnisse entscheidest du selbst.</p>
+            <label class="bp-scan-consent"><input id="bp-scan-permission-check" type="checkbox"><span>Ich bin einverstanden, dass bib-pods meinen Pod dafür durchsucht.</span></label>
+        </div>
         <div id="bp-scan-sources" class="bp-scan-sources"></div>
         <p id="bp-scan-status" class="bp-scan-status" role="status" aria-live="polite"></p>
         <p id="bp-scan-error" class="bp-scan-error" role="alert" hidden></p>
         <div class="bp-scan-actions">
+            <button id="bp-scan-start" class="button" type="button" disabled>Suche starten</button>
             <button id="bp-scan-accept" class="button" type="button" disabled hidden>Auswahl übernehmen</button>
             <button id="bp-scan-retry" class="button" type="button" hidden>Erneut suchen</button>
             <button id="bp-scan-cancel" class="button" type="button" autofocus>Schließen</button>

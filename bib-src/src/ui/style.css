@@ -575,6 +575,7 @@ dialog.bp-scan-dialog {
 }
 .bp-scan-dialog .bp-modal-content { padding: 24px 28px; }
 .bp-scan-dialog h3 { margin: 0 0 10px; font-size: 22px; }
+.bp-scan-permission p { margin: 0 0 12px; line-height: 1.5; }
 .bp-scan-sources { display: grid; gap: 12px; margin-bottom: 16px; }
 .bp-scan-sources:empty { display: none; }
 .bp-scan-source { border: 1px solid #e4e0d7; border-radius: 8px; overflow: hidden; }

@@ -23,6 +23,10 @@ export function mountScanDialog(root, { onSaved }) {
     root.insertAdjacentHTML("beforeend", dialogHtml)
     const get = id => root.querySelector(`#bp-scan-${id}`)
     const dialog = get("dialog")
+    const heading = get("heading")
+    const permission = get("permission")
+    const permissionCheck = get("permission-check")
+    const start = get("start")
     const sources = get("sources")
     const status = get("status")
     const error = get("error")
@@ -240,7 +244,20 @@ export function mountScanDialog(root, { onSaved }) {
     launcher.addEventListener("click", e => {
         e.preventDefault()
         if (saving || dialog.open) return
+        heading.textContent = "Deinen Pod durchsuchen"
+        permission.hidden = false
+        permissionCheck.checked = false
+        start.hidden = false
+        start.disabled = true
+        sources.replaceChildren()
+        status.hidden = error.hidden = accept.hidden = retry.hidden = true
         dialog.showModal()
+    })
+    permissionCheck.addEventListener("change", () => { start.disabled = !permissionCheck.checked })
+    start.addEventListener("click", () => {
+        if (!dialog.open || !permissionCheck.checked || start.disabled) return
+        permission.hidden = start.hidden = true
+        heading.textContent = "Vorschläge aus deinem Pod"
         scan()
     })
     retry.addEventListener("click", scan)
