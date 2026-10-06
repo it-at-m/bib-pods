@@ -17,7 +17,7 @@ const element = (tag, className, text) => {
 }
 
 // SCCON demo: use this Munich address for the lookup without changing the Pod contact file.
-const DEMO_ADDRESS = { street: "Museumsinsel 1", postalCode: "80538", city: "München", country: "Deutschland" }
+const DEMO_ADDRESS = { street: "Milchstraße 1", postalCode: "81667", city: "München", country: "Deutschland" }
 
 export function mountScanDialog(root, { onSaved }) {
     root.insertAdjacentHTML("beforeend", dialogHtml)

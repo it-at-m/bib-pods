@@ -3,10 +3,10 @@ import assert from "node:assert/strict"
 import { airDistance, nearestLibrary } from "../src/nearest-library.js"
 
 test("the Munich demo address selects Motorama ahead of every other branch", () => {
-    const museum = { lat: 48.1304654, lon: 11.5836265 }
-    const winner = nearestLibrary(museum)
+    const milchstrasse = { lat: 48.13108, lon: 11.59457 }
+    const winner = nearestLibrary(milchstrasse)
     assert.equal(winner.uri, "https://www.muenchner-stadtbibliothek.de/stadtbibliothek-im-motorama")
     assert.equal(winner.name, "Motorama (Haidhausen)")
-    assert.ok(winner.distanceKm > 0.4 && winner.distanceKm < 0.5)
-    assert.equal(airDistance(museum, museum), 0)
+    assert.ok(winner.distanceKm > 0.3 && winner.distanceKm < 0.4)
+    assert.equal(airDistance(milchstrasse, milchstrasse), 0)
 })
