@@ -4,7 +4,7 @@ import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, orderDocsByProfile, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
-import { sopacCatalogueUrl, fetchBook, parseCatalogueRef, resolveCatalogueRef } from "./catalogue.js"
+import { sopacCatalogueUrl, fetchBook, parseCatalogueRef, resolveCatalogueRef, OnleiheUnavailableError } from "./catalogue.js"
 import { cleanAuthorName } from "./book-prompt.js"
 import { grantMerklisteAccess, revokeMerklisteAccess, readMerklisteAccessControl } from "./publish.js"
 import { mountScanDialog } from "./scan-dialog.js"
@@ -624,15 +624,11 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     // what gets saved, so a pasted title and a clicked one land identically.
     async function submitCatalogueRef() {
         const ref = parseCatalogueRef(addTitleInput.value)
-        // Recognised but unresolvable: the new Onleihe frontend keys titles by a product
-        // id the catalogue has never seen, so name the format and point at the way out
-        // rather than letting the lookup report the title as missing.
+        // Recognised but unresolvable: Goodreads keys titles by an id of its own, so name
+        // the format and point at the way out rather than letting the lookup report the
+        // title as missing.
         if (ref?.kind === "goodreads") {
             showAddTitleMsg("Goodreads-Links enthalten keine ISBN, nur eine Goodreads-eigene Nummer. Bitte die ISBN des Titels einfügen.")
-            return
-        }
-        if (ref?.kind === "onleihe-v3") {
-            showAddTitleMsg("Dieser Link stammt aus der neuen Onleihe (Onleihe 3.0). Solche Links kennt der Katalog noch nicht. Bitte stattdessen die ISBN des Titels einfügen.")
             return
         }
         if (!ref) {
@@ -651,13 +647,16 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             openBookPrompt(id, book)
         } catch (err) {
             console.error("[bib-pods] catalogue lookup failed:", err)
-            // The catalogue is unreachable, not the title unknown — reporting "nicht
-            // gefunden" would misdescribe a link that parsed fine. A SOPAC id stands on
+            // The catalogue (or, for an Onleihe 3.0 link, Onleihe) is unreachable, not the
+            // title unknown — reporting "nicht gefunden" would misdescribe a link that
+            // parsed fine. A SOPAC id stands on
             // its own, so offer the same degraded save a card click falls back to; an
             // unresolved Onleihe id has no AK id to save under.
             if (ref.kind === "sopac") {
                 closeAddTitle()
                 openBookPrompt(ref.id, null)
+            } else if (err instanceof OnleiheUnavailableError) {
+                showAddTitleMsg("Die Onleihe ist gerade nicht erreichbar. Bitte versuche es später erneut oder füge die ISBN des Titels ein.")
             } else {
                 showAddTitleMsg("Der Katalog ist gerade nicht erreichbar. Bitte versuche es später erneut.")
             }

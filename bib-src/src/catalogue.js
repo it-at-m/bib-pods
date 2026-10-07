@@ -17,10 +17,62 @@ export const SOPAC_RE = /[?&]sp=S(AK)0*(\d+)/
 export const ONLEIHE_RE = /onleihe\.de\/.+\/mediaInfo,\d+-\d+-(\d+)-/
 
 // Onleihe 3.0 (the React app served at <tenant>.onleihe.de) addresses a title by a
-// 24-hex product id that appears nowhere in the catalogue: the harvested 856$u links
-// still carry the old mediaInfo form, and divibib's product API needs credentials.
-// Matched anyway so the modal can say what the link is instead of rejecting it blindly.
+// 24-hex product id that appears nowhere in the catalogue — the harvested 856$u links
+// still carry the old mediaInfo form. Onleihe's own API maps it to the title's ISBN
+// (see fetchOnleiheV3Isbns).
 export const ONLEIHE_V3_RE = /onleihe\.de\/mediadetail\?[^#\s]*productId=([0-9a-f]{24})/i
+
+const ONLEIHE_API = "https://api.onleihe.de"
+
+// Onleihe München's internal tenant id, as its SPA gets it from
+// `GET /management/v1/auth/domains?host=muenchen.onleihe.de`. Product ids are global
+// across tenants — München's id resolves products from other libraries' links too — so
+// the per-link host lookup the SPA does is skipped. It is undocumented, though: if
+// divibib ever reassigns it, the login below fails and that lookup (keyed on the
+// pasted link's host) is the way back.
+const ONLEIHE_MUENCHEN_ID = "696652cb9d468a92eb935dd7"
+
+// Failures on Onleihe's side, kept apart from catalogue failures so the modal can name
+// the service that is actually down. A 404 is not one: it means the product id doesn't
+// exist, which the caller reports as "not found".
+export class OnleiheUnavailableError extends Error {
+    name = "OnleiheUnavailableError"
+}
+
+async function onleiheJson(url, init) {
+    let res
+    try {
+        res = await fetch(url, init)
+    } catch (err) {
+        throw new OnleiheUnavailableError(`Onleihe unreachable: ${err.message}`)
+    }
+    if (res.status === 404) return null
+    if (!res.ok) throw new OnleiheUnavailableError(`Onleihe ${res.status}: ${res.statusText}`)
+    return res.json()
+}
+
+// The ISBNs/EANs Onleihe 3.0 lists for a product, via the calls its SPA makes for a
+// visitor who isn't logged in: an anonymous login → bearer token, token → product
+// details. Both answer CORS with "*" and need no credentials, so this runs from any
+// embedding page. EANs are included because audio and some e-books carry only an EAN,
+// which for books is the ISBN-13 anyway.
+export async function fetchOnleiheV3Isbns(productId) {
+    const onleiheId = ONLEIHE_MUENCHEN_ID
+    const login = await onleiheJson(`${ONLEIHE_API}/user-application/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ onleiheId }),
+    })
+    if (!login?.accessToken) throw new OnleiheUnavailableError("Onleihe login returned no token")
+    const details = await onleiheJson(`${ONLEIHE_API}/ui/v2/pages/product-details/${productId}?onleiheId=${onleiheId}`, {
+        headers: { Authorization: `Bearer ${login.accessToken}` },
+    })
+    const isbns = (details?.product?.productIdentifiers ?? [])
+        .filter(p => p.identifierType === "ISBN" || p.identifierType === "EAN")
+        .map(p => normalizeIsbn(p.identifier))
+        .filter(Boolean)
+    return [...new Set(isbns)]
+}
 
 // Amazon addresses every product by a ten-character ASIN in /dp/ or /gp/product/, and
 // for printed books that ASIN *is* the ISBN-10 — so a shared Amazon link carries a
@@ -114,7 +166,6 @@ export function parseCatalogueRef(input) {
 // savedBook→akkey stripping assumes an "AK…" id), so it replaces the input id and a
 // failed resolution leaves nothing usable behind.
 export async function resolveCatalogueRef(endpoint, ref) {
-    if (ref.kind === "onleihe-v3") throw new Error("Onleihe 3.0 product ids are not in the catalogue index")
     if (ref.kind === "goodreads") throw new Error("Goodreads book ids carry no ISBN and are not in the catalogue index")
     if (ref.kind === "isbn") {
         const book = await fetchBookByIsbn(endpoint, ref.id)
@@ -123,6 +174,13 @@ export async function resolveCatalogueRef(endpoint, ref) {
     if (ref.kind === "onleihe") {
         const book = await fetchBookByOnleiheId(endpoint, ref.id)
         return { id: book?.id ?? null, book: book ?? null }
+    }
+    if (ref.kind === "onleihe-v3") {
+        for (const isbn of await fetchOnleiheV3Isbns(ref.id)) {
+            const book = await fetchBookByIsbn(endpoint, isbn)
+            if (book) return { id: book.id, book }
+        }
+        return { id: null, book: null }
     }
     const book = await fetchBook(endpoint, ref.id)
     return { id: ref.id, book: book ?? null }
