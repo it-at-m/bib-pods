@@ -2,7 +2,7 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
 bp:kielPrototypeContact a bp:ScanSource ;
-    rdfs:label "Digitale Ummeldung (Kiel)"@de ;
+    rdfs:label "Digitale Ummeldung"@de ;
     bp:podPath "personal/contact.ttl" ;
     bp:formatDescription "vCard-Individual mit verknüpfter Wohnadresse (hasAddress, Home und Address)"@de ;
     bp:ruleSet bp:kielPrototypeRules ;
