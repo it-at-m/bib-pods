@@ -766,7 +766,22 @@ cori-profile .cori-profile-actions button:hover { color: #222; }
     font-weight: bold;
 }
 .bp-collapsible > summary::-webkit-details-marker { display: none; }
+/* inline-block keeps the link underline (once activated) off the emoji */
+.bp-collapsible > summary > .bp-icon { display: inline-block; margin-right: 0.4em; }
 .bp-landing:not(.is-activated) .bp-collapsible > summary { pointer-events: none; }
+
+.bp-intro-links { font-weight: bold; }
+
+/* Folded sections inside the top blocks (how-to steps, privacy details, the full
+   Datenschutzauskunft): only the summary shows until opened. Unlike the blocks'
+   own summaries these stay clickable in every state. */
+.bp-fold { margin: 8px 0; }
+.bp-fold > summary { cursor: pointer; font-weight: bold; }
+.bp-fold[open] { padding-bottom: 4px; }
+.bp-fold > :not(summary) { margin-left: 18px; }
+.bp-fold li + li { margin-top: 4px; }
+.bp-privacy-full h4 { margin: 16px 0 4px; }
+.bp-privacy-full hr { margin-top: 16px; border: none; border-top: 1px solid #e4e0d7; }
 
 /* Once activated the top blocks collapse to a row of links. A block the user
    expands breaks onto its own full-width row and regains the box styling. */

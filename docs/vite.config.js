@@ -1,11 +1,12 @@
 import { emitRefreshWorker } from "cori-sdk/refresh-worker-plugin.js"
 import { loadConfig } from "bib-src/src/build-config.js"
+import { markdownPlugin } from "bib-src/src/markdown-plugin.js"
 import { defineConfig } from "vite"
 
 const config = loadConfig()
 
 export default defineConfig({
-    plugins: [emitRefreshWorker],
+    plugins: [emitRefreshWorker, markdownPlugin],
     define: {
         __SOLR_ENDPOINT__: JSON.stringify(config.solrEndpoint),
         __QDRANT_ENDPOINT__: JSON.stringify(config.qdrantEndpoint),

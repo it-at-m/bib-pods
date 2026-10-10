@@ -13,6 +13,8 @@
         "cori-sdk": "file:../cori-sdk"
     },
     "devDependencies": {
-        "cheerio": "1.2.0"
+        "cheerio": "1.2.0",
+        "marked": "18.0.14",
+        "pdfmake": "0.3.11"
     }
 }

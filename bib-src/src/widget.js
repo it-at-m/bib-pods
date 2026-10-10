@@ -13,6 +13,10 @@ import styleCss from "./ui/style.css?inline"
 import entryHtml from "./ui/entry.html?raw"
 import landingHtml from "./ui/landing.html?raw"
 import modalHtml from "./ui/modal.html?raw"
+// The Datenschutzauskunft's one stored copy; markdown-plugin.js renders the other formats.
+import privacyMd from "../resources/datenschutzauskunft.md?raw"
+import privacyHtml from "../resources/datenschutzauskunft.md?html"
+import privacyPdf from "../resources/datenschutzauskunft.md?pdf"
 
 // Concise "where your data lives" line for the main page's Konto block. The chooser is
 // the login; once a location is picked this just states it — switching means logging
@@ -48,6 +52,13 @@ function queryPageHref(strategy, { q, fq }, solrEndpoint) {
     params.set("label", strategy.label)
     params.set("endpoint", solrEndpoint)
     return `${QUERY_PAGE}?${params.toString()}`
+}
+
+// The Datenschutzauskunft downloads. Both are data: URLs so the docs site and TYPO3 serve
+// them the same way: no asset file whose URL depends on where the host mounts the bundle.
+const PRIVACY_DOWNLOADS = {
+    pdf: { href: privacyPdf, name: "Datenschutzauskunft-Bib-Pods.pdf" },
+    md: { href: "data:text/markdown;charset=utf-8," + encodeURIComponent(privacyMd), name: "Datenschutzauskunft-Bib-Pods.md" },
 }
 
 // scoped styles injected once into <head>: both hosts (docs, TYPO3) get the same look without coordinating stylesheets
@@ -894,6 +905,14 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         } catch (err) {
             console.error("[bib-pods] strategy toggles render failed:", err)
         }
+    }
+
+    // --- the Datenschutz block ---
+    root.querySelector("#bp-privacy-full-body").innerHTML = privacyHtml
+    for (const link of root.querySelectorAll("[data-bp-download]")) {
+        const { href, name } = PRIVACY_DOWNLOADS[link.dataset.bpDownload]
+        link.href = href
+        link.download = name
     }
 
     // --- listeners: the logged-out state machine + the activated actions ---
