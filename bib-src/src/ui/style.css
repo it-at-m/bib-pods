@@ -770,16 +770,52 @@ cori-profile .cori-profile-actions button:hover { color: #222; }
 .bp-collapsible > summary > .bp-icon { display: inline-block; margin-right: 0.4em; }
 .bp-landing:not(.is-activated) .bp-collapsible > summary { pointer-events: none; }
 
+/* h2, not h1: on TYPO3 the host page already carries the page's h1. Margins and size are
+   set explicitly so host heading rules don't leak in; px because of TYPO3's 62.5% root. */
+.bp-title { margin: 0; font-size: 36px; line-height: 1.2; font-weight: bold; }
+
 .bp-intro-links { font-weight: bold; }
 
 /* Folded sections inside the top blocks (how-to steps, privacy details, the full
    Datenschutzauskunft): only the summary shows until opened. Unlike the blocks'
-   own summaries these stay clickable in every state. */
-.bp-fold { margin: 8px 0; }
-.bp-fold > summary { cursor: pointer; font-weight: bold; }
+   own summaries these stay clickable in every state. The chevron is drawn here rather
+   than left to the native marker, which host stylesheets (TYPO3) switch off. */
+/* tight stacking: the host's body line-height (TYPO3) would otherwise space the rows widely */
+.bp-fold { margin: 2px 0; }
+.bp-fold > summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    list-style: none;
+    cursor: pointer;
+    font-weight: bold;
+    line-height: 1.3;
+    padding: 2px 0;
+    color: #5f5f5f;
+}
+.bp-fold > summary::-webkit-details-marker { display: none; }
+.bp-fold > summary::before {
+    content: "";
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid var(--contrastcolor, #d14900);
+    border-bottom: 2px solid var(--contrastcolor, #d14900);
+    transform: translateX(-2px) rotate(-45deg);
+    transition: transform 0.15s;
+}
+.bp-fold[open] > summary::before { transform: translateY(-2px) rotate(45deg); }
+.bp-fold > summary:hover { color: var(--contrastcolor, #d14900); }
 .bp-fold[open] { padding-bottom: 4px; }
 .bp-fold > :not(summary) { margin-left: 18px; }
 .bp-fold li + li { margin-top: 4px; }
+/* The host's list reset (TYPO3 .maincontents ul/li) strips the markers, so the browser
+   defaults are restated here for every list in the three top blocks. */
+.bp-top-blocks ul, .bp-top-blocks ol { padding-left: 24px; }
+.bp-top-blocks ul { list-style: disc; }
+.bp-top-blocks ul ul { list-style: circle; }
+.bp-top-blocks ol { list-style: decimal; }
+.bp-top-blocks li { display: list-item; }
 .bp-privacy-full h4 { margin: 16px 0 4px; }
 .bp-privacy-full hr { margin-top: 16px; border: none; border-top: 1px solid #e4e0d7; }
 
