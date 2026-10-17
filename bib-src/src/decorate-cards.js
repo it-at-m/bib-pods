@@ -101,7 +101,7 @@ function mountDecoration(target) {
     const btn = document.createElement("button")
     btn.type = "button"
     // .bp-round-btn is the shared round icon-button look (also used by the carousel's
-    // "seen" control in style.css) — the "+" here and the "✕" there are the same button,
+    // dismiss control in style.css) — the "+" here and the "✕" there are the same button,
     // different glyph/action.
     btn.className = msbWrap || eventBox ? "bp-decoration bp-round-btn" : "bp-decoration"
     btn.textContent = "+"

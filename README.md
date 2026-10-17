@@ -121,8 +121,8 @@ textNode["<div align='left'>
   api/               ← assembler #3
 ```
 
-- **`cori-sdk/`**: headless Integration-SDK. Enthält die Storage-Abstraktion mit Backends für lokalen Browser-Speicher und Solid-Pods, das Meta-Vokabular (`UserAction`, `Message`) und RDF-Hilfsfunktionen.
-- **`bib-src/`**: bibliotheksspezifische Schicht. Baut auf cori-sdk auf und stellt das Bibliotheks-Pods-Widget (Anmeldung, Benachrichtigungen und – auf der Hauptseite – Speicherortwahl, Profil und Empfehlungen), den Buch-Prompt (Folgefragen beim Klick auf ein Buch), die Buch-Dekoration auf Katalogseiten, die Solr-gestützten Empfehlungen sowie das domänenspezifische Vokabular (`favoriteAuthor`, `RecommendationStrategy`, …) bereit.
+- **`cori-sdk/`**: headless Integration-SDK. Enthält die Storage-Abstraktion mit Backends für lokalen Browser-Speicher und Solid-Pods, das Meta-Vokabular (`UserAction`, `Profile`, `ProfileSection`) und RDF-Hilfsfunktionen.
+- **`bib-src/`**: bibliotheksspezifische Schicht. Baut auf cori-sdk auf und stellt das Bibliotheks-Pods-Widget (Anmeldung und – auf der Hauptseite – Speicherortwahl, Profil und Empfehlungen), den Buch-Prompt (Folgefragen beim Klick auf ein Buch), die Buch-Dekoration auf Katalogseiten, die Solr-gestützten Empfehlungen sowie das domänenspezifische Vokabular (`favoriteAuthor`, `RecommendationStrategy`, …) bereit.
 - **`docs/`**: arbeitet Aspekte von `bib-src` über GitHub Pages heraus im Sinne einer Dokumentation + Demo + selber experimentieren.
 - **`typo3/bib_pods/`**: bündelt `bib-src` zur TYPO3-Extension, die in der lokalen Instanz und auf der Webseite der Münchner Stadtbibliothek eingebunden wird.
 - **`api/`**: minimaler HTTP-Server, der `bib-src` headless einbindet: Nutzer*innen senden ihr Profil-Turtle und erhalten Empfehlungen als JSON zurück. Dieselbe Empfehlungslogik wie im Plugin, nur anders ausgeliefert.
@@ -130,7 +130,7 @@ textNode["<div align='left'>
 ### Wie Empfehlungen ausgewählt werden
 
 Das Vokabular definiert die Empfehlungsstrategien; die gemeinsame Implementierung bestimmt Auswahl und Reihenfolge der Bücher.
-Die [Strategieseite](https://it-at-m.github.io/bib-pods/recommendations/) erklärt die verwendeten Profileinträge, Kombinationsvorschläge, Balancierung, Sortierung und den Umgang mit früheren Empfehlungen.
+Die [Strategieseite](https://it-at-m.github.io/bib-pods/recommendations/) erklärt die verwendeten Profileinträge, Kombinationsvorschläge, Balancierung und Sortierung.
 
 ### Hilfsskripte
 

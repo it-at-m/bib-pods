@@ -103,8 +103,7 @@
             <div class="rules">
                 <h2 id="matching">Gemeinsam für alle Solr-Strategien</h2>
                 <p>Die Profileinträge werden über die Indexzuordnungen im Vokabular gesucht.
-                    Neue Vorschläge schließen gemerkte Bücher und bereits in derselben Strategie
-                    gespeicherte Empfehlungen aus, auch weggeklickte. Sprach- und Medienartpräferenzen
+                    Vorschläge schließen gemerkte Bücher aus. Sprach- und Medienartpräferenzen
                     gelten zusätzlich, etwa „Deutsch oder Englisch, und als E-Book“.</p>
 
                 <h2 id="solr-or">Solr mit OR: Kombination zuerst, dann ausgleichen</h2>
@@ -120,8 +119,8 @@
                     <li><strong>Kombination zuerst:</strong> Der erste Kombinationstreffer,
                         dessen Katalogdaten mindestens zwei Einträge bestätigen, erhält
                         den ersten Platz, sofern vorhanden.</li>
-                    <li><strong>Ausgleichen:</strong> Danach kommen Einträge mit weniger bisherigen
-                        und gerade ausgewählten Vorschlägen zum Zug; Mehrfachtreffer zählen
+                    <li><strong>Ausgleichen:</strong> Danach kommen Einträge mit weniger
+                        ausgewählten Vorschlägen zum Zug; Mehrfachtreffer zählen
                         für jeden passenden Eintrag. Bei Gleichstand entscheidet der Anzeigename.</li>
                     <li><strong>Dopplungen vermeiden:</strong> Gleiche Katalog-IDs oder gleiche
                         Kombinationen aus normalisiertem Titel und erstem Autor werden innerhalb
@@ -130,35 +129,33 @@
                 <p>Der Solr-Score bewertet die Suchübereinstimmung, nicht die persönliche Eignung;
                     auch innerhalb eines Themas können die Scores unterschiedlich sein.
                     Pro Ergebnisliste werden höchstens doppelt so viele Kandidaten wie das
-                    Vorschlagslimit geladen, weshalb weniger Vorschläge entstehen können.</p>
+                    Vorschlagslimit geladen, weshalb weniger Vorschläge entstehen können.
+                    Hat ein Profil mehr Einträge als die Reihe Plätze, bleiben einzelne Einträge
+                    ohne Vorschlag, bei Gleichstand die nach Anzeigenamen letzten.</p>
                 <p><strong>Beispiel:</strong> Ein Profil enthält Bewegung, Gesunde Ernährung und
                     Schlaf. Ein gefundenes Buch zu Bewegung und Ernährung kommt zuerst und zählt
-                    für beide Themen. Ohne frühere Empfehlungen ist anschließend Schlaf an der
-                    Reihe.</p>
+                    für beide Themen. Anschließend ist Schlaf an der Reihe.</p>
 
                 <h2 id="solr-and">Solr mit AND: alle Angaben zusammen</h2>
                 <p>Ein Titel muss alle vorhandenen, abfragbaren Angaben der Strategie zugleich
-                    erfüllen. Neue Treffer folgen dem Solr-Score, bei Gleichstand der Katalog-ID;
+                    erfüllen. Treffer folgen dem Solr-Score, bei Gleichstand der Katalog-ID;
                     Einzelangaben werden nicht ausgeglichen.</p>
 
                 <h2 id="shelf">Wie entsteht die Reihenfolge im Schaufenster?</h2>
-                <p>Gespeicherte Vorschläge enthalten keine Scores oder Rangpositionen;
-                    OR-Regale werden deshalb beim Anzeigen neu geordnet.
-                    Ein Titel mit den meisten passenden Einträgen steht vorn, sofern er mindestens
-                    zwei trifft; danach wird innerhalb des sichtbaren Regals ausgeglichen.
-                    Bei Gleichstand und innerhalb der einzelnen Listen entscheiden das neuere
-                    gültige Erscheinungsjahr und die Katalog-ID.
-                    Nicht mehr passende Vorschläge bleiben am Ende; AND und inspira_BIB erhalten
-                    keine solche Neusortierung.</p>
-                <p>Das Limit gilt <strong>je Prüfung</strong>; weitere Prüfungen ergänzen die
-                    vorhandenen Vorschläge. Die Katalogtrefferzahl umfasst alle unter den aktuellen
-                    Filtern passenden, nicht gemerkten Bücher, einschließlich früherer Vorschläge.</p>
+                <p>Jede Reihe zeigt die Vorschläge in der Reihenfolge, in der die Auswahl sie
+                    bestimmt: OR-Regale wie oben beschrieben, AND-Regale nach Solr-Score,
+                    inspira_BIB in der Reihenfolge des Dienstes.</p>
+                <p>Das Schaufenster wird bei jedem Klick auf „Empfehlungen prüfen“ neu
+                    berechnet und nicht gespeichert. Gleiches Profil und unveränderter Katalog
+                    ergeben dieselben Vorschläge; nimmt der Katalog passende Titel auf, ändert
+                    sich das Regal. Das Limit gilt <strong>je Reihe</strong>. Die
+                    Katalogtrefferzahl umfasst alle unter den aktuellen Filtern passenden, nicht
+                    gemerkten Bücher, einschließlich der angezeigten.</p>
 
                 <h2 id="inspira">inspira_BIB: Ähnlichkeit zur Merkliste</h2>
                 <p>Der gesonderte inspira_BIB-Dienst erhält die IDs deiner gemerkten Bücher und
                     liefert ähnliche Titel; gemerkte Bücher werden aus den Ergebnissen entfernt.
-                    Solr-Balancierung, frühere Vorschläge und Sprach-/Medienartfilter werden dort
-                    nicht berücksichtigt, sodass der Dienst dieselben Titel erneut liefern kann.</p>
+                    Solr-Balancierung und Sprach-/Medienartfilter werden dort nicht berücksichtigt.</p>
 
                 <h2 id="implementation">Definitionen und Implementierung</h2>
                 <p><a href="https://github.com/it-at-m/bib-pods/blob/main/bib-src/definitions/vocabulary.ttl">vocabulary.ttl</a>
@@ -187,7 +184,7 @@
                 : "kein Profil im Browser-Speicher"
 
             // Browse the whole catalogue pool, as in the widget's count link.
-            // Candidate retrieval, history and ranking are documented separately.
+            // Candidate retrieval and ranking are documented separately.
             function queryPageHref(strategy, { q, fq }) {
                 const params = new URLSearchParams()
                 params.set("q", q)
@@ -248,7 +245,7 @@
                 selectionLink.textContent = isInspira ? "Ähnlichkeit zur Merkliste"
                     : isAnd ? "Alle Angaben zusammen" : "Kombination zuerst, dann ausgleichen"
                 const limit = document.createElement("small")
-                limit.textContent = `${isInspira ? "inspira_BIB" : "Solr"} · bis zu ${s.maxSuggestions ?? DEFAULT_RECOMMENDATION_LIMIT} Ergebnisse je Prüfung`
+                limit.textContent = `${isInspira ? "inspira_BIB" : "Solr"} · bis zu ${s.maxSuggestions ?? DEFAULT_RECOMMENDATION_LIMIT} Vorschläge je Reihe`
                 selectionCell.append(selectionLink, limit)
                 tr.appendChild(selectionCell)
 

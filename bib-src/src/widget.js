@@ -1,9 +1,9 @@
-import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, getAccessControlMode, warmupStorage, loadStore, listMessages, markMessageRead, addMessageIfNew, replaceSubjectObjects } from "cori-sdk/storage/index.js"
+import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, getAccessControlMode, warmupStorage, loadStore, replaceSubjectObjects } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
 import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
-import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, orderDocsByProfile, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
+import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl, fetchBook, parseCatalogueRef, resolveCatalogueRef, OnleiheUnavailableError } from "./catalogue.js"
 import { cleanAuthorName } from "./book-prompt.js"
 import { grantMerklisteAccess, revokeMerklisteAccess, readMerklisteAccessControl } from "./publish.js"
@@ -82,13 +82,6 @@ function reparentIntoMainContents(root) {
 
 function warmup() {
     warmupStorage().catch(err => console.error("Storage warmup failed:", err))
-}
-
-// Unread recommendation messages, or null when storage can't be read at all (e.g. a Solid
-// session that hasn't been restored) — lets callers tell "none" apart from "unknown".
-async function readUnread() {
-    if (!isStorageReady()) return null
-    return (await listMessages()).filter(m => !m.read)
 }
 
 // The single reverse action behind every "Abmelden": end any Solid session and forget the
@@ -172,9 +165,10 @@ function buildLane(label, items, ctx, buildSlide = buildCard) {
 
 // One coverflow slide: the cover on top, then the title (linked to the catalogue when we
 // have a SOPAC id) and author below — the library's column-reverse card. Adds our two
-// affordances the library card lacks: a "seen" dismiss control over the cover, and the
+// affordances the library card lacks: a dismiss control over the cover, and the
 // card's own "why recommended" tooltip on hover.
-function buildCard({ uri, title, author, sopacId, coverUrl, explanation }, { onDismiss, tip }) {
+function buildCard(item, { onDismiss, tip }) {
+    const { title, author, sopacId, coverUrl, explanation } = item
     const slide = document.createElement("li")
     slide.className = "bp-cf-slide"
     if (explanation) {
@@ -225,9 +219,9 @@ function buildCard({ uri, title, author, sopacId, coverUrl, explanation }, { onD
     dismiss.type = "button"
     dismiss.className = "bp-cf-dismiss bp-round-btn"
     dismiss.textContent = "✕"
-    dismiss.title = "Als gesehen markieren"
-    dismiss.setAttribute("aria-label", "Als gesehen markieren")
-    dismiss.addEventListener("click", () => onDismiss(uri))
+    dismiss.title = "Nicht mehr vorschlagen"
+    dismiss.setAttribute("aria-label", "Nicht mehr vorschlagen")
+    dismiss.addEventListener("click", () => onDismiss(item))
     image.appendChild(dismiss)
 
     // DOM order desc → image; the wrap's column-reverse renders the cover on top, text below.
@@ -361,7 +355,7 @@ function createTip(root) {
 
 // Two embeds share this entry point. The main (bib-pods) page inlines the whole control
 // centre (mountLanding); every other library page gets just a button + modal (mountCompact).
-// Card decoration and the notification count are common; each embed owns its own DOM.
+// Card decoration is common; each embed owns its own DOM.
 export async function installWidget(root, { solrEndpoint, qdrantEndpoint, solidCallbackUrl, openBookPrompt, landing = false, mainHref } = {}) {
     injectStyles()
     reparentIntoMainContents(root)
@@ -378,8 +372,8 @@ export async function installWidget(root, { solrEndpoint, qdrantEndpoint, solidC
 }
 
 // Compact embed (every non-main library page): an entry button opening a modal with the
-// session control, the unread-recommendations count, and links back to the main page. It
-// also decorates the host page's catalogue cards. Only reached when already activated
+// session control and links back to the main page. It also decorates the host page's
+// catalogue cards. Only reached when already activated
 // (the host gates the mount), so a logged-out state here means the user just hit Abmelden.
 function mountCompact({ root, solrEndpoint, openBookPrompt, mainHref }) {
     // insertAdjacentHTML appends, so the book-prompt dialog installed in main.js survives.
@@ -393,36 +387,18 @@ function mountCompact({ root, solrEndpoint, openBookPrompt, mainHref }) {
     root.appendChild(dialog)
 
     const openBtn = root.querySelector(".bp-open-btn")
-    const badge = root.querySelector(".bp-badge")
     const closeBtn = dialog.querySelector(".bp-modal-close")
     const logoutBtn = dialog.querySelector(".bp-logout")
     const loginHint = dialog.querySelector("#bp-login-hint")
-    const noNotifications = dialog.querySelector("#bp-no-notifications")
-    const recLink = dialog.querySelector("#bp-recommendations-link")
     const loginLink = dialog.querySelector("#bp-login-link")
     const homeLink = dialog.querySelector("#bp-home-link")
 
-    // All three links target the main page (present on every compact embed). The login
+    // Both links target the main page (present on every compact embed). The login
     // hint points at the Anmelden CTA — the visible first step, not the hidden chooser.
-    recLink.href = (mainHref ?? "") + "#bp-showcase"
     loginLink.href = (mainHref ?? "") + "#bp-login-cta"
     homeLink.href = mainHref ?? "#"
     // Close the dialog first, then let the browser follow the href.
-    for (const a of [recLink, loginLink, homeLink]) a.addEventListener("click", () => dialog.close())
-
-    // Unread count → button badge + modal line. null means storage can't be read (Solid
-    // session gone), so we neither show a count nor claim an empty inbox.
-    async function renderCount() {
-        const unread = await readUnread()
-        const n = unread?.length ?? 0
-        badge.hidden = n === 0
-        recLink.hidden = n === 0
-        if (n > 0) {
-            badge.textContent = n > 9 ? "9+" : String(n)
-            recLink.textContent = `${n} neue Empfehlung${n === 1 ? "" : "en"}`
-        }
-        noNotifications.hidden = !(unread && n === 0)
-    }
+    for (const a of [loginLink, homeLink]) a.addEventListener("click", () => dialog.close())
 
     function applyState() {
         const active = isActivated()
@@ -430,7 +406,6 @@ function mountCompact({ root, solrEndpoint, openBookPrompt, mainHref }) {
         // appears when nothing is chosen or a Solid session has lapsed.
         logoutBtn.hidden = !active
         loginHint.hidden = active && isStorageReady()
-        renderCount()
         if (active) decorateCards({ solrEndpoint, onBookClick: openBookPrompt })
         else undecorateCards()
     }
@@ -479,9 +454,9 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const logoutBtn = root.querySelector(".bp-logout")
     const activatedBlocks = root.querySelectorAll(".bp-when-activated")
     const profileEl = root.querySelector("cori-profile")
-    // Solr docs by SOPAC id, shared by the profile's Merkliste and the lanes' per-card
-    // explanations: each id resolves once per page view (the map caches the promise;
-    // a failed lookup yields null and callers degrade gracefully).
+    // Solr docs by SOPAC id for the profile's Merkliste, which re-renders on every
+    // profile refresh: each id resolves once per page view (the map caches the promise;
+    // a failed lookup yields null and the tile degrades gracefully).
     const docCache = new Map()
     function fetchDocCached(id) {
         if (!docCache.has(id)) docCache.set(id, fetchBook(solrEndpoint, id).catch(() => null))
@@ -575,7 +550,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             renderLanes()
             decorateCards({ solrEndpoint, onBookClick: openBookPrompt })
         } else {
-            lanes.hidden = true
+            discardShelf()
             undecorateCards()
         }
 
@@ -694,60 +669,110 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
-    // The Schaufenster: one carousel per strategy of unread recommendations (seen ones drop
-    // out, so a fully-seen strategy disappears). Empty / unreadable → hide the lanes.
-    // Each render replaces the lanes wholesale, so first tear down the previous carousels'
-    // resize observers to avoid leaking them across renders.
+    // The Schaufenster: one carousel per enabled strategy that found books. The shelf is
+    // computed from profile + catalogue on "Empfehlungen prüfen" and is never stored, so
+    // it is empty after a reload and the same profile shows other books once the
+    // catalogue changes. Other state changes re-render the shelf on hand.
+    let shelf = null            // [{ strategy, docs }] of the latest run; null until it lands
+    let shelfRun = 0            // a run whose number is no longer current drops its result
+    let shelfLoading = false
+    const checkRecLabel = checkRecLink.textContent
+
+    async function refreshShelf() {
+        if (shelfLoading) return
+        if (!isStorageReady()) {
+            // Only Solid can be not-ready: the choice is persisted but the session wasn't
+            // restored (pod offline or expired).
+            window.alert("Keine Verbindung zum Pod. Lade die Seite neu, sobald dein Pod wieder erreichbar ist.")
+            return
+        }
+        const run = ++shelfRun
+        shelfLoading = true
+        checkRecLink.textContent = "Lädt …"
+        try {
+            const profileStore = await loadStore()
+            const { results, serverUnreachable } = await runRecommendations(profileStore, getProfileSubject(), { solrEndpoint, qdrantEndpoint })
+            if (run !== shelfRun) return
+            shelf = results.filter(({ docs }) => docs.length > 0)
+            if (shelf.length === 0) {
+                window.alert(serverUnreachable
+                    ? "Der Empfehlungsdienst ist zurzeit nicht erreichbar. Bitte versuche es später erneut."
+                    : "Keine Empfehlungen gefunden — vielleicht fehlen noch Profileinträge?")
+            }
+            renderLanes()
+        } catch (err) {
+            if (run !== shelfRun) return
+            console.error("[bib-pods] recommendations failed:", err)
+            window.alert("Empfehlungen konnten nicht geladen werden:\n" + storageErrorMessage(err))
+        } finally {
+            if (run === shelfRun) {
+                shelfLoading = false
+                checkRecLink.textContent = checkRecLabel
+            }
+        }
+    }
+
+    // Logging out leaves nothing of this profile's shelf behind, including a run still
+    // in flight.
+    function discardShelf() {
+        shelfRun++
+        laneRender++
+        shelf = null
+        shelfLoading = false
+        checkRecLink.textContent = checkRecLabel
+        clearLanes()
+    }
+
+    // Each render replaces the lanes wholesale, so it first tears down the previous
+    // carousels' resize observers to avoid leaking them across renders.
     let carouselCleanups = []
-    async function renderLanes() {
+    function clearLanes() {
         for (const cleanup of carouselCleanups) cleanup()
         carouselCleanups = []
-        // Re-renders keep each lane's scroll position (dismissing a card would
-        // otherwise snap the carousel back to the start); restoring clamps to the
-        // new maximum, so a shortened lane stays right-aligned.
-        const scrollLeftByLane = new Map([...lanes.querySelectorAll(".bp-cf")].map(lane =>
-            [lane.dataset.label, lane.querySelector(".bp-cf-track").scrollLeft]))
-        const unread = await readUnread()
-        if (!unread || unread.length === 0) { lanes.replaceChildren(); lanes.hidden = true; return }
+        lanes.replaceChildren()
+        lanes.hidden = true
+    }
+
+    let laneRender = 0          // like shelfRun: only the latest render may touch the DOM
+    async function renderLanes() {
+        const render = ++laneRender
+        const current = shelf
+        if (!current?.length) { clearLanes(); return }
         try {
             const profileStore = await loadStore()
             const profileSubject = getProfileSubject()
-            const strategyByLabel = new Map(getStrategies().map(s => [s.label, s]))
-            // Message content is "label\ntitle\nauthor\nisbn" (see checkRecommendations);
-            // refersTo is the SOPAC id. Group the unread into one lane per strategy.
-            const byStrategy = new Map()
-            for (const m of unread) {
-                const [label, title, author, isbn] = m.content.split("\n")
-                if (!byStrategy.has(label)) byStrategy.set(label, [])
-                const coverUrl = isbn && coverBase ? coverBase + encodeURIComponent(isbn) : null
-                byStrategy.get(label).push({ uri: m.uri, title, author, sopacId: m.refersTo, coverUrl })
-            }
             const frag = document.createDocumentFragment()
-            for (const [label, items] of byStrategy) {
-                const strategy = strategyByLabel.get(label)
-                const laneExplanation = strategy ? await explainStrategy(strategy, profileStore, profileSubject) : null
-                // How deep the matching catalogue pool behind this lane is. The
-                // count includes already-seen records — it sizes the catalogue pool, not
-                // an unseen queue.
-                const total = strategy ? await countStrategyMatches(strategy, profileStore, profileSubject, solrEndpoint) : null
-                const more = total === null ? null : Math.max(0, total - items.length)
+            for (const { strategy, docs } of current) {
+                const laneExplanation = await explainStrategy(strategy, profileStore, profileSubject)
+                // How deep the matching catalogue pool behind this lane is, cards on
+                // display included.
+                const total = await countStrategyMatches(strategy, profileStore, profileSubject, solrEndpoint)
+                const more = total === null ? null : Math.max(0, total - docs.length)
                 const query = total === null ? null : buildQuery(strategy, profileStore, profileSubject)
                 const moreHref = query ? queryPageHref(strategy, query, solrEndpoint) : null
                 // Per-card precision: check which profile facts the recommended book itself
-                // carries. The strategy-level text is the fallback — for docs that can't be
-                // fetched, and for non-symbolic matches (inspira's vector similarity).
-                const docs = []
-                for (const item of items) {
-                    const doc = item.sopacId ? await fetchDocCached(item.sopacId) : null
-                    if (doc) docs.push(doc)
-                    item.explanation = (doc && explainDocMatches(doc, profileStore, profileSubject, strategy?.properties)) ?? laneExplanation
-                }
-                const order = new Map(orderDocsByProfile(docs, strategy, profileStore, profileSubject)
-                    .map((doc, index) => [doc.id, index]))
-                items.sort((a, b) => (order.get(a.sopacId) ?? Infinity) - (order.get(b.sopacId) ?? Infinity))
-                frag.appendChild(buildLane(label, items, { onDismiss: dismissCard, tip, more, moreHref }))
+                // carries. The strategy-level text is the fallback for non-symbolic matches
+                // (inspira's vector similarity).
+                const items = docs.map(doc => {
+                    const isbn = doc.isbn?.[0]
+                    return {
+                        title: doc.title?.[0] ?? doc.id,
+                        author: doc.author?.[0] ?? "",
+                        sopacId: doc.id,
+                        coverUrl: isbn && coverBase ? coverBase + encodeURIComponent(isbn) : null,
+                        explanation: explainDocMatches(doc, profileStore, profileSubject, strategy.properties) ?? laneExplanation,
+                    }
+                })
+                frag.appendChild(buildLane(strategy.label, items, { onDismiss: dismissCard, tip, more, moreHref }))
             }
-            lanes.replaceChildren(frag)
+            if (render !== laneRender) return
+            // Re-renders keep each lane's scroll position (a profile edit would otherwise
+            // snap the carousel back to the start); restoring clamps to the new maximum,
+            // so a shortened lane stays right-aligned.
+            const scrollLeftByLane = new Map([...lanes.querySelectorAll(".bp-cf")].map(lane =>
+                [lane.dataset.label, lane.querySelector(".bp-cf-track").scrollLeft]))
+            clearLanes()
+            lanes.append(frag)
             lanes.hidden = false
             // Now that the lanes are in the document, wire each into a working carousel
             // (dot counts need measured widths, so this must run post-insertion).
@@ -757,58 +782,16 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
                 if (prev) lane.querySelector(".bp-cf-track").scrollLeft = prev
             }
         } catch (err) {
+            if (render !== laneRender) return
             console.error("[bib-pods] showcase render failed:", err)
-            lanes.replaceChildren()
-            lanes.hidden = true
+            clearLanes()
         }
     }
 
-    // Mark a recommendation seen: it leaves its lane, and the lane goes once it's empty.
-    async function dismissCard(uri) {
-        try { await markMessageRead(uri); renderLanes() }
-        catch (err) { console.error("[bib-pods] markMessageRead failed:", err) }
-    }
-
-    // "Empfehlungen prüfen": generate recommendations here and store the new ones as
-    // messages (surfaced as notifications everywhere). Guards against concurrent runs.
-    let recCheckBusy = false
-    async function checkRecommendations() {
-        if (recCheckBusy) return
-        if (!isStorageReady()) {
-            // Only Solid can be not-ready: the choice is persisted but the session wasn't
-            // restored (pod offline or expired).
-            window.alert("Keine Verbindung zum Pod. Lade die Seite neu, sobald dein Pod wieder erreichbar ist.")
-            return
-        }
-        recCheckBusy = true
-        const label = checkRecLink.textContent
-        checkRecLink.textContent = "Lädt …"
-        try {
-            const profileStore = await loadStore()
-            const { results, serverUnreachable } = await runRecommendations(profileStore, getProfileSubject(), { solrEndpoint, qdrantEndpoint })
-            const items = results.flatMap(({ strategy, docs }) => docs.map(doc => ({ strategy, doc })))
-            if (items.length === 0) {
-                window.alert(serverUnreachable
-                    ? "Der Empfehlungsdienst ist zurzeit nicht erreichbar. Bitte versuche es später erneut."
-                    : "Keine Empfehlungen gefunden — vielleicht fehlen noch Profileinträge?")
-            } else {
-                // Identical recommendations (same strategy + book) are skipped, whether
-                // already seen or still unread (see addMessageIfNew).
-                for (const { strategy, doc } of items) {
-                    const title = doc.title?.[0] ?? doc.id
-                    const author = doc.author?.[0] ?? ""
-                    const isbn = doc.isbn?.[0] ?? ""
-                    await addMessageIfNew(`${strategy.label}\n${title}\n${author}\n${isbn}`, doc.id)
-                }
-            }
-            applyState()
-        } catch (err) {
-            console.error("[bib-pods] recommendations failed:", err)
-            window.alert("Empfehlungen konnten nicht geladen werden:\n" + storageErrorMessage(err))
-        } finally {
-            checkRecLink.textContent = label
-            recCheckBusy = false
-        }
+    // TODO: store the title as a profile exclusion that every lane filters out, and drop
+    // the card from the shelf.
+    function dismissCard({ sopacId, title }) {
+        console.log(`[bib-pods] TODO: exclude ${sopacId} („${title}“) from recommendations — not implemented yet`)
     }
 
     // Strategy multiselect: a summary trigger ("2 von 5 Empfehlungsarten") over a
@@ -1012,13 +995,9 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     })
     // Editing after a rejection retracts the complaint about the previous input.
     addTitleInput.addEventListener("input", () => { if (!addTitleMsg.hidden) showAddTitleMsg(null) })
-    checkRecLink.addEventListener("click", (e) => { e.preventDefault(); checkRecommendations() })
+    checkRecLink.addEventListener("click", (e) => { e.preventDefault(); refreshShelf() })
 
     applyState()
-
-    // Arriving via a modal's #bp-showcase link: the landing content mounts async, so the
-    // browser's on-load fragment jump can miss it — scroll once it's in place.
-    if (location.hash === "#bp-showcase") root.querySelector("#bp-showcase")?.scrollIntoView()
 
     return { applyState }
 }

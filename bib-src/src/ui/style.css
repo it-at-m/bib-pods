@@ -1,25 +1,7 @@
 .bp-entry { text-align: right; }
-.bp-open-btn { position: relative; }
-.bp-badge {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    border-radius: 9px;
-    background: var(--contrastcolor, #d14900);
-    color: #fff;
-    font-size: 11px;
-    font-weight: bold;
-    line-height: 18px;
-    text-align: center;
-    box-shadow: 0 0 0 2px #fff;
-}
-.bp-badge[hidden] { display: none; }
 
 /* Shared round icon-button look: decorate-cards.js's "+" (injected on host catalogue
-   cards, e.g. the production coverflow) and the carousel's "seen" control below both use
+   cards, e.g. the production coverflow) and the carousel's dismiss control below both use
    this — same circle/border/shadow, differing only by glyph, color and where they sit. */
 .bp-round-btn { width: 1.7em; height: 1.7em; padding: 0; font-size: 1.1em; font-weight: bold;
     line-height: 1; border: 1px solid currentColor; border-radius: 50%;
@@ -117,7 +99,7 @@
 .bp-cf-noimage { width: 100%; min-height: 160px; display: flex; color: #b3aea3; }
 .bp-cf-noimage svg { width: 56px; height: 56px; margin: auto; }
 
-/* "seen" control over the cover's top-right corner — the .bp-round-btn look (see above),
+/* Dismiss control over the cover's top-right corner — the .bp-round-btn look (see above),
    colored to match the carousel's own accent (arrows/dots) rather than the host's. Sized a
    touch below .bp-round-btn's own default — the host's "+" button sits on a full-size
    catalogue card, ours sits on this carousel's smaller cover. */
@@ -181,12 +163,12 @@ dialog.bp-modal {
     max-height: 92vh;
     overflow: auto;
 }
-/* The bib-pods modal is a compact account/notifications menu, so it's much narrower
-   than the shared .bp-modal width; the book-prompt keeps the wider default. px (not rem):
-   TYPO3 sets html{font-size:62.5%} (root=10px) but body{font-size:1.8rem} (body text=18px)
-   — two different scaling bases. A rem-sized box shrinks to ~220px there while the text
-   inside still renders at the larger 18px, so "3 neue Empfehlungen" no longer fit on one
-   line and the whole modal read as cramped. px decouples the box from that mismatch. */
+/* The bib-pods modal is a compact account menu, so it's much narrower than the shared
+   .bp-modal width; the book-prompt keeps the wider default. px (not rem): TYPO3 sets
+   html{font-size:62.5%} (root=10px) but body{font-size:1.8rem} (body text=18px) — two
+   different scaling bases. A rem-sized box shrinks to ~220px there while the text inside
+   still renders at the larger 18px, so the modal reads as cramped. px decouples the box
+   from that mismatch. */
 dialog.bp-pods-modal {
     max-width: min(360px, 92vw) !important;
     width: min(360px, 92vw) !important;
@@ -236,8 +218,7 @@ dialog.bp-access-dialog {
     font-family: ui-monospace, Menlo, monospace; font-size: 11px; line-height: 1.5;
 }
 /* The bib-pods modal is a small, plain account panel: a close ✕ in the corner, the
-   title, the unread-recommendations line + a link to the main page, and a quiet
-   Abmelden action set off by a hairline. */
+   title, a link to the main page, and a quiet Abmelden action set off by a hairline. */
 .bp-pods-modal .bp-modal-content { position: relative; padding: 22px 26px; }
 .bp-pods-modal #bp-modal-title { margin: 0 0 16px; font-size: 20px; }
 .bp-pods-modal .bp-modal-close {
@@ -248,13 +229,9 @@ dialog.bp-access-dialog {
     font-size: 22px; line-height: 1; color: #999; cursor: pointer;
 }
 .bp-pods-modal .bp-modal-close:hover { background: #f0f0f0; color: #333; }
-/* Notifications line + link home, stacked and left-aligned. */
+/* The modal's body content, stacked and left-aligned. */
 .bp-modal-body { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
 .bp-modal-note { margin: 0; color: #888; font-size: 0.95em; }
-/* nowrap: with the box now sized in px (see dialog.bp-pods-modal above) there's reliably
-   enough room for this on one line on both hosts, so pin it rather than leave it to chance. */
-.bp-modal-rec { color: var(--contrastcolor, #d14900); font-weight: 600; text-decoration: none; white-space: nowrap; }
-.bp-modal-rec:hover { text-decoration: underline; }
 .bp-modal-link { color: #222; text-decoration: none; font-weight: 500; }
 .bp-modal-link:hover { color: var(--contrastcolor, #d14900); text-decoration: underline; }
 /* Quiet secondary action, set off by a hairline. Resets the docs/host global <button>
@@ -751,10 +728,6 @@ cori-profile .cori-profile-actions button:hover { color: #222; }
 }
 .bp-block > :first-child { margin-top: 0; }
 .bp-block > :last-child { margin-bottom: 0; }
-
-/* #bp-showcase is the scroll anchor for the modal's recommendations link; the
-   margin keeps it off the very top edge (clear of any host header) when scrolled to. */
-.bp-showcase { scroll-margin-top: 1rem; }
 
 /* Top blocks (intro / how-to / privacy): stacked while inactive, with their
    <summary> acting as a plain, non-interactive heading. */

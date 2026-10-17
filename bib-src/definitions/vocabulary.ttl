@@ -233,7 +233,7 @@ bp:engine a rdf:Property ; # which backend computes the strategy's results
     rdfs:domain bp:RecommendationStrategy ;
     rdfs:range bp:RecommendationEngine .
 
-bp:maxSuggestions a rdf:Property ; # results per check, not the total size of the saved shelf; default: runner limit (normally 3)
+bp:maxSuggestions a rdf:Property ; # how many books the strategy's lane shows; default: runner limit (normally 3)
     rdfs:domain bp:RecommendationStrategy ;
     rdfs:range xsd:integer .
 

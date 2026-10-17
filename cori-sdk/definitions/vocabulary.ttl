@@ -86,25 +86,6 @@ cori:PersonalSection a cori:ProfileSection ;
     rdfs:label "personal"@en, "Persönliches"@de ;
     cori:order 10 .
 
-cori:Message a rdfs:Class ;
-    rdfs:label "message" ;
-    rdfs:comment "A recommendation or notification shown to the user in the cockpit." .
-
-cori:content a rdf:Property ;
-    rdfs:label "content" ;
-    rdfs:domain cori:Message ;
-    rdfs:range xsd:string .
-
-cori:read a rdf:Property ;
-    rdfs:label "read" ;
-    rdfs:domain cori:Message ;
-    rdfs:range xsd:boolean .
-
-cori:refersToEntity a rdf:Property ;
-    rdfs:label "refers to entity" ;
-    rdfs:domain cori:Message ;
-    rdfs:range xsd:string .
-
 # ----- App configuration -----
 
 cori:appName a rdf:Property ;

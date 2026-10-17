@@ -1,4 +1,4 @@
-import { addTriple, storeToTurtle, storeFromTurtles } from "@foerderfunke/sem-ops-utils/core"
+import { storeToTurtle, storeFromTurtles } from "@foerderfunke/sem-ops-utils/core"
 import { Writer, DataFactory } from "n3"
 import coriVocabTtl from "./definitions/vocabulary.ttl.js"
 
@@ -85,10 +85,6 @@ export function getPluralLabel(uri) {
     return preferDe(getVocab().getObjects(uri, CORI + "pluralLabel", null))
 }
 
-export function mintMessageUri() {
-    return CORI + "msg-" + Math.random().toString(36).slice(2, 7)
-}
-
 // User-facing message for a failed storage operation. fetch rejects with
 // TypeError on network-level failure, i.e. the storage backend (e.g. the
 // user's pod server) is unreachable — application-level errors carry a
@@ -106,13 +102,6 @@ export function subjectsOfType(store, typeIri) {
 // if multiple values exist, returns the first one
 export function getOne(store, subject, predicate) {
     return store.getObjects(subject, predicate, null)[0]?.value
-}
-
-export function replaceProperty(store, subject, predicate, value) {
-    for (const q of store.getQuads(subject, predicate, null, null)) {
-        store.removeQuad(q)
-    }
-    addTriple(store, subject, predicate, value)
 }
 
 export function parseTurtle(text) {
