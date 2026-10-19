@@ -219,3 +219,8 @@ test("an empty Merkliste does not mask an unreachable catalogue", async t => {
     assert.equal(run.serverUnreachable, true)
     assert.ok(calls.every(url => url === endpoint), "no request to inspira")
 })
+
+test("genres and places feed the interests lane as alternatives of their own", () => {
+    const store = parseTurtle(`<${subject}> <${BP}favoriteGenre> "Autobiografie" ; <${BP}interestedInPlace> "Alpen" .`)
+    assert.deepEqual(buildRecommendationQueries(strategy, store, subject).map(q => q.q), ['genre:"Autobiografie"', 'geographic:"Alpen"'])
+})

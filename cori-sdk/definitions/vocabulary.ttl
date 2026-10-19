@@ -22,7 +22,8 @@ cori:username a rdf:Property ;
     rdfs:domain cori:Profile ;
     rdfs:range xsd:string ;
     cori:inSection cori:PersonalSection ;
-    cori:order 10 .
+    cori:order 10 ;
+    cori:assistantQuestion false . # a name for the profile, nothing the profile's use depends on
 
 cori:comment a rdf:Property ;
     rdfs:label "comment"@en, "Kommentar"@de ;
@@ -73,6 +74,16 @@ cori:assistantQuestion a rdf:Property ;
     rdfs:domain rdf:Property ;
     rdfs:range xsd:boolean ;
     rdfs:comment "Whether the dialog assistant asks about this profile field. false = the field's values arrive through dedicated interactions (e.g. catalogue clicks) or the field doesn't suit a guided question (free-form remarks). Unset counts as true." .
+
+cori:assistantPrompt a rdf:Property ;
+    rdfs:domain rdf:Property ;
+    rdfs:range rdf:langString ;
+    rdfs:comment "The question the dialog assistant asks for an empty field. Unset: a generic question built from the field's label." .
+
+cori:assistantExample a rdf:Property ;
+    rdfs:domain rdf:Property ;
+    rdfs:range rdf:langString ;
+    rdfs:comment "A sample answer the dialog assistant shows in a free-text field's input, e.g. in the spelling that matches best." .
 
 # ----- Closed value sets for profile fields -----
 

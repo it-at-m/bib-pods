@@ -57,9 +57,11 @@ test("scan proposals leave strategy settings and other profile categories alone"
     assert.equal(resolveStrategyEnabled(strategy, readStrategyChoices(store)), false)
 })
 
-test("separate place information does not masquerade as a location filter in the existing topic strategy", async () => {
+test("separate place information does not masquerade as a location filter in the interests strategy", async () => {
     const store = await profile()
     const before = buildQuery(strategy, store, subject)
     store.addQuads(parseTurtle(`<${subject}> <${BP}interestedInPlace> <${GND}4127793-4> .`).getQuads())
-    assert.deepEqual(buildQuery(strategy, store, subject), before)
+    const after = buildQuery(strategy, store, subject)
+    assert.deepEqual(after.fq, before.fq, "a place is no filter")
+    assert.ok(after.q.includes(`geographic_uri_str_mv:"${GND}4127793-4"`) && after.q.includes(before.q.replace(/^\(|\)$/g, "")), "it is one more alternative")
 })

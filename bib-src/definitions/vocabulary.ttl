@@ -28,7 +28,8 @@ bp:favoriteWork a rdf:Property ;
     rdfs:domain cori:Profile ;
     rdfs:range bf:Work ;
     cori:inSection bp:TasteSection ;
-    cori:order 30 .
+    cori:order 30 ;
+    cori:assistantQuestion false . # free text no strategy reads; a liked book goes in through „Titel hinzufügen“
 
 bp:favoriteAuthor a rdf:Property ;
     rdfs:label "favorite author"@en, "Autor*in"@de ;
@@ -38,6 +39,9 @@ bp:favoriteAuthor a rdf:Property ;
     cori:inSection bp:TasteSection ;
     cori:order 10 ;
     bp:explanationPhrase "dir {value} gefällt"@de ;
+    cori:assistantPrompt "Welche Autor*innen liest du gern?"@de ;
+    # the catalogue's own "Nachname, Vorname" form — the typed "Cornelia Funke" matches nothing
+    cori:assistantExample "Nachname, Vorname – z. B. Funke, Cornelia"@de ;
     bp:linkedToIndex [
         bp:labelField "author" ;
         bp:iriField "author_uri_str_mv"
@@ -58,6 +62,7 @@ bp:favoriteGenre a rdf:Property ;
     cori:allowedValues bp:GenreValues ;
     cori:storeAs cori:LabelLiteral ;
     bp:explanationPhrase "du das Genre {value} magst"@de ;
+    cori:assistantPrompt "Welche Arten von Büchern liest du gern?"@de ;
     bp:linkedToIndex [
         bp:labelField "genre" ;
         bp:iriField "genre_uri_str_mv"
@@ -71,6 +76,9 @@ bp:interestedIn a rdf:Property ;
     cori:inSection bp:TasteSection ;
     cori:order 40 ;
     bp:explanationPhrase "du dich für {value} interessierst"@de ;
+    cori:assistantPrompt "Welche Themen interessieren dich?"@de ;
+    # one topic per entry, in the singular of the catalogue's subject headings ("Pferd", not "Pferde")
+    cori:assistantExample "ein Thema, z. B. Fotografie"@de ;
     bp:linkedToIndex [
         bp:labelField "topic" ;
         bp:iriField "topic_uri_str_mv"
@@ -91,6 +99,7 @@ bp:interestedInPlace a rdf:Property ;
     cori:allowedValues bp:PlaceValues ;
     cori:storeAs cori:LabelLiteral ;
     bp:explanationPhrase "es um {value} geht"@de ;
+    cori:assistantPrompt "Über welche Orte oder Regionen liest du gern?"@de ;
     bp:linkedToIndex [
         bp:labelField "geographic" ;
         bp:iriField "geographic_uri_str_mv"
@@ -110,6 +119,7 @@ bp:preferredLanguage a rdf:Property, bp:RecommendationFilter ;
     cori:allowedValues bp:LanguageValues ;
     cori:storeAs cori:ConceptIri ;
     bp:explanationPhrase "es auf {value} erschienen ist"@de ;
+    cori:assistantPrompt "In welchen Sprachen möchtest du lesen?"@de ;
     bp:linkedToIndex [
         bp:labelField "language"
     ] .
@@ -127,6 +137,7 @@ bp:preferredMedium a rdf:Property, bp:RecommendationFilter ;
     cori:allowedValues bp:MediumValues ;
     cori:storeAs cori:ConceptIri ;
     bp:explanationPhrase "es als {value} vorliegt"@de ;
+    cori:assistantPrompt "Welche Medienarten bevorzugst du?"@de ;
     bp:linkedToIndex [
         bp:labelField "format"
     ] .
@@ -147,7 +158,8 @@ bp:hobby a rdf:Property ;
     rdfs:domain cori:Profile ;
     rdfs:range xsd:string ;
     cori:inSection bp:HobbiesSection ;
-    cori:order 10 .
+    cori:order 10 ;
+    cori:assistantQuestion false . # free text no strategy reads
 
 bp:sourceLabel a rdf:Property .
 
@@ -367,28 +379,18 @@ bp:authorAndTopic a bp:RecommendationStrategy ;
     bp:usesProfileProperty bp:favoriteAuthor, bp:interestedIn ;
     bp:combine bp:And .
 
-# The topic field is the index's best GND-linked subject substrate; genre and
-# geographic matching work label-first (genre carries virtually no authority
-# links in the MSB data) — see interim-index/field-notes.md §4.
+# Topics, genres and places share one lane: each value is an alternative input, and
+# the selection balances the inputs, so a broad genre takes a fair share rather than
+# the whole lane. The topic field is the index's best GND-linked subject substrate;
+# genre and geographic matching work label-first (genre carries virtually no
+# authority links in the MSB data) — see interim-index/field-notes.md §4.
 bp:topicMatch a bp:RecommendationStrategy ;
-    rdfs:label "Passend zu deinen Themen"@de ;
+    rdfs:label "Passend zu deinen Interessen"@de ;
     bp:engine bp:SolrEngine ;
-    bp:usesProfileProperty bp:interestedIn ;
+    bp:usesProfileProperty bp:interestedIn, bp:favoriteGenre, bp:interestedInPlace ;
     bp:combine bp:Or ;
     bp:maxSuggestions 6 ;
     bp:enabledByDefault true .
-
-bp:genreMatch a bp:RecommendationStrategy ;
-    rdfs:label "Aus deinen Genres"@de ;
-    bp:engine bp:SolrEngine ;
-    bp:usesProfileProperty bp:favoriteGenre ;
-    bp:combine bp:Or .
-
-bp:placeMatch a bp:RecommendationStrategy ;
-    rdfs:label "Rund um deine Orte & Regionen"@de ;
-    bp:engine bp:SolrEngine ;
-    bp:usesProfileProperty bp:interestedInPlace ;
-    bp:combine bp:Or .
 
 bp:savedBookSimilarity a bp:RecommendationStrategy ;
     rdfs:label "Ähnlich zu gemerkten Büchern"@de ;

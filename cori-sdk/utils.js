@@ -79,7 +79,12 @@ function preferDe(terms) {
 }
 
 export function getLabel(uri) {
-    return preferDe(getVocab().getObjects(uri, RDFS_LABEL, null))
+    return getText(uri, RDFS_LABEL)
+}
+
+// any language-tagged text of a vocabulary term, German preferred
+export function getText(uri, predicate) {
+    return preferDe(getVocab().getObjects(uri, predicate, null))
 }
 
 // cori:pluralLabel — how a UI titles a group of several values of a property

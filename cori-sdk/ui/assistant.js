@@ -1,5 +1,5 @@
 import { loadStore, addInquiryFacts, isStorageReady } from "../storage/index.js"
-import { getProfileSubject, getVocab, getLabel, getPluralLabel, getOne, contractTerm, sectionPlan, storageErrorMessage, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
+import { getProfileSubject, getVocab, getLabel, getPluralLabel, getText, getOne, contractTerm, sectionPlan, storageErrorMessage, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
 import { getProfileShapesStore } from "../shacl.js"
 
 const SH = "http://www.w3.org/ns/shacl#"
@@ -57,7 +57,8 @@ export function askableFields(fields, countOf) {
     })
 }
 
-// Article-free sentence frames: generated German with grammatical gender is a trap,
+// An empty field asks its cori:assistantPrompt where the vocabulary has one. Otherwise
+// article-free sentence frames: generated German with grammatical gender is a trap,
 // so every frame embeds the field label in a case-neutral position.
 function questionText(item, addedHere) {
     if (addedHere) return "Noch etwas?"
@@ -65,6 +66,7 @@ function questionText(item, addedHere) {
         const entries = item.count === 1 ? "schon einen Eintrag" : `schon ${item.count} Einträge`
         return `Unter „${item.label}" hast du ${entries}. Noch welche hinzufügen?`
     }
+    if (item.prompt) return item.prompt
     return item.single
         ? `Möchtest du „${item.label}" ausfüllen?`
         : `Möchtest du unter „${item.label}" etwas eintragen?`
@@ -115,6 +117,8 @@ export async function openAssistant({ host, onChange, sectionIri = null, fieldIr
                 label: (max === 1 ? null : getPluralLabel(field)) ?? getLabel(field) ?? contractTerm(field),
                 existing: (values.get(field) ?? []).map(labelOfValue),
                 choices: allowedValuesOf(field),
+                prompt: getText(field, CORI + "assistantPrompt"),
+                example: getText(field, CORI + "assistantExample"),
             })
         })
     }
@@ -180,6 +184,7 @@ export async function openAssistant({ host, onChange, sectionIri = null, fieldIr
         sourceEl.textContent = item.choices?.source ?? ""
         sourceEl.hidden = true
         input.value = ""
+        input.placeholder = item.example ?? ""
         skipBtn.textContent = addedHere ? "Weiter" : "Überspringen"
         ;(remaining ? select : input).focus()
     }
