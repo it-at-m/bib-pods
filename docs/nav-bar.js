@@ -4,7 +4,7 @@
 // capitalised first letter, overridden via LABELS where that isn't enough.
 // The "bib-pods" brand (= home link) stays visible; on narrow screens the rest
 // of the links collapse behind the .nav-toggle hamburger.
-const PAGES = ["vocabulary", "query", "plugin", "recommendations", "more"]
+const PAGES = ["vocabulary", "query", "plugin", "interactions", "recommendations", "more"]
 const LABELS = { api: "API" }
 // Pages that carry a dropdown of sub-pages. Neither has a landing page of its own —
 // Plugin's is reached via its "Hauptseite" child — so the toggle is always a <button>,
@@ -15,7 +15,6 @@ const CHILDREN = {
         { slug: "example", label: "Beispielseite" },
     ],
     more: [
-        { slug: "interactions", label: "Interactions" },
         { slug: "api", label: "API" },
         { slug: "search", label: "Search" },
         { slug: "parking-lot", label: "Parking Lot" },

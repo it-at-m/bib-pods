@@ -131,7 +131,7 @@ bp:preferredMedium a rdf:Property, bp:RecommendationFilter ;
         bp:labelField "format"
     ] .
 
-bp:savedBook a rdf:Property ; # SOPAC identifier
+bp:savedBook a rdf:Property, bp:RecommendationExclusion ; # SOPAC identifier
     rdfs:label "saved book"@en, "Gemerktes Buch"@de ;
     cori:pluralLabel "saved books"@en, "Gemerkte Bücher"@de ;
     rdfs:domain cori:Profile ;
@@ -204,8 +204,17 @@ bp:followUpQuestion a rdf:Property ;
     rdfs:domain cori:UserAction ;
     rdfs:range rdf:Property .
 
+# The profile property the action adds the title itself to (its catalogue id), e.g. the
+# Merkliste. Its checkbox comes pre-ticked; follow-up questions don't.
+bp:addsTitleTo a rdf:Property ;
+    rdfs:label "adds title to"@en ;
+    rdfs:domain cori:UserAction ;
+    rdfs:range rdf:Property .
+
 bp:BookSelection a cori:UserAction ;
-    rdfs:label "user clicks on a book --> follow-up questions"@en, "Nutzer*in klickt auf ein Buch - Folgefragen"@de ;
+    rdfs:label "save a book"@en, "Buch merken"@de ;
+    rdfs:comment "„+“ an einer Katalogkarte oder „Titel hinzufügen“ öffnet den Dialog „Was gefällt dir an diesem Buch?“."@de ;
+    bp:addsTitleTo bp:savedBook ;
     bp:followUpQuestion bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn, bp:interestedInPlace .
 
 # ----- Recommendations -----
@@ -219,6 +228,10 @@ bp:RecommendationStrategy a rdfs:Class ;
 # AND across properties ("auf Deutsch oder Englisch, und als E-Book"). The inspira
 # engine can't be filtered this way, so its lanes ignore these preferences.
 bp:RecommendationFilter a rdfs:Class .
+
+# Profile properties typed bp:RecommendationExclusion hold catalogue ids that no Solr
+# lane suggests: every strategy's query drops them as -id: fq clauses.
+bp:RecommendationExclusion a rdfs:Class .
 
 bp:usesProfileProperty a rdf:Property ;
     rdfs:domain bp:RecommendationStrategy ;

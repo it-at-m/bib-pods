@@ -1,7 +1,7 @@
 import { BP, getFollowUpsFor, LOCAL, NO_IRI } from "./vocab.js"
 import { addInquiryFacts } from "cori-sdk/storage/index.js"
 import bookPromptHtml from "./ui/book-prompt.html?raw"
-import { RDFS_LABEL, storageErrorMessage } from "cori-sdk/utils.js"
+import { RDFS_LABEL, getVocab, storageErrorMessage } from "cori-sdk/utils.js"
 
 export function installBookPrompt(root, { onSaved } = {}) {
     const bookHost = document.createElement("div")
@@ -15,6 +15,8 @@ export function installBookPrompt(root, { onSaved } = {}) {
     const bookMerklisteBox = bookDialog.querySelector("#bp-book-merkliste")
     const bookCancelBtn = bookDialog.querySelector("#bp-book-cancel")
     const bookSaveBtn = bookDialog.querySelector("#bp-book-save")
+    // where the Merkliste checkbox saves the title (bp:addsTitleTo)
+    const titleProperty = getVocab().getObjects(BP + "BookSelection", BP + "addsTitleTo", null)[0].value
     let currentSopacId = null
     let currentEntries = []
 
@@ -26,7 +28,7 @@ export function installBookPrompt(root, { onSaved } = {}) {
         if (!currentSopacId) return
         const facts = []
         if (bookMerklisteBox.checked) {
-            facts.push({ predicate: BP + "savedBook", object: currentSopacId })
+            facts.push({ predicate: titleProperty, object: currentSopacId })
         }
         for (const { predicate, cleanedLabel, rawLabel, iri, checkbox } of currentEntries) {
             if (!checkbox.checked) continue

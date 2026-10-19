@@ -183,16 +183,18 @@ function combinatorOf(v, iri) {
 //   Returns { q, fq: [filter-strings] } or null if no clauses applied.
 // Each profile fact becomes a group OR-ing across all of its bp:linkedToIndex fields
 // (e.g. author + author2). Groups are then combined via the strategy's bp:combine.
-// The fq carries what constrains rather than matches: -id: exclusions for bp:savedBook
-// entries and the profile's preference filters (see preferenceFilters).
+// The fq carries what constrains rather than matches: -id: exclusions for the ids under
+// every bp:RecommendationExclusion property (e.g. bp:savedBook) and the profile's
+// preference filters (see preferenceFilters).
 export function buildQuery(strategy, profileStore, profileSubject) {
     const v = getVocab()
     const factGroups = profileFactGroups(strategy, profileStore, profileSubject)
     if (factGroups.length === 0) return null
     const op = strategy.combine?.iri === BP + "And" ? " AND " : " OR "
     const q = factGroups.length === 1 ? factGroups[0] : `(${factGroups.join(op)})`
-    const savedIds = profileStore.getObjects(profileSubject, BP + "savedBook", null).map(o => o.value)
-    return { q, fq: [...savedIds.map(id => `-id:"${escapeSolr(id)}"`), ...preferenceFilters(v, profileStore, profileSubject)] }
+    const excludedIds = v.getSubjects(RDF_TYPE, BP + "RecommendationExclusion", null)
+        .flatMap(prop => profileStore.getObjects(profileSubject, prop, null).map(o => o.value))
+    return { q, fq: [...excludedIds.map(id => `-id:"${escapeSolr(id)}"`), ...preferenceFilters(v, profileStore, profileSubject)] }
 }
 
 // RDF has no order. Use the displayed labels so saving/reloading a profile cannot

@@ -1,83 +1,74 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Interactions — bib-pods</title>
+        <title>Interaktionen — bib-pods</title>
         <link rel="stylesheet" href="../styles.css">
         <style>
-            main { max-width: 1100px; }
-            .graph-card {
-                margin: 1.5rem 0;
+            main { max-width: 900px; }
+            .intro, .trigger { max-width: 54rem; line-height: 1.6; }
+            .action h2 { margin: 2rem 0 0.3rem; }
+            .action code {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: 0.85em;
+                font-weight: normal;
+                color: #888;
+            }
+            .action h2 code { font-size: 0.6em; }
+            .trigger { margin: 0; }
+            .fields {
+                margin: 1rem 0;
+                padding: 0.6rem 0.9rem;
+                list-style: none;
                 background: #fff;
                 border: 1px solid #e5e5e5;
                 border-radius: 6px;
-                padding: 1rem 1.2rem 1.2rem;
             }
-            .graph-card h2 {
-                margin: 0 0 0.6rem 0;
-                font-size: 1.05rem;
-            }
-            .graph-container {
-                width: 100%;
-                height: 520px;
-                border: 1px solid #eee;
-                border-radius: 4px;
-                overflow: hidden;
-            }
+            .fields li { padding: 0.25rem 0; }
+            .box { display: inline-block; width: 1.4em; color: #555; }
         </style>
         <script src="../nav-bar.js"></script>
     </head>
     <body>
         <nav-bar current="interactions"></nav-bar>
         <main>
-            <div id="graphs"></div>
+            <h1>Interaktionen</h1>
+            <p class="intro">Welche Profilfelder eine Interaktion ergänzen kann. Erzeugt aus den
+                <code>cori:UserAction</code>-Einträgen im Vokabular. Die nicht vorausgewählten Felder
+                bietet der Dialog als Folgefragen nur an, wenn der jeweilige Katalogeintrag dazu Angaben
+                enthält.</p>
+            <div id="actions"></div>
         </main>
         <script type="module">
-            import { getUserActionGraphs, ForceGraph } from "../dist/interactions.js"
+            import { getUserActions, contractTerm } from "../dist/interactions.js"
 
-            const NODE_COLOR = {
-                NamedNode: "#07a",
-                BlankNode: "#999",
-                Literal: "#3a9d3a",
+            const element = (tag, className, text) => {
+                const el = document.createElement(tag)
+                if (className) el.className = className
+                if (text !== undefined) el.textContent = text
+                return el
             }
 
-            const graphs = getUserActionGraphs()
-            const host = document.getElementById("graphs")
-            if (graphs.length === 0) {
-                host.innerHTML = "<p>No <code>cori:UserAction</code> instances found in the vocabulary.</p>"
-            }
-            for (const g of graphs) {
-                const card = document.createElement("div")
-                card.className = "graph-card"
-                const heading = document.createElement("h2")
-                heading.textContent = g.label
-                const container = document.createElement("div")
-                container.className = "graph-container"
-                card.append(heading, container)
-                host.appendChild(card)
-
-                ForceGraph()(container)
-                    .width(container.clientWidth)
-                    .height(container.clientHeight)
-                    .graphData({
-                        nodes: g.nodes.map(n => ({ ...n })),
-                        links: g.links.map(l => ({ ...l })),
-                    })
-                    .nodeLabel("label")
-                    .linkLabel("label")
-                    .linkDirectionalArrowLength(5)
-                    .linkDirectionalArrowRelPos(1)
-                    .nodeColor(n => NODE_COLOR[n.type] ?? "#444")
-                    .nodeCanvasObjectMode(() => "after")
-                    .nodeCanvasObject((node, ctx, scale) => {
-                        const fontSize = 11 / scale
-                        ctx.font = `${fontSize}px sans-serif`
-                        ctx.fillStyle = "#222"
-                        ctx.textAlign = "left"
-                        ctx.textBaseline = "middle"
-                        ctx.fillText(node.label ?? "", node.x + 7, node.y)
-                    })
+            const host = document.getElementById("actions")
+            const actions = await getUserActions()
+            if (actions.length === 0) host.append(element("p", null, "Keine Interaktionen im Vokabular."))
+            for (const action of actions) {
+                const section = element("section", "action")
+                const heading = element("h2", null, action.label + " ")
+                heading.append(element("code", null, contractTerm(action.iri)))
+                section.append(heading)
+                if (action.trigger) section.append(element("p", "trigger", action.trigger))
+                // As in the dialog: one checkbox per profile field, pre-ticked where it is there.
+                const fields = element("ul", "fields")
+                for (const field of action.fields) {
+                    const li = element("li")
+                    li.append(element("span", "box", field.preselected ? "☑" : "☐"), field.label, " ",
+                        element("code", null, contractTerm(field.property)))
+                    fields.append(li)
+                }
+                section.append(fields)
+                host.append(section)
             }
         </script>
     </body>
