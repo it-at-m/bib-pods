@@ -135,3 +135,24 @@ test("the inspira lane drops books the index finds under a blocked value, and ke
     solrUp = false
     assert.deepEqual(await lane(), ["AK2", "AK3"])
 })
+
+test("only catalogue ids from the Merkliste are sent to inspira", async t => {
+    const store = parseTurtle(`
+        <${subject}> <${BP}savedBook> "AK4264358", "mein Lieblingsbuch über Pferde", "AK12x", "4227778" .
+        <${SETTINGS_SUBJECT}> <${DISABLED_STRATEGY}> <${BP}authorMatch>, <${BP}topicMatch> .`)
+    const bodies = []
+    t.mock.method(console, "warn", () => {})
+    t.mock.method(globalThis, "fetch", async (url, init) => {
+        bodies.push(await new Response(init.body).text())
+        return { ok: true, status: 200, json: async () => ({ basedOn: [], points: [] }) }
+    })
+    await runRecommendations(store, subject, { solrEndpoint: "https://index.example/select", qdrantEndpoint: "https://inspira.example/api/recommend" })
+    assert.deepEqual(bodies.map(b => JSON.parse(b)), [{ query: { recommend: { positive: ["4264358"] } }, limit: 5 }])
+
+    const onlyText = parseTurtle(`
+        <${subject}> <${BP}savedBook> "mein Lieblingsbuch" .
+        <${SETTINGS_SUBJECT}> <${DISABLED_STRATEGY}> <${BP}authorMatch>, <${BP}topicMatch> .`)
+    bodies.length = 0
+    await runRecommendations(onlyText, subject, { solrEndpoint: "https://index.example/select", qdrantEndpoint: "https://inspira.example/api/recommend" })
+    assert.deepEqual(bodies.filter(b => b.includes("recommend")), [])
+})

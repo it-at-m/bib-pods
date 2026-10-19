@@ -1,7 +1,7 @@
 import { getVocab, contractTerm, RDF_TYPE, RDFS_LABEL, RDFS } from "cori-sdk/utils.js"
 import { sparqlSelect } from "@foerderfunke/sem-ops-utils/sparql"
 import { BP, LOCAL } from "./vocab.js"
-import { recommendFromSavedBooks } from "./qdrant.js"
+import { recommendFromSavedBooks, sendableSavedIds } from "./qdrant.js"
 
 const INSPIRA_ENGINE = BP + "InspiraEngine"
 export const DEFAULT_RECOMMENDATION_LIMIT = 3
@@ -406,8 +406,8 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
         if (!resolveStrategyEnabled(strategy, choices)) continue
 
         if (strategy.engine === INSPIRA_ENGINE) {
-            // An empty Merkliste sends nothing, so it can't vouch for a reachable backend.
-            if (profileStore.getObjects(profileSubject, BP + "savedBook", null).length === 0) continue
+            // A Merkliste with nothing to send can't vouch for a reachable backend.
+            if (sendableSavedIds(profileStore, profileSubject).length === 0) continue
             attempted++
             try {
                 // The inspira recommender is seeded by the Merkliste, returning points whose

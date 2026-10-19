@@ -1,5 +1,20 @@
 import { BP } from "./vocab.js"
 
+// Only catalogue ids leave the browser: a bp:savedBook value that isn't "AK" plus digits
+// (text written into the profile by hand or by another app) is never sent.
+const CATALOGUE_ID = /^AK(\d+)$/
+
+// The bare akkeys of the Merkliste that may be sent to inspira.
+export function sendableSavedIds(profileStore, profileSubject) {
+    return sendableIds(profileStore.getObjects(profileSubject, BP + "savedBook", null).map(o => o.value))
+}
+
+function sendableIds(savedIds) {
+    const skipped = savedIds.filter(id => !CATALOGUE_ID.test(id))
+    if (skipped.length > 0) console.warn("[bib-pods] not sent to inspira (no catalogue id):", skipped)
+    return savedIds.flatMap(id => CATALOGUE_ID.exec(id)?.[1] ?? [])
+}
+
 // Recommends books from the inspira_BIB recommender, seeded by the whole Merkliste as
 // positive examples. The recommender keys points on the BARE numeric akkey (bp:savedBook
 // holds "AK4298169" → send "4298169"), ignores ids not in the collection, and echoes the
@@ -8,9 +23,9 @@ import { BP } from "./vocab.js"
 // carries akkey/isbn/author/title/type for mapping back to our catalogue.
 export async function recommendFromSavedBooks(profileStore, profileSubject, qdrantEndpoint, limit = 10) {
     const savedIds = profileStore.getObjects(profileSubject, BP + "savedBook", null).map(o => o.value)
-    if (savedIds.length === 0) return { savedIds, basedOn: [], results: [], empty: true }
+    const bareIds = sendableIds(savedIds)
+    if (bareIds.length === 0) return { savedIds, basedOn: [], results: [], empty: true }
 
-    const bareIds = savedIds.map(id => id.replace(/^AK/, ""))
     const body = JSON.stringify({ query: { recommend: { positive: bareIds } }, limit })
 
     // A POST with Content-Type: application/json is a "non-simple" CORS request, so the
