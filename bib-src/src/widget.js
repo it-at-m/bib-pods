@@ -235,41 +235,51 @@ function buildCard(item, { onDismiss, tip }) {
 // cover (or the no-cover placeholder) linking to the catalogue entry. Title + author
 // live in the shared tooltip — shown instantly (no schedule() delay), since these tiles
 // carry no visible text at all. With onRemove the tile gets a ✕ that takes it off.
-function buildMiniCard({ title, author, sopacId, coverUrl }, { tip, onRemove }) {
+// `details` resolves to { title, author, coverUrl }: the tile shows at once with the
+// catalogue id and the no-cover placeholder, and fills in when the record arrives.
+function buildMiniCard({ sopacId, details }, { tip, onRemove }) {
+    let title = sopacId
+    let author = ""
     const slide = document.createElement("li")
     slide.className = "bp-cf-slide"
-    const tipHtml = `<strong>${escapeHtml(title)}</strong>${author ? "<br>" + escapeHtml(author) : ""}`
-    slide.addEventListener("mouseenter", () => tip.show(tipHtml, slide))
+    slide.addEventListener("mouseenter", () =>
+        tip.show(`<strong>${escapeHtml(title)}</strong>${author ? "<br>" + escapeHtml(author) : ""}`, slide))
     slide.addEventListener("mouseleave", () => tip.hide())
     const link = document.createElement("a")
     link.className = "bp-cf-image"
     link.href = sopacCatalogueUrl(sopacId)
     link.target = "_blank"
     link.rel = "noopener"
-    link.setAttribute("aria-label", author ? `${title} – ${author}` : title)
-    if (coverUrl) {
-        const img = document.createElement("img")
-        img.src = coverUrl
-        img.alt = ""
-        img.loading = "lazy"
-        // same expected-404 fallback as buildCard: partial cover coverage, not an error
-        img.addEventListener("error", () => img.replaceWith(buildNoCoverPlaceholder()), { once: true })
-        link.appendChild(img)
-    } else {
-        link.appendChild(buildNoCoverPlaceholder())
-    }
+    link.appendChild(buildNoCoverPlaceholder())
     slide.appendChild(link)
+    let remove = null
     if (onRemove) {
         // a sibling of the link, not inside it: a button can't nest in an <a>
-        const remove = document.createElement("button")
+        remove = document.createElement("button")
         remove.type = "button"
         remove.className = "bp-cf-dismiss bp-round-btn"
         remove.textContent = "✕"
         remove.title = "Wieder vorschlagen"
-        remove.setAttribute("aria-label", `„${title}" wieder vorschlagen`)
         remove.addEventListener("click", () => { tip.hide(); onRemove(sopacId) })
         slide.appendChild(remove)
     }
+    const label = () => {
+        link.setAttribute("aria-label", author ? `${title} – ${author}` : title)
+        remove?.setAttribute("aria-label", `„${title}" wieder vorschlagen`)
+    }
+    label()
+    details.then(d => {
+        ;({ title, author } = d)
+        label()
+        if (!d.coverUrl) return
+        const img = document.createElement("img")
+        img.src = d.coverUrl
+        img.alt = ""
+        img.loading = "lazy"
+        // same expected-404 fallback as buildCard: partial cover coverage, not an error
+        img.addEventListener("error", () => img.replaceWith(buildNoCoverPlaceholder()), { once: true })
+        link.replaceChildren(img)
+    })
     return slide
 }
 
@@ -513,16 +523,18 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const titleListCleanups = new Map()
     profileEl.renderFieldValues = async (predicate, objects) => {
         if (!TITLE_LISTS[predicate]) return null
-        const items = await Promise.all(objects.map(async ({ value }) => {
-            const doc = await fetchDocCached(value)
-            const isbn = doc?.isbn?.[0]
-            return {
-                // titles occasionally carry "| marketing subtitle" appendices — the tooltip shows the main title
-                title: doc?.title?.[0]?.split(" | ")[0] ?? value,
-                author: doc?.author?.[0] ? cleanAuthorName(doc.author[0]) : "",
-                sopacId: value,
-                coverUrl: isbn && coverBase ? coverBase + encodeURIComponent(isbn) : null,
-            }
+        // The catalogue lookups don't hold up the profile: each tile fills in on its own.
+        const items = objects.map(({ value }) => ({
+            sopacId: value,
+            details: fetchDocCached(value).then(doc => {
+                const isbn = doc?.isbn?.[0]
+                return {
+                    // titles occasionally carry "| marketing subtitle" appendices — the tooltip shows the main title
+                    title: doc?.title?.[0]?.split(" | ")[0] ?? value,
+                    author: doc?.author?.[0] ? cleanAuthorName(doc.author[0]) : "",
+                    coverUrl: isbn && coverBase ? coverBase + encodeURIComponent(isbn) : null,
+                }
+            }),
         }))
         const lane = buildLane(null, items, { tip, ...TITLE_LISTS[predicate] }, buildMiniCard)
         lane.classList.add("bp-cf-mini")
