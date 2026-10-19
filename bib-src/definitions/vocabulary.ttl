@@ -392,7 +392,7 @@ bp:placeMatch a bp:RecommendationStrategy ;
 
 bp:savedBookSimilarity a bp:RecommendationStrategy ;
     rdfs:label "Ähnlich zu gemerkten Büchern"@de ;
-    rdfs:comment "Sendet deine Merkliste an einen weiteren Server der Stadt München (inspira_BIB), um ähnliche Titel zu finden."@de ;
+    rdfs:comment "Sendet deine Merkliste bei jeder Berechnung des Schaufensters (beim Öffnen der Seite und nach jeder Profiländerung) an einen weiteren Server der Stadt München (inspira_BIB), um ähnliche Titel zu finden."@de ;
     bp:engine bp:InspiraEngine ;
     bp:usesProfileProperty bp:savedBook ;
     bp:combine bp:AverageVector ;

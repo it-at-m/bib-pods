@@ -53,8 +53,8 @@
                 <p>Liegen in deinem Pod schon Daten aus anderen Anwendungen, kannst du ihn durchsuchen lassen: Wir zeigen, was davon in dein Bibliotheksprofil passen könnte, und du entscheidest, was übernommen wird. Die Suche kennt derzeit ausgewählte Anwendungen und Datenformate.</p>
             </details>
             <details class="bp-fold">
-                <summary>3. Empfehlungen prüfen</summary>
-                <p>Klicke auf „Empfehlungen prüfen“. Dein Schaufenster zeigt dann Vorschläge in Reihen, und jede Reihe sagt, warum sie da ist: „Mehr von deinen Lieblingsautor*innen“, „Passend zu deinen Themen“, „Ähnlich zu gemerkten Büchern“. Du wählst, welche Empfehlungsarten dabei sind. Die Vorschläge werden bei jedem Klick neu aus deinem Profil und dem aktuellen Bestand berechnet. Gespeichert werden sie nicht; ändert sich dein Profil oder der Bestand, ändern sich auch die Vorschläge. Passt ein Vorschlag nicht, klicke auf ✕ und sag, was dir nicht gefällt: der Titel selbst oder etwa die Autor*in oder das Thema. Das landet im Profil unter „Nicht mehr vorschlagen“, wo du es jederzeit zurücknehmen kannst; steht es schon unter deinen Interessen, wird es dort entfernt.</p>
+                <summary>3. Dein Schaufenster</summary>
+                <p>Dein Schaufenster zeigt Vorschläge in Reihen, und jede Reihe sagt, warum sie da ist: „Mehr von deinen Lieblingsautor*innen“, „Passend zu deinen Themen“, „Ähnlich zu gemerkten Büchern“. Du wählst, welche Empfehlungsarten dabei sind. Die Vorschläge werden neu aus deinem Profil und dem aktuellen Bestand berechnet, wenn du diese Seite öffnest und sobald du dein Profil änderst. Gespeichert werden sie nicht; ändert sich dein Profil oder der Bestand, ändern sich auch die Vorschläge. Passt ein Vorschlag nicht, klicke auf ✕ und sag, was dir nicht gefällt: der Titel selbst oder etwa die Autor*in oder das Thema. Das landet im Profil unter „Nicht mehr vorschlagen“, wo du es jederzeit zurücknehmen kannst; steht es schon unter deinen Interessen, wird es dort entfernt.</p>
             </details>
             <details class="bp-fold">
                 <summary>4. Du behältst die Kontrolle</summary>
@@ -189,14 +189,18 @@
 
     <section id="bp-showcase" class="bp-block bp-showcase bp-when-activated" aria-labelledby="bp-showcase-heading" hidden>
         <h3 id="bp-showcase-heading">Schaufenster</h3>
-        <div id="bp-strategy-settings">
-            <button id="bp-strategy-summary" class="bp-strategy-summary" type="button"
-                title="Welche Empfehlungen sollen im Schaufenster erscheinen?"
-                aria-haspopup="true" aria-expanded="false"></button>
-            <div id="bp-strategy-toggles" class="bp-strategy-popover" hidden></div>
-        </div>
-        <p><a id="bp-check-recommendations-link" href="#">Empfehlungen prüfen</a></p>
         <div id="bp-lanes" hidden></div>
+        <!-- The shelf keeps itself up to date, so checking by hand and choosing the lanes
+             are quiet secondary controls below it. -->
+        <div class="bp-showcase-controls">
+            <a id="bp-check-recommendations-link" href="#">Empfehlungen prüfen</a>
+            <div id="bp-strategy-settings">
+                <button id="bp-strategy-summary" class="bp-strategy-summary" type="button"
+                    title="Welche Empfehlungen sollen im Schaufenster erscheinen?"
+                    aria-haspopup="true" aria-expanded="false"></button>
+                <div id="bp-strategy-toggles" class="bp-strategy-popover" hidden></div>
+            </div>
+        </div>
     </section>
 
     <section class="bp-block bp-profile bp-when-activated" hidden>

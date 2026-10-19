@@ -1,4 +1,4 @@
-import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, getAccessControlMode, warmupStorage, loadStore, replaceSubjectObjects, removeProfileFact } from "cori-sdk/storage/index.js"
+import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, getAccessControlMode, warmupStorage, loadStore, replaceSubjectObjects, removeProfileFact, PROFILE_SAVED } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
 import { getProfileSubject, storageErrorMessage, factory } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
@@ -33,6 +33,11 @@ const STORAGE_LABELS = {
 // one of several handles on a title. Everything named here actually resolves.
 const ADD_TITLE_TIP = "<strong>Titel von anderswo übernehmen</strong>"
     + "<br>Zitierlink aus dem Katalog (OPAC), Link aus der Onleihe oder ISBN einfügen. Der Titel wird im Katalog gesucht."
+
+// Shown on "Empfehlungen prüfen": the click is only a shortcut, since the shelf keeps
+// itself up to date.
+const CHECK_TIP = "<strong>Vorschläge neu berechnen</strong>"
+    + "<br>Das passiert auch automatisch: beim Öffnen der Seite und nach jeder Änderung an deinem Profil."
 
 // The catalogue count deep-links into the docs query page — a power-user
 // affordance. On the docs site itself (recognizable by its <nav-bar>) the link stays
@@ -584,7 +589,10 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             mountAddTitleLauncher()
             profileEl.refresh()
             renderStrategyToggles()
-            renderLanes()
+            // Entering the activated view (page load, login) computes the shelf; every
+            // later state change re-renders the one on hand.
+            if (active !== lastActivation) refreshShelf()
+            else renderLanes()
             decorateCards({ solrEndpoint, onBookClick: openBookPrompt })
         } else {
             discardShelf()
@@ -707,56 +715,97 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     }
 
     // The Schaufenster: one carousel per enabled strategy that found books. The shelf is
-    // computed from profile + catalogue on "Empfehlungen prüfen" and is never stored, so
-    // it is empty after a reload and the same profile shows other books once the
-    // catalogue changes. Other state changes re-render the shelf on hand.
+    // computed from profile + catalogue when the page opens, after every profile change
+    // and on "Empfehlungen prüfen", and is never stored: the same profile shows other
+    // books once the catalogue changes. Other state changes re-render the shelf on hand.
+    // An empty or unreachable result shows as a quiet note in place of the lanes.
+    const SHELF_NOTES = {
+        empty: "Noch keine Vorschläge. Sobald dein Profil passende Angaben enthält, erscheinen sie hier.",
+        unreachable: "Das Schaufenster kann gerade nicht geladen werden. Bitte versuche es später erneut.",
+    }
     let shelf = null            // [{ strategy, docs }] of the latest run; null until it lands
+    let shelfNote = null        // a SHELF_NOTES text while the shelf is empty
     let shelfRun = 0            // a run whose number is no longer current drops its result
     let shelfLoading = false
     const checkRecLabel = checkRecLink.textContent
+    // While a run is under way the link turns into plain status text: there is nothing
+    // to click until it ends.
+    function showShelfLoading(loading) {
+        shelfLoading = loading
+        checkRecLink.textContent = loading ? "Lädt …" : checkRecLabel
+        checkRecLink.classList.toggle("is-loading", loading)
+        if (loading) checkRecLink.setAttribute("aria-disabled", "true")
+        else checkRecLink.removeAttribute("aria-disabled")
+    }
 
-    async function refreshShelf() {
+    // `manual`: the click on "Empfehlungen prüfen", the only run that may interrupt
+    // with an alert (a Solid session that wasn't restored).
+    async function refreshShelf({ manual = false } = {}) {
         if (shelfLoading) return
+        clearTimeout(autoTimer)
+        autoPending = false
         if (!isStorageReady()) {
             // Only Solid can be not-ready: the choice is persisted but the session wasn't
-            // restored (pod offline or expired).
-            window.alert("Keine Verbindung zum Pod. Lade die Seite neu, sobald dein Pod wieder erreichbar ist.")
+            // restored (pod offline or expired). The Konto block already says so.
+            if (manual) window.alert("Keine Verbindung zum Pod. Lade die Seite neu, sobald dein Pod wieder erreichbar ist.")
             return
         }
         const run = ++shelfRun
-        shelfLoading = true
-        checkRecLink.textContent = "Lädt …"
+        showShelfLoading(true)
         try {
             const profileStore = await loadStore()
             const { results, serverUnreachable } = await runRecommendations(profileStore, getProfileSubject(), { solrEndpoint, qdrantEndpoint })
             if (run !== shelfRun) return
             shelf = results.filter(({ docs }) => docs.length > 0)
-            if (shelf.length === 0) {
-                window.alert(serverUnreachable
-                    ? "Der Empfehlungsdienst ist zurzeit nicht erreichbar. Bitte versuche es später erneut."
-                    : "Keine Empfehlungen gefunden — vielleicht fehlen noch Profileinträge?")
-            }
+            shelfNote = shelf.length > 0 ? null : serverUnreachable ? SHELF_NOTES.unreachable : SHELF_NOTES.empty
             renderLanes()
         } catch (err) {
             if (run !== shelfRun) return
             console.error("[bib-pods] recommendations failed:", err)
-            window.alert("Empfehlungen konnten nicht geladen werden:\n" + storageErrorMessage(err))
+            shelf = []
+            shelfNote = SHELF_NOTES.unreachable
+            renderLanes()
         } finally {
             if (run === shelfRun) {
-                shelfLoading = false
-                checkRecLink.textContent = checkRecLabel
+                showShelfLoading(false)
+                // a change saved during the run gets its own run now
+                if (autoPending) runPendingRefresh()
             }
         }
     }
 
+    // Every saved profile change (PROFILE_SAVED, from any UI) asks for a new shelf. A
+    // burst of changes computes once after a short pause, a change during a run once
+    // after it, and the profile assistant's answers once it closes.
+    const AUTO_DELAY_MS = 600
+    let autoTimer = 0
+    let autoPending = false
+    function scheduleShelfRefresh() {
+        autoPending = true
+        clearTimeout(autoTimer)
+        autoTimer = setTimeout(runPendingRefresh, AUTO_DELAY_MS)
+    }
+    function runPendingRefresh() {
+        if (!autoPending || !isActivated() || shelfLoading) return
+        if (profileEl.querySelector("dialog.cori-assistant[open]")) return
+        refreshShelf()
+    }
+    window.addEventListener(PROFILE_SAVED, scheduleShelfRefresh)
+    // "close" doesn't bubble: capture it on its way to the assistant's dialog
+    profileEl.addEventListener("close", (e) => {
+        if (e.target.matches?.("dialog.cori-assistant")) runPendingRefresh()
+    }, true)
+
     // Logging out leaves nothing of this profile's shelf behind, including a run still
-    // in flight.
+    // in flight or waiting.
     function discardShelf() {
+        clearTimeout(autoTimer)
+        autoPending = false
         shelfRun++
         laneRender++
         shelf = null
-        shelfLoading = false
-        checkRecLink.textContent = checkRecLabel
+        shelfNote = null
+        showShelfLoading(false)
         clearLanes()
     }
 
@@ -774,7 +823,17 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     async function renderLanes() {
         const render = ++laneRender
         const current = shelf
-        if (!current?.length) { clearLanes(); return }
+        if (!current?.length) {
+            clearLanes()
+            if (shelfNote) {
+                const note = document.createElement("p")
+                note.className = "bp-aside"
+                note.textContent = shelfNote
+                lanes.append(note)
+                lanes.hidden = false
+            }
+            return
+        }
         try {
             const profileStore = await loadStore()
             const profileSubject = getProfileSubject()
@@ -1049,7 +1108,14 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     })
     // Editing after a rejection retracts the complaint about the previous input.
     addTitleInput.addEventListener("input", () => { if (!addTitleMsg.hidden) showAddTitleMsg(null) })
-    checkRecLink.addEventListener("click", (e) => { e.preventDefault(); refreshShelf() })
+    checkRecLink.addEventListener("click", (e) => { e.preventDefault(); tip.hide(); refreshShelf({ manual: true }) })
+    // show(), not schedule(): like the „Titel hinzufügen“ launcher, the explanation
+    // arrives on contact
+    const revealCheckTip = () => tip.show(CHECK_TIP, checkRecLink)
+    checkRecLink.addEventListener("mouseenter", revealCheckTip)
+    checkRecLink.addEventListener("focus", revealCheckTip)
+    checkRecLink.addEventListener("mouseleave", () => tip.hide())
+    checkRecLink.addEventListener("blur", () => tip.hide())
 
     applyState()
 

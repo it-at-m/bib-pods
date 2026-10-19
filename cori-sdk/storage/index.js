@@ -118,7 +118,10 @@ export async function loadStore() {
 // --- Mutation ---
 // The single place the profile graph changes. Provenance is derived from the diff, so
 // it covers what a mutation actually did — including removals no call site declares,
-// like a replaced property dropping its old value.
+// like a replaced property dropping its old value. Every saved change is announced as
+// PROFILE_SAVED on window, whichever UI made it.
+
+export const PROFILE_SAVED = "cori:profile-saved"
 
 async function mutate(fn) {
     const storage = getStorage()
@@ -129,6 +132,7 @@ async function mutate(fn) {
     const { added, removed } = diff(before, store.getQuads())
     if (!added.length && !removed.length) return
     await storage.save(store)
+    window.dispatchEvent(new CustomEvent(PROFILE_SAVED))
     // After the save: provenance may only claim what is stored.
     await recordChange({ added, removed })
 }

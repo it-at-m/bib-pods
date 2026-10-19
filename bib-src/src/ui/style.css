@@ -671,33 +671,35 @@ cori-profile .cori-profile-clear-section { display: block; margin-top: 10px; fon
 .bp-book-note { color: #888; font-size: 0.9em; }
 .bp-book-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
 
-/* The strategy multiselect: a quiet outlined trigger over an absolute popover of
-   checkboxes. Explicit background/border/font throughout so host button and
-   .maincontents globals can't leak in; px (not rem) for box dimensions — the TYPO3
-   host's 62.5% root font-size would otherwise shrink them. */
-#bp-strategy-settings { position: relative; display: inline-block; margin: 0.5rem 0; }
+/* Below the lanes, bottom left: "Empfehlungen prüfen" and the strategy multiselect as
+   small grey text controls. */
+.bp-showcase-controls { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px;
+    margin-top: 12px; font-size: 0.85em; }
+.bp-showcase-controls a { color: #888; text-decoration: underline; }
+.bp-showcase-controls a:hover { color: #555; }
+.bp-showcase-controls a.is-loading { text-decoration: none; cursor: default; pointer-events: none; }
+/* The strategy multiselect: a text trigger over an absolute popover of checkboxes,
+   opening upwards from the bottom of the section. Explicit background/border/font
+   throughout so host button and .maincontents globals can't leak in; px (not rem) for
+   box dimensions — the TYPO3 host's 62.5% root font-size would otherwise shrink them. */
+#bp-strategy-settings { position: relative; display: inline-block; }
 .bp-strategy-summary {
-    padding: 3px 14px;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 999px;
+    padding: 0;
+    background: none;
+    border: none;
     box-shadow: none;
     font: inherit;
-    font-size: 0.9em;
-    color: #444;
+    color: #888;
+    text-decoration: underline;
     cursor: pointer;
     white-space: nowrap;
 }
-.bp-strategy-summary:hover {
-    background: #fff;
-    border-color: var(--contrastcolor, #d14900);
-    color: var(--contrastcolor, #d14900);
-}
+.bp-strategy-summary:hover { background: none; color: #555; }
 /* own glyph instead of a background icon: host-independent (FA exists only on TYPO3) */
-.bp-strategy-summary::after { content: "▾"; margin-left: 8px; }
+.bp-strategy-summary::after { content: "▾"; margin-left: 4px; display: inline-block; text-decoration: none; }
 .bp-strategy-popover {
     position: absolute;
-    top: calc(100% + 4px);
+    bottom: calc(100% + 4px);
     left: 0;
     z-index: 20;
     min-width: 260px;

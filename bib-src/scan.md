@@ -31,6 +31,6 @@ preferences. The scan does not select books itself.
 
 Select individual entries in the preview and confirm to add them to the profile.
 Each scan offers all findings again; accepting the same entry does not duplicate it.
-Closing the preview changes nothing. After saving, the profile refreshes.
-Recommendation searches remain a separate, manual action. Failed scans or saves
+Closing the preview changes nothing. After saving, the profile refreshes and the
+Schaufenster recomputes like after any other profile change. Failed scans or saves
 are shown in the dialog and can be retried.
