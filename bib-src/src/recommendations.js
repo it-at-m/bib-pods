@@ -129,12 +129,16 @@ export function explainDocMatches(doc, profileStore, profileSubject, properties)
 }
 
 export function countDocMatches(doc, profileStore, profileSubject, properties) {
-    const v = getVocab()
-    return [...new Set(properties)].reduce((count, prop) => {
-        const mappings = getLinkedIndices(v, prop)
-        return count + profileStore.getObjects(profileSubject, prop, null)
-            .filter(obj => docMatchesFact(doc, mappings, obj, profileStore)).length
-    }, 0)
+    return [...new Set(properties)].reduce((count, prop) =>
+        count + profileFactsMatching(prop, doc, profileStore, profileSubject).length, 0)
+}
+
+// The profile's values of `property` that the doc carries, read through the property's
+// index mapping (see docMatchesFact).
+export function profileFactsMatching(property, doc, profileStore, profileSubject) {
+    const mappings = getLinkedIndices(getVocab(), property)
+    return profileStore.getObjects(profileSubject, property, null)
+        .filter(obj => docMatchesFact(doc, mappings, obj, profileStore))
 }
 
 // Does the doc carry this profile fact in any of the property's index fields?
@@ -183,18 +187,39 @@ function combinatorOf(v, iri) {
 //   Returns { q, fq: [filter-strings] } or null if no clauses applied.
 // Each profile fact becomes a group OR-ing across all of its bp:linkedToIndex fields
 // (e.g. author + author2). Groups are then combined via the strategy's bp:combine.
-// The fq carries what constrains rather than matches: -id: exclusions for the ids under
-// every bp:RecommendationExclusion property (e.g. bp:savedBook) and the profile's
-// preference filters (see preferenceFilters).
+// The fq carries what constrains rather than matches: -id: exclusions (see excludedIds),
+// one negative clause per blocked value (see blockFilters) and the profile's preference
+// filters (see preferenceFilters).
 export function buildQuery(strategy, profileStore, profileSubject) {
     const v = getVocab()
     const factGroups = profileFactGroups(strategy, profileStore, profileSubject)
     if (factGroups.length === 0) return null
     const op = strategy.combine?.iri === BP + "And" ? " AND " : " OR "
     const q = factGroups.length === 1 ? factGroups[0] : `(${factGroups.join(op)})`
-    const excludedIds = v.getSubjects(RDF_TYPE, BP + "RecommendationExclusion", null)
+    return { q, fq: [
+        ...excludedIds(v, profileStore, profileSubject).map(id => `-id:"${escapeSolr(id)}"`),
+        ...blockFilters(v, profileStore, profileSubject),
+        ...preferenceFilters(v, profileStore, profileSubject),
+    ] }
+}
+
+// The catalogue ids under every bp:RecommendationExclusion property (e.g. bp:savedBook):
+// titles no lane may suggest.
+function excludedIds(v, profileStore, profileSubject) {
+    return v.getSubjects(RDF_TYPE, BP + "RecommendationExclusion", null)
         .flatMap(prop => profileStore.getObjects(profileSubject, prop, null).map(o => o.value))
-    return { q, fq: [...excludedIds.map(id => `-id:"${escapeSolr(id)}"`), ...preferenceFilters(v, profileStore, profileSubject)] }
+}
+
+// A blocklist field's value, queried through the index mapping of the taste field it
+// negates (bp:negates), drops every book carrying it: one negative fq per value.
+function blockFilters(v, profileStore, profileSubject) {
+    return v.getQuads(null, BP + "negates", null, null).flatMap(({ subject, object }) => {
+        const mappings = getLinkedIndices(v, object.value)
+        return profileStore.getObjects(profileSubject, subject, null)
+            .map(obj => factClauses(v, mappings, obj, profileStore))
+            .filter(clauses => clauses.length > 0)
+            .map(clauses => `-(${clauses.join(" OR ")})`)
+    })
 }
 
 // RDF has no order. Use the displayed labels so saving/reloading a profile cannot
@@ -216,7 +241,7 @@ function profileFactEntries(strategy, profileStore, profileSubject) {
     const v = getVocab()
     const groups = new Map()
     for (const { obj, mappings } of orderedProfileFacts(strategy, profileStore, profileSubject)) {
-        const clauses = factClauses(v, mappings, obj)
+        const clauses = factClauses(v, mappings, obj, profileStore)
         if (clauses.length > 0) {
             const q = clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`
             if (!groups.has(q)) groups.set(q, { q, facts: [] })
@@ -304,15 +329,23 @@ function publicationYearSort() {
 // The Solr clauses one profile fact contributes, across the property's index mappings:
 // authority IRIs hit the iriField, literals the labelField, and picker concepts carrying
 // bp:indexValue expand to their raw catalogue token(s) on the labelField — "Deutsch"
-// becomes language:"ger", merged media concepts OR all their tokens.
-function factClauses(v, mappings, obj) {
+// becomes language:"ger", merged media concepts OR all their tokens. Locally minted
+// URNs (urn:bibpods:…) never appear in the index; their preserved raw index form
+// (bp:sourceLabel) hits the labelField, as in docMatchesFact.
+function factClauses(v, mappings, obj, profileStore) {
     const indexValues = obj.termType === "NamedNode"
         ? v.getObjects(obj.value, BP + "indexValue", null).map(t => t.value)
         : []
+    const local = obj.termType === "NamedNode" && obj.value.startsWith(LOCAL)
+    const raw = local
+        ? germanText(profileStore, obj.value, BP + "sourceLabel") ?? germanText(profileStore, obj.value, RDFS_LABEL)
+        : null
     const clauses = []
     for (const m of mappings) {
         if (indexValues.length > 0) {
             if (m.labelField) clauses.push(...indexValues.map(t => `${m.labelField}:"${escapeSolr(t)}"`))
+        } else if (local) {
+            if (m.labelField && raw) clauses.push(`${m.labelField}:"${escapeSolr(raw)}"`)
         } else {
             const field = obj.termType === "NamedNode" ? m.iriField : m.labelField
             if (field) clauses.push(`${field}:"${escapeSolr(obj.value)}"`)
@@ -331,7 +364,7 @@ function preferenceFilters(v, profileStore, profileSubject) {
         const clauses = []
         const mappings = getLinkedIndices(v, prop.value)
         for (const obj of profileStore.getObjects(profileSubject, prop.value, null)) {
-            clauses.push(...factClauses(v, mappings, obj))
+            clauses.push(...factClauses(v, mappings, obj, profileStore))
         }
         if (clauses.length > 0) fqs.push(clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`)
     }
@@ -387,6 +420,7 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
                 const used = new Set(basedOn)
                 const notInCollection = savedIds.filter(id => !used.has(id.replace(/^AK/, "")))
                 console.log(`[bib-pods] ${strategy.label}: ${basedOn.length}/${savedIds.length} gemerkte Bücher genutzt`, { basedOn, notInCollection })
+                const excluded = new Set(excludedIds(getVocab(), profileStore, profileSubject))
                 const docs = points.map(p => {
                     const meta = p.payload?.metadata ?? {}
                     return {
@@ -395,8 +429,8 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
                         author: meta.author ? [meta.author] : undefined,
                         isbn: meta.isbn ? [meta.isbn] : undefined,
                     }
-                })
-                results.push({ strategy, docs })
+                }).filter(doc => !excluded.has(doc.id))
+                results.push({ strategy, docs: await withoutBlocked(docs, profileStore, profileSubject, solrEndpoint) })
             } catch (err) {
                 console.error(`[bib-pods] ${strategy.label} failed:`, err)
             }
@@ -439,6 +473,25 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
     }
     const serverUnreachable = attempted > 0 ? reached === 0 : !(await solrReachable(solrEndpoint))
     return { results, serverUnreachable }
+}
+
+// Blocked values can't be read off inspira's sparse metadata, so the index decides: one
+// query for the lane's ids under the blocklist filters keeps the books that pass. If the
+// index can't answer, the lane stays as it is rather than going empty.
+async function withoutBlocked(docs, profileStore, profileSubject, solrEndpoint) {
+    const blocks = blockFilters(getVocab(), profileStore, profileSubject)
+    if (blocks.length === 0 || docs.length === 0) return docs
+    const ids = docs.map(doc => doc.id)
+    try {
+        const result = await fetchSolr(solrEndpoint, {
+            q: "{!terms f=id v=$laneIds}", fq: blocks, params: { laneIds: ids.join(","), fl: "id" },
+        }, ids.length)
+        const passing = new Set((result.response?.docs ?? []).map(doc => doc.id))
+        return docs.filter(doc => passing.has(doc.id))
+    } catch (err) {
+        console.error("[bib-pods] blocklist check for the inspira lane failed:", err)
+        return docs
+    }
 }
 
 // Cheap liveness check: a match-all query asking for zero rows. true only on a

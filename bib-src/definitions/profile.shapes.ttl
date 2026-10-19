@@ -43,13 +43,34 @@ bp:ProfileShape
         sh:datatype xsd:string
     ] ;
     sh:property [
+        sh:path bp:excludedBook ;
+        sh:datatype xsd:string
+    ] ;
+    sh:property [
+        sh:path bp:blockedAuthor ;
+        sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )
+    ] ;
+    sh:property [
+        sh:path bp:blockedGenre ;
+        sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )
+    ] ;
+    sh:property [
+        sh:path bp:blockedTopic ;
+        sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )
+    ] ;
+    sh:property [
+        sh:path bp:blockedPlace ;
+        sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )
+    ] ;
+    sh:property [
         sh:path bp:nearestLibrary ;
         sh:nodeKind sh:IRI
     ] .
 
 bp:ProfileEntityShape
     a sh:NodeShape ;
-    sh:targetObjectsOf bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn, bp:interestedInPlace, bp:favoriteWork, bp:preferredLanguage, bp:preferredMedium, bp:nearestLibrary ;
+    sh:targetObjectsOf bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn, bp:interestedInPlace, bp:favoriteWork, bp:preferredLanguage, bp:preferredMedium, bp:nearestLibrary,
+        bp:blockedAuthor, bp:blockedGenre, bp:blockedTopic, bp:blockedPlace ;
     sh:property [
         sh:path rdfs:label ;
         sh:maxCount 1 ;

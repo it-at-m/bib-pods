@@ -187,6 +187,14 @@ bp:SavedSection a cori:ProfileSection ;
     rdfs:label "saved list"@en, "Merkliste"@de ;
     cori:order 110 .
 
+# Filled through ✕ in the Schaufenster, so it sits below the disclosure too; folded,
+# since it is there to look things up and undo them, not to read every visit.
+bp:ExcludedSection a cori:ProfileSection ;
+    rdfs:label "not suggested"@en, "Nicht mehr vorschlagen"@de ;
+    cori:order 120 ;
+    cori:collapsed true ;
+    cori:clearable true .
+
 # ----- Index mapping -----
 
 bp:linkedToIndex a rdf:Property .
@@ -195,7 +203,65 @@ bp:iriField a rdf:Property .
 
 # On a picker concept: the raw index token(s) it stands for, when they differ from the
 # display label ("Deutsch" queries language:"ger"). Several tokens OR into one clause.
+bp:excludedBook a rdf:Property, bp:RecommendationExclusion ; # SOPAC identifier
+    rdfs:label "excluded book"@en, "Buch"@de ;
+    cori:pluralLabel "excluded books"@en, "Bücher"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range xsd:string ;
+    cori:inSection bp:ExcludedSection ;
+    cori:order 10 ;
+    cori:assistantQuestion false .
+
+# Blocklist fields: the values the user doesn't want suggested. Each one negates a
+# taste field and shares its index mapping (bp:negates); stored values look like that
+# field's, and the profile shows them under „Nicht mehr vorschlagen“.
+bp:blockedAuthor a rdf:Property ;
+    rdfs:label "blocked author"@en, "Autor*in"@de ;
+    cori:pluralLabel "blocked authors"@en, "Autor*innen"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range bf:Person ;
+    cori:inSection bp:ExcludedSection ;
+    cori:order 20 ;
+    cori:assistantQuestion false ;
+    bp:negates bp:favoriteAuthor .
+
+bp:blockedGenre a rdf:Property ;
+    rdfs:label "blocked genre"@en, "Genre"@de ;
+    cori:pluralLabel "blocked genres"@en, "Genres"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range bf:GenreForm ;
+    cori:inSection bp:ExcludedSection ;
+    cori:order 30 ;
+    cori:assistantQuestion false ;
+    bp:negates bp:favoriteGenre .
+
+bp:blockedTopic a rdf:Property ;
+    rdfs:label "blocked topic"@en, "Thema"@de ;
+    cori:pluralLabel "blocked topics"@en, "Themen"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range bf:Topic ;
+    cori:inSection bp:ExcludedSection ;
+    cori:order 40 ;
+    cori:assistantQuestion false ;
+    bp:negates bp:interestedIn .
+
+bp:blockedPlace a rdf:Property ;
+    rdfs:label "blocked place"@en, "Ort/Region"@de ;
+    cori:pluralLabel "blocked places"@en, "Orte & Regionen"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range bf:Place ;
+    cori:inSection bp:ExcludedSection ;
+    cori:order 50 ;
+    cori:assistantQuestion false ;
+    bp:negates bp:interestedInPlace .
+
 bp:indexValue a rdf:Property .
+
+# A blocklist field's positive counterpart. Every lane drops books carrying a blocked
+# value in that field's index fields.
+bp:negates a rdf:Property ;
+    rdfs:domain rdf:Property ;
+    rdfs:range rdf:Property .
 
 # ----- Interactions -----
 
@@ -217,6 +283,12 @@ bp:BookSelection a cori:UserAction ;
     bp:addsTitleTo bp:savedBook ;
     bp:followUpQuestion bp:favoriteAuthor, bp:favoriteGenre, bp:interestedIn, bp:interestedInPlace .
 
+bp:BookDismissal a cori:UserAction ;
+    rdfs:label "dismiss a suggestion"@en, "Nicht mehr vorschlagen"@de ;
+    rdfs:comment "✕ an einer Karte im Schaufenster öffnet den Dialog „Was gefällt dir an diesem Buch nicht?“. Angehakte Werte kommen auf die Ausschlussliste; steht einer davon schon in deinem Profil, wird er dort zugleich entfernt."@de ;
+    bp:addsTitleTo bp:excludedBook ;
+    bp:followUpQuestion bp:blockedAuthor, bp:blockedGenre, bp:blockedTopic, bp:blockedPlace .
+
 # ----- Recommendations -----
 
 bp:RecommendationStrategy a rdfs:Class ;
@@ -229,8 +301,8 @@ bp:RecommendationStrategy a rdfs:Class ;
 # engine can't be filtered this way, so its lanes ignore these preferences.
 bp:RecommendationFilter a rdfs:Class .
 
-# Profile properties typed bp:RecommendationExclusion hold catalogue ids that no Solr
-# lane suggests: every strategy's query drops them as -id: fq clauses.
+# Profile properties typed bp:RecommendationExclusion hold catalogue ids that no lane
+# suggests: Solr queries drop them as -id: fq clauses, the inspira lane filters them out.
 bp:RecommendationExclusion a rdfs:Class .
 
 bp:usesProfileProperty a rdf:Property ;

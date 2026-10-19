@@ -32,14 +32,18 @@ registerVocab(languageValuesTtl)
 registerVocab(mediumValuesTtl)
 registerProfileShapes(libraryProfileShapesTtl)
 
-// collects the follow-up questions declared on a cori:UserAction in the vocabulary
+// collects the follow-up questions declared on a cori:UserAction in the vocabulary.
+// A blocklist field (bp:negates) reads the book through its taste field's index
+// mapping; `source` is that taste field, or the property itself.
 export async function getFollowUpsFor(actionUri) {
     const rows = await sparqlSelect(`
         PREFIX bp: <${BP}>
         PREFIX rdfs: <${RDFS}>
-        SELECT ?property ?label ?labelField ?iriField WHERE {
+        SELECT ?property ?source ?label ?labelField ?iriField WHERE {
             <${actionUri}> bp:followUpQuestion ?property .
-            ?property bp:linkedToIndex ?link .
+            OPTIONAL { ?property bp:negates ?negated }
+            BIND(COALESCE(?negated, ?property) AS ?source)
+            ?source bp:linkedToIndex ?link .
             ?link bp:labelField ?labelField .
             OPTIONAL { ?link bp:iriField ?iriField }
             OPTIONAL { ?property rdfs:label ?label . FILTER(lang(?label) = "de") }
@@ -49,6 +53,7 @@ export async function getFollowUpsFor(actionUri) {
         if (!byProperty.has(r.property)) {
             byProperty.set(r.property, {
                 property: r.property,
+                source: r.source,
                 label: r.label ?? contractTerm(r.property),
                 fields: [],
             })

@@ -8,6 +8,9 @@ const EVENT_RE = /\/veranstaltungen\/details\/[^/?#]*-(\d+)(?:[?#]|$)/
 export function decorateCards({ solrEndpoint, onBookClick } = {}) {
     if (!isActivated()) return
     document.querySelectorAll('a[href*="sp=SAK"]').forEach(link => {
+        // our own carousels (Schaufenster, profile title lists) link to the catalogue too,
+        // but aren't catalogue cards
+        if (link.closest(".bp-cf")) return
         const match = link.href.match(SOPAC_RE)
         if (match) decorateBookCard(link, match[1] + match[2], { solrEndpoint, onBookClick })
     })

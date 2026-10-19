@@ -103,8 +103,10 @@
             <div class="rules">
                 <h2 id="matching">Gemeinsam für alle Solr-Strategien</h2>
                 <p>Die Profileinträge werden über die Indexzuordnungen im Vokabular gesucht.
-                    Vorschläge schließen gemerkte Bücher aus. Sprach- und Medienartpräferenzen
-                    gelten zusätzlich, etwa „Deutsch oder Englisch, und als E-Book“.</p>
+                    Vorschläge schließen gemerkte und ausgeblendete Bücher aus, ebenso Bücher mit
+                    einem Wert, den du unter „Nicht mehr vorschlagen“ ausgeschlossen hast (etwa
+                    eine Autor*in oder ein Thema). Sprach- und Medienartpräferenzen gelten
+                    zusätzlich, etwa „Deutsch oder Englisch, und als E-Book“.</p>
 
                 <h2 id="solr-or">Solr mit OR: Kombination zuerst, dann ausgleichen</h2>
                 <p>Für Themen, Autor*innen, Genres sowie Orte und Regionen genügt ein passender
@@ -149,13 +151,15 @@
                     berechnet und nicht gespeichert. Gleiches Profil und unveränderter Katalog
                     ergeben dieselben Vorschläge; nimmt der Katalog passende Titel auf, ändert
                     sich das Regal. Das Limit gilt <strong>je Reihe</strong>. Die
-                    Katalogtrefferzahl umfasst alle unter den aktuellen Filtern passenden, nicht
-                    gemerkten Bücher, einschließlich der angezeigten.</p>
+                    Katalogtrefferzahl umfasst alle unter den aktuellen Filtern und Ausschlüssen
+                    passenden Bücher, einschließlich der angezeigten.</p>
 
                 <h2 id="inspira">inspira_BIB: Ähnlichkeit zur Merkliste</h2>
                 <p>Der gesonderte inspira_BIB-Dienst erhält die IDs deiner gemerkten Bücher und
-                    liefert ähnliche Titel; gemerkte Bücher werden aus den Ergebnissen entfernt.
-                    Solr-Balancierung und Sprach-/Medienartfilter werden dort nicht berücksichtigt.</p>
+                    liefert ähnliche Titel; gemerkte und ausgeblendete Bücher werden aus den
+                    Ergebnissen entfernt, ebenso Bücher mit einem ausgeschlossenen Wert (geprüft
+                    über den Katalogindex). Solr-Balancierung und Sprach-/Medienartfilter werden
+                    dort nicht berücksichtigt.</p>
 
                 <h2 id="implementation">Definitionen und Implementierung</h2>
                 <p><a href="https://github.com/it-at-m/bib-pods/blob/main/bib-src/definitions/vocabulary.ttl">vocabulary.ttl</a>
@@ -283,12 +287,16 @@
                         a.appendChild(code)
                         queryCell.appendChild(a)
                         if (query.fq.length > 0) {
-                            // -id: fq's exclude saved books, the rest are preference
-                            // filters (bp:RecommendationFilter: Sprache, Medienart)
-                            const excluded = query.fq.filter(f => f.startsWith("-id:")).length
+                            // -id: fq's exclude saved and dismissed titles, other negative
+                            // fq's blocked values; the rest are preference filters
+                            // (bp:RecommendationFilter: Sprache, Medienart)
+                            const titles = query.fq.filter(f => f.startsWith("-id:")).length
+                            const values = query.fq.filter(f => f.startsWith("-") && !f.startsWith("-id:")).length
+                            const preferences = query.fq.length - titles - values
                             const parts = []
-                            if (excluded > 0) parts.push(`${excluded} fq-Ausschlüsse (gemerkte Bücher)`)
-                            if (excluded < query.fq.length) parts.push(`${query.fq.length - excluded} fq-Präferenzfilter`)
+                            if (titles > 0) parts.push(`${titles} ausgeschlossene Titel`)
+                            if (values > 0) parts.push(`${values} ausgeschlossene Werte`)
+                            if (preferences > 0) parts.push(`${preferences} fq-Präferenzfilter`)
                             const fqNote = document.createElement("span")
                             fqNote.className = "no-query"
                             fqNote.textContent = ` + ${parts.join(" + ")}`

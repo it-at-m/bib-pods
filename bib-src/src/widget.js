@@ -1,11 +1,12 @@
-import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, getAccessControlMode, warmupStorage, loadStore, replaceSubjectObjects } from "cori-sdk/storage/index.js"
+import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, getAccessControlMode, warmupStorage, loadStore, replaceSubjectObjects, removeProfileFact } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
-import { getProfileSubject, storageErrorMessage } from "cori-sdk/utils.js"
+import { getProfileSubject, storageErrorMessage, factory } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
 import { sopacCatalogueUrl, fetchBook, parseCatalogueRef, resolveCatalogueRef, OnleiheUnavailableError } from "./catalogue.js"
-import { cleanAuthorName } from "./book-prompt.js"
+import { installDismissPrompt } from "./book-prompt.js"
+import { cleanAuthorName, bookHasOption } from "./book-options.js"
 import { grantMerklisteAccess, revokeMerklisteAccess, readMerklisteAccessControl } from "./publish.js"
 import { mountScanDialog } from "./scan-dialog.js"
 import { BP } from "./vocab.js"
@@ -230,11 +231,11 @@ function buildCard(item, { onDismiss, tip }) {
     return slide
 }
 
-// A compact slide for the profile's Merkliste: just the cover (or the no-cover
-// placeholder) linking to the catalogue entry. Title + author live in the shared
-// tooltip — shown instantly (no schedule() delay), since these tiles carry no
-// visible text at all.
-function buildMiniCard({ title, author, sopacId, coverUrl }, { tip }) {
+// A compact slide for the profile's title lists (Merkliste, excluded titles): just the
+// cover (or the no-cover placeholder) linking to the catalogue entry. Title + author
+// live in the shared tooltip — shown instantly (no schedule() delay), since these tiles
+// carry no visible text at all. With onRemove the tile gets a ✕ that takes it off.
+function buildMiniCard({ title, author, sopacId, coverUrl }, { tip, onRemove }) {
     const slide = document.createElement("li")
     slide.className = "bp-cf-slide"
     const tipHtml = `<strong>${escapeHtml(title)}</strong>${author ? "<br>" + escapeHtml(author) : ""}`
@@ -258,6 +259,17 @@ function buildMiniCard({ title, author, sopacId, coverUrl }, { tip }) {
         link.appendChild(buildNoCoverPlaceholder())
     }
     slide.appendChild(link)
+    if (onRemove) {
+        // a sibling of the link, not inside it: a button can't nest in an <a>
+        const remove = document.createElement("button")
+        remove.type = "button"
+        remove.className = "bp-cf-dismiss bp-round-btn"
+        remove.textContent = "✕"
+        remove.title = "Wieder vorschlagen"
+        remove.setAttribute("aria-label", `„${title}" wieder vorschlagen`)
+        remove.addEventListener("click", () => { tip.hide(); onRemove(sopacId) })
+        slide.appendChild(remove)
+    }
     return slide
 }
 
@@ -492,9 +504,15 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     profileEl.addEventListener("mouseout", (e) => {
         if (e.target.closest(".cori-profile-field-notice")) tip.hide()
     })
-    let savedBooksCleanup = null
+    // The profile's title lists render as cover tiles; excluded titles can be taken
+    // off again (the Merkliste has no remove control).
+    const TITLE_LISTS = {
+        [BP + "savedBook"]: {},
+        [BP + "excludedBook"]: { onRemove: id => unexcludeTitle(id) },
+    }
+    const titleListCleanups = new Map()
     profileEl.renderFieldValues = async (predicate, objects) => {
-        if (predicate !== BP + "savedBook") return null
+        if (!TITLE_LISTS[predicate]) return null
         const items = await Promise.all(objects.map(async ({ value }) => {
             const doc = await fetchDocCached(value)
             const isbn = doc?.isbn?.[0]
@@ -506,16 +524,23 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
                 coverUrl: isbn && coverBase ? coverBase + encodeURIComponent(isbn) : null,
             }
         }))
-        const lane = buildLane(null, items, { tip }, buildMiniCard)
+        const lane = buildLane(null, items, { tip, ...TITLE_LISTS[predicate] }, buildMiniCard)
         lane.classList.add("bp-cf-mini")
-        // carousel wiring needs measured widths: wait until <cori-profile> has inserted
-        // the lane (a superseded refresh never inserts it — then there's nothing to wire)
-        requestAnimationFrame(() => {
-            if (!lane.isConnected) return
-            savedBooksCleanup?.()
-            savedBooksCleanup = initCarousel(lane)
-        })
+        // Wired right away: the carousel's resize observer lays it out once the lane has
+        // real widths — after <cori-profile> inserts it, however long the rest of the
+        // profile takes to render, or when a folded section opens.
+        titleListCleanups.get(predicate)?.()
+        titleListCleanups.set(predicate, initCarousel(lane))
         return lane
+    }
+    async function unexcludeTitle(id) {
+        try {
+            await removeProfileFact(BP + "excludedBook", factory.literal(id))
+            applyState()
+        } catch (err) {
+            console.error("[bib-pods] removing an excluded title failed:", err)
+            window.alert("Eintrag konnte nicht entfernt werden:\n" + storageErrorMessage(err))
+        }
     }
     const lanes = root.querySelector("#bp-lanes")
     const checkRecLink = root.querySelector("#bp-check-recommendations-link")
@@ -759,6 +784,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
                         title: doc.title?.[0] ?? doc.id,
                         author: doc.author?.[0] ?? "",
                         sopacId: doc.id,
+                        doc,
                         coverUrl: isbn && coverBase ? coverBase + encodeURIComponent(isbn) : null,
                         explanation: explainDocMatches(doc, profileStore, profileSubject, strategy.properties) ?? laneExplanation,
                     }
@@ -788,10 +814,26 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
-    // TODO: store the title as a profile exclusion that every lane filters out, and drop
-    // the card from the shelf.
-    function dismissCard({ sopacId, title }) {
-        console.log(`[bib-pods] TODO: exclude ${sopacId} („${title}“) from recommendations — not implemented yet`)
+    // ✕ on a card: ask what the user doesn't want (see installDismissPrompt). Books are
+    // read from the catalogue, both for the dialog and for clearing the shelf: an
+    // inspira card's own data is too sparse to show what it carries. Saving takes every
+    // affected card off the shelf on hand.
+    const openDismissPrompt = installDismissPrompt(root, { onSaved: async chosen => { await dropFromShelf(chosen); applyState() } })
+    async function dismissCard({ sopacId, doc }) {
+        tip.hide()
+        openDismissPrompt(sopacId, await fetchDocCached(sopacId) ?? doc)
+    }
+    async function dropFromShelf({ sopacId, title, options }) {
+        const current = shelf
+        if (!current) return
+        const dropped = book => (title && book.id === sopacId)
+            || options.some(({ spec, option }) => bookHasOption(spec, option, book))
+        const kept = await Promise.all(current.map(async ({ strategy, docs }) => {
+            const books = await Promise.all(docs.map(async doc => await fetchDocCached(doc.id) ?? doc))
+            return { strategy, docs: docs.filter((_, i) => !dropped(books[i])) }
+        }))
+        // a newer run replaced the shelf meanwhile: it already reflects the change
+        if (shelf === current) shelf = kept.filter(({ docs }) => docs.length > 0)
     }
 
     // Strategy multiselect: a summary trigger ("2 von 5 Empfehlungsarten") over a

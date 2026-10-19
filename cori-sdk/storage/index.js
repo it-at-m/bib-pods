@@ -156,11 +156,20 @@ export const addTriple = (subject, predicate, object) =>
 // Removes one profile fact (subject = profile root); `object` is the RDF term, so
 // IRI and literal values delete precisely. An IRI object that is no longer referenced
 // anywhere afterwards takes its own description triples (labels etc.) with it.
-export const removeProfileFact = (predicate, object) => mutate(store => {
+export const removeProfileFact = (predicate, object) => mutate(store => dropProfileFact(store, predicate, object))
+
+function dropProfileFact(store, predicate, object) {
     for (const q of store.getQuads(getProfileSubject(), predicate, object, null)) store.removeQuad(q)
     if (object.termType === "NamedNode" && store.getQuads(null, null, object, null).length === 0) {
         for (const q of store.getQuads(object, null, null, null)) store.removeQuad(q)
     }
+}
+
+// Removals (as removeProfileFact) and additions (as addInquiryFacts) in one write.
+export const changeProfileFacts = ({ remove = [], add = [] }) => mutate(store => {
+    for (const { predicate, object } of remove) dropProfileFact(store, predicate, object)
+    const defaultSubject = getProfileSubject()
+    for (const { subject, predicate, object } of add) addTripleToStore(store, subject ?? defaultSubject, predicate, object)
 })
 
 // Empties the profile down to its bare typing triple. A mutation of the loaded graph,

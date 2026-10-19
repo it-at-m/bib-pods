@@ -52,6 +52,8 @@ export function sectionPlan() {
             iri,
             order: orderOf(iri),
             label: getLabel(iri) ?? contractTerm(iri),
+            collapsed: getOne(v, iri, CORI + "collapsed") === "true",
+            clearable: getOne(v, iri, CORI + "clearable") === "true",
             fields: v.getSubjects(IN_SECTION, iri, null)
                 .map(t => t.value)
                 .sort((a, b) => orderOf(a) - orderOf(b)),

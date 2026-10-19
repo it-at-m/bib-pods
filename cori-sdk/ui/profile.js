@@ -1,4 +1,4 @@
-import { loadStore, loadAsTurtle, addTriple, removeProfileFact, clearStorage, isStorageReady, getStorageEntryName } from "../storage/index.js"
+import { loadStore, loadAsTurtle, addTriple, removeProfileFact, changeProfileFacts, clearStorage, isStorageReady, getStorageEntryName } from "../storage/index.js"
 import { getProfileSubject, getVocab, getLabel, getPluralLabel, getOne, contractTerm, expandTerm, sectionPlan, storageErrorMessage, RDFS_LABEL, RDF_TYPE, CORI } from "../utils.js"
 import { validateProfile } from "../shacl.js"
 import { openAssistant, askableFields } from "./assistant.js"
@@ -88,6 +88,7 @@ export class CoriProfile extends HTMLElement {
             </div>`
         this._sectionsEl = this.querySelector(".cori-profile-sections")
         this._refreshSeq = 0
+        this._openSections = new Set()    // cori:collapsed sections the user opened
 
         this.querySelector(".cori-profile-fill").addEventListener("click", () => this._assist())
         this.querySelector('[data-action="add"]').addEventListener("click", () => this._add())
@@ -164,10 +165,12 @@ export class CoriProfile extends HTMLElement {
             }
             el.appendChild(head)
             const emptyFields = []
+            const facts = []
             for (const field of s.fields) {
                 const objects = values.get(field)
                 values.delete(field)
                 if (objects?.length) {
+                    facts.push(...objects.map(object => ({ predicate: field, object })))
                     el.appendChild(await this._buildFieldGroup(store, field, objects,
                         askable(field) ? () => this._assist(s.iri, field) : null))
                 } else {
@@ -177,13 +180,14 @@ export class CoriProfile extends HTMLElement {
             // Empty fields show what could go there: each a "+ <label>" launcher (or
             // plain text when the assistant has nothing to ask for it). In a fully
             // empty section they sit inline (the section itself is collapsed away
-            // below); in a populated one they fold behind their own disclosure.
+            // below); in a populated one they fold behind their own disclosure, as
+            // long as one of them can be filled from here.
             const gapFields = this._buildGapFields(s.iri, emptyFields, askable)
             if (el.children.length === 1) {
                 if (gapFields) el.appendChild(gapFields)
                 emptySections.push(el)
             } else {
-                if (gapFields) {
+                if (gapFields && emptyFields.some(askable)) {
                     const gaps = document.createElement("details")
                     gaps.className = "cori-profile-more cori-profile-field-gaps"
                     const gapsSummary = document.createElement("summary")
@@ -191,7 +195,9 @@ export class CoriProfile extends HTMLElement {
                     gaps.append(gapsSummary, gapFields)
                     el.appendChild(gaps)
                 }
-                ;(s.order > gapsOrder ? trailingSections : sections).push(el)
+                if (s.clearable) el.appendChild(this._buildClearSection(s.label, facts))
+                const placed = s.collapsed ? this._foldSection(s.iri, el, facts.length) : el
+                ;(s.order > gapsOrder ? trailingSections : sections).push(placed)
             }
         }
         // facts whose predicate no section claims (e.g. manually added triples)
@@ -215,6 +221,46 @@ export class CoriProfile extends HTMLElement {
             sections.push(details)
         }
         return [...sections, ...trailingSections]
+    }
+
+    // A cori:collapsed section: the same content behind its heading (with the number of
+    // entries), open again after a refresh if the user opened it.
+    _foldSection(sectionIri, el, entries) {
+        const details = document.createElement("details")
+        details.className = `${el.className} cori-profile-collapsible`
+        details.open = this._openSections.has(sectionIri)
+        details.addEventListener("toggle", () => {
+            if (details.open) this._openSections.add(sectionIri)
+            else this._openSections.delete(sectionIri)
+        })
+        const summary = document.createElement("summary")
+        const head = el.firstElementChild
+        head.querySelector("h4").append(` (${entries})`)
+        summary.appendChild(head)
+        details.append(summary, ...el.childNodes)
+        return details
+    }
+
+    // A cori:clearable section's "Bereich leeren": removes every fact shown in it in one
+    // write, after a confirmation.
+    _buildClearSection(label, facts) {
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = "cori-profile-clear-section"
+        btn.textContent = "Bereich leeren"
+        btn.addEventListener("click", async () => {
+            const count = facts.length === 1 ? "Der Eintrag darin wird" : `Alle ${facts.length} Einträge darin werden`
+            if (!window.confirm(`„${label}" leeren? ${count} aus dem Profil entfernt.`)) return
+            try {
+                await changeProfileFacts({ remove: facts })
+                await this.refresh()
+                this._emitChange()
+            } catch (err) {
+                console.error("[cori-profile] clearing a section failed:", err)
+                window.alert("Bereich konnte nicht geleert werden:\n" + storageErrorMessage(err))
+            }
+        })
+        return btn
     }
 
     // The "+ <label>" launcher chips for a section's empty fields (plain muted text
