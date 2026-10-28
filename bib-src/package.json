@@ -15,6 +15,6 @@
     "devDependencies": {
         "cheerio": "1.2.0",
         "marked": "18.0.14",
-        "pdfmake": "0.3.11"
+        "pdfmake": "0.3.13"
     }
 }
