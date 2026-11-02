@@ -3,7 +3,7 @@
 # see all content: http://localhost:9200/interim-index/_search?pretty
 services:
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.19@sha256:5dbf405a97e008f3024cf6f8f4a314d91b765d82954530893dcc13f8e87d21f4
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.24@sha256:d6dfe6626d645cfec66e91009aca60c6c1bb6f94d34253528f24d8cea2f94ba6
     ports:
       - "9200:9200"
     environment:
