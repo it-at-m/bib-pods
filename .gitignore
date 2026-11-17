@@ -12,7 +12,7 @@ interim-index/oai/data*/
 interim-index/.import-cursor.json
 
 typo3/site/
-typo3/.syncdetails
+typo3/.syncdetails.*
 
 bundle.js
 RefreshWorker.js

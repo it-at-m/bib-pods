@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Usage: ./sync.sh {pull|push|diff}
+# Usage: ./sync.sh {pull|push|diff} {staging|prod}
 #
 # Mirrors typo3/bib_pods with a remote SFTP location
 #
 # Setup:
 #   1. brew install lftp
-#   2. Create .syncdetails next to this script (gitignored) with:
+#   2. Per target, create .syncdetails.<target> next to this script (gitignored) with:
 #
 #        SFTP_HOST=""
 #        SFTP_PORT=""
@@ -17,7 +17,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOCAL_DIR="$SCRIPT_DIR/bib_pods"
-SFTP_FILE="$SCRIPT_DIR/.syncdetails"
+TARGET="${2:-}"
+SFTP_FILE="$SCRIPT_DIR/.syncdetails.$TARGET"
 
 if ! command -v lftp >/dev/null 2>&1; then
     echo "Error: lftp is required. Install with: brew install lftp" >&2
@@ -25,6 +26,7 @@ if ! command -v lftp >/dev/null 2>&1; then
 fi
 
 if [[ ! -f "$SFTP_FILE" ]]; then
+    echo "Usage: $0 {pull|push|diff} {staging|prod}" >&2
     echo "Error: $SFTP_FILE not found." >&2
     echo "See the setup instructions at the top of this script." >&2
     exit 1
@@ -89,20 +91,20 @@ case "${1:-}" in
         ;;
 
     pull)
-        echo "==> Pulling remote -> local (mirror with --delete)..."
+        echo "==> Pulling $TARGET -> local (mirror with --delete)..."
         run_lftp "mirror $MIRROR_FLAGS \"$SFTP_REMOTE_PATH\" \"$LOCAL_DIR\""
         echo "==> Done."
         ;;
 
     push)
-        echo "==> Pushing local -> remote (mirror with --delete)..."
+        echo "==> Pushing local -> $TARGET (mirror with --delete)..."
         run_lftp "mirror -R $MIRROR_FLAGS \"$LOCAL_DIR\" \"$SFTP_REMOTE_PATH\""
         echo "==> Done."
         ;;
 
     *)
         cat <<HELP >&2
-Usage: $0 {pull|push|diff}
+Usage: $0 {pull|push|diff} {staging|prod}
 
   diff   Show what pull and push would change (read-only).
   pull   Mirror remote -> local. Overwrites local files; deletes locals not on remote.
