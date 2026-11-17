@@ -9,7 +9,7 @@
     "devDependencies": {
         "bib-src": "file:../bib-src",
         "cori-sdk": "file:../cori-sdk",
-        "force-graph": "1.51.4",
+        "force-graph": "1.52.0",
         "serve": "14.2.6",
         "vite": "7.3.6"
     }
