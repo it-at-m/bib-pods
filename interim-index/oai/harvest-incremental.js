@@ -28,6 +28,7 @@ const DATA_DIR = path.join(import.meta.dirname, "data")
 async function findLatestDatestamp(dir, { concurrency = 32, stableThreshold = 500 } = {}) {
     if (!fs.existsSync(dir)) return null
     const files = fs.readdirSync(dir).filter(f => f.endsWith(".xml")).sort().reverse()
+    const today = new Date().toISOString().slice(0, 10)
     let latest = null
     let filesSinceUpdate = 0
     let scanned = 0
@@ -38,6 +39,10 @@ async function findLatestDatestamp(dir, { concurrency = 32, stableThreshold = 50
             const xml = await fs.promises.readFile(path.join(dir, f), "utf8")
             let max = null
             for (const m of xml.matchAll(/<datestamp>([^<]+)<\/datestamp>/g)) {
+                // The feed carries placeholder datestamps far in the future (9999-01-01).
+                // Taken as the latest, one would make every later harvest ask for changes
+                // since that day and receive nothing but the placeholder record.
+                if (m[1] > today) continue
                 if (!max || m[1] > max) max = m[1]
             }
             return max
