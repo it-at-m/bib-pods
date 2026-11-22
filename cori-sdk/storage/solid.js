@@ -1,5 +1,5 @@
 // Solid-pod-backed storage: OIDC auth lifecycle + pod discovery + setup + CRUD
-import { getResource, parseToN3, createContainer, putResource, getContainerItems, getLinkHeader, SPACE, SOLID, RDF } from "@uvdsl/solid-requests"
+import { getResource, parseToN3, postResource, putResource, getContainerItems, getLinkHeader, SPACE, SOLID, RDF, LDP } from "@uvdsl/solid-requests"
 import { parseTurtle, serializeTurtle } from "../utils.js"
 import { Session } from "@uvdsl/solid-oidc-client-browser"
 import { universalAccess } from "@inrupt/solid-client"
@@ -189,7 +189,13 @@ async function doEnsurePodSetup() {
         log("cori/ container already exists:", coriUri)
     } else {
         log("creating cori/ container at", storageRoot)
-        const resp = await createContainer(storageRoot, CORI_CONTAINER_NAME, session)
+        // The Solid Protocol lets a server reject a POST without Content-Type, also
+        // for a bodiless container creation, so the header is sent explicitly.
+        const resp = await postResource(storageRoot, undefined, session, {
+            "Content-type": "text/turtle",
+            Link: `<${LDP("BasicContainer")}>; rel="type"`,
+            Slug: CORI_CONTAINER_NAME,
+        })
         log("cori/ created, server response status =", resp.status)
     }
 
