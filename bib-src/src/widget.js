@@ -478,9 +478,6 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const solidSetup = root.querySelector("#bp-solid-setup")
     const solidInput = root.querySelector("#bp-solid-input")
     const storageLabel = root.querySelector("#bp-storage-label-text")
-    const publishBlock = root.querySelector("#bp-publish")
-    const grantLink = root.querySelector("#bp-grant-link")
-    const revokeLink = root.querySelector("#bp-revoke-link")
     const laneStatus = root.querySelector("#bp-lane-status")
     const laneStatusDialog = root.querySelector("#bp-lane-status-dialog")
     const laneStatusList = root.querySelector("#bp-lane-status-list")
@@ -636,44 +633,42 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
-    // Every way to add to the profile, side by side in its heading line: the SDK's own
-    // assistant launcher, then the two bib-pods adds, a title and (pod storage only)
-    // what the pod already holds. The header belongs to the profile primitive, and its
-    // refresh() replaces only .cori-profile-sections, so the row is built once and
-    // survives re-renders; each applyState only settles the pod launcher's visibility.
-    let scanLauncher = null
+    // The ways to add to the profile, side by side in its heading line: the SDK's own
+    // assistant launcher, then „Titel hinzufügen“. The header belongs to the profile
+    // primitive, and its refresh() replaces only .cori-profile-sections, so the row is
+    // built once and survives re-renders.
+    let enrichRowMounted = false
     function mountEnrichRow() {
         const header = profileEl.querySelector(".cori-profile-header")
-        if (!header) return
-        if (!scanLauncher) {
-            const lead = document.createElement("p")
-            lead.className = "bp-profile-lead"
-            lead.innerHTML = `<span class="bp-profile-lead-empty">Noch leer. </span>Daraus entstehen deine Empfehlungen.`
-            header.appendChild(lead)
-            const launchers = header.querySelector(".cori-profile-launchers")
-            const launcher = (text, onClick) => {
-                const btn = document.createElement("button")
-                btn.type = "button"
-                btn.className = "bp-enrich-btn"
-                btn.textContent = text
-                btn.addEventListener("click", onClick)
-                launchers.appendChild(btn)
-                return btn
-            }
-            const addTitle = launcher("Titel hinzufügen", openAddTitle)
-            // show(), not schedule(): the label says what the button does but not what it
-            // accepts, and that list is the whole point — so it arrives on contact rather
-            // than after the hover delay the cards use.
-            const reveal = () => tip.show(ADD_TITLE_TIP, addTitle)
-            addTitle.addEventListener("mouseenter", reveal)
-            addTitle.addEventListener("focus", reveal)
-            addTitle.addEventListener("mouseleave", () => tip.hide())
-            addTitle.addEventListener("blur", () => tip.hide())
-            scanLauncher = launcher("Aus deinem Pod übernehmen", () => openScan())
-            scanLauncher.setAttribute("aria-haspopup", "dialog")
-        }
-        scanLauncher.hidden = !canPublish()
+        if (!header || enrichRowMounted) return
+        enrichRowMounted = true
+        const lead = document.createElement("p")
+        lead.className = "bp-profile-lead"
+        lead.innerHTML = `<span class="bp-profile-lead-empty">Noch leer. </span>Daraus entstehen deine Empfehlungen.`
+        header.appendChild(lead)
+        const addTitle = document.createElement("button")
+        addTitle.type = "button"
+        addTitle.className = "bp-enrich-btn"
+        addTitle.textContent = "Titel hinzufügen"
+        addTitle.addEventListener("click", openAddTitle)
+        header.querySelector(".cori-profile-launchers").appendChild(addTitle)
+        // show(), not schedule(): the label says what the button does but not what it
+        // accepts, and that list is the whole point — so it arrives on contact rather
+        // than after the hover delay the cards use.
+        const reveal = () => tip.show(ADD_TITLE_TIP, addTitle)
+        addTitle.addEventListener("mouseenter", reveal)
+        addTitle.addEventListener("focus", reveal)
+        addTitle.addEventListener("mouseleave", () => tip.hide())
+        addTitle.addEventListener("blur", () => tip.hide())
     }
+    // What only a pod can do are demo features: taking over what the pod already holds,
+    // and sharing the Merkliste (a pod has a URL space to publish into). They sit with
+    // the expert tools of the raw-data view, and only while there is a pod to work on.
+    profileEl.expertTools = [
+        { label: "Aus deinem Pod übernehmen", available: canPublish, run: () => openScan() },
+        { label: "Merkliste freigeben", available: canPublish, run: () => openAccessDialog("grant") },
+        { label: "Freigabe widerrufen", available: canPublish, run: () => openAccessDialog("revoke") },
+    ]
     // The profile assistant is the SDK's: its whole deck of cards.
     function openAssistant() {
         profileEl.assist()
@@ -885,16 +880,15 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
-    // The Konto block's one-line "where your data lives", plus the publish action that
-    // only a pod can offer.
+    // The Konto block's one-line "where your data lives".
     function renderStorageLabel() {
         const choice = getChoice()
         storageLabel.textContent = choice === "solid" && !isStorageReady()
             ? "Solid Pod – Sitzung unterbrochen"
             : STORAGE_LABELS[choice] ?? ""
-        publishBlock.hidden = !canPublish()
-        // Ask the pod which access-control mechanism it speaks: acl:agentGroup exists
-        // only in WAC, so on an ACP pod the group option must not be offered at all.
+        // For the Merkliste sharing dialog, ask the pod which access-control mechanism
+        // it speaks: acl:agentGroup exists only in WAC, so on an ACP pod the group
+        // option must not be offered at all.
         if (canPublish()) {
             getAccessControlMode()
                 .then(mode => { accessGroupOption.hidden = mode !== "wac" })
@@ -1329,8 +1323,6 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         renderAccessDoc()
         accessDialog.showModal()
     }
-    grantLink.addEventListener("click", (e) => { e.preventDefault(); openAccessDialog("grant") })
-    revokeLink.addEventListener("click", (e) => { e.preventDefault(); openAccessDialog("revoke") })
     const openScan = mountScanDialog(root, { onSaved: () => profileEl.refresh() })
     for (const radio of accessDialog.querySelectorAll('input[name="bp-access-scope"]')) {
         radio.addEventListener("change", () => {

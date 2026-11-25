@@ -114,15 +114,13 @@
 
     <section id="bp-account" class="bp-block bp-when-activated" hidden>
         <p id="bp-storage-label" class="bp-storage-label"><span id="bp-storage-label-text"></span></p>
-        <!-- Copies the Merkliste to a merkliste.ttl beside the profile and grants
-             read on it — to everyone, to one WebID, or to a group, chosen in the
-             dialog below. Needs a pod's URL space, so applyState hides it for
-             local/session storage and while a Solid session is interrupted. -->
-        <p id="bp-publish" class="bp-publish bp-aside" hidden>Merkliste: <a id="bp-grant-link" href="#">freigeben</a> | <a id="bp-revoke-link" href="#">Freigabe widerrufen</a></p>
         <button class="button bp-logout" type="button">Abmelden</button>
     </section>
 
-    <!-- One dialog for both directions; the link that opened it sets the verb. -->
+    <!-- Sharing the Merkliste: copies it to a merkliste.ttl beside the profile and
+         grants read on it — to everyone, to one WebID, or to a group. Needs a pod's URL
+         space; opened from the raw-data view's tools, which offer it only then. One
+         dialog for both directions; the link that opened it sets the verb. -->
     <dialog id="bp-access-dialog" class="bp-modal bp-access-dialog">
         <div class="bp-modal-content">
             <h3 id="bp-access-title"></h3>

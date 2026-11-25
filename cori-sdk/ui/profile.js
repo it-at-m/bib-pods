@@ -20,7 +20,7 @@ const PROFILE_TYPE = CORI + "Profile"
 // can add its own launchers to .cori-profile-launchers.
 // The header's "⋯" menu manages the profile as a whole (download; clear once there is
 // something to clear) and leads to the raw Turtle view, where the expert tools live:
-// adding a single triple, validating.
+// adding a single triple, validating, and whatever the app adds (expertTools).
 // While the profile holds no facts the element carries the attribute data-empty.
 // No shadow root, no bundled styles.
 // Call refresh() to re-render after the profile changes elsewhere, assist(only) to open
@@ -29,6 +29,10 @@ const PROFILE_TYPE = CORI + "Profile"
 // Assignable properties:
 //   assistantSource: what the app knows about a field's values (search, suggestions,
 //     preview, cards of its own); see ./assistant.js.
+//   expertTools: [{ label, run, available? }]
+//     tools of the app's own in the raw Turtle view's header, beside the SDK's. Each
+//     opening of the view asks available() (if given) whether to show one; running one
+//     closes the view first.
 //   renderFieldValues: async (predicateIri, objectTerms) => Element | null
 //     lets the app take over rendering of one field's values (e.g. saved books
 //     as cover tiles); null/undefined or a throw falls back to the default chips.
@@ -72,8 +76,8 @@ function buildTurtleDialog({ onAdd, onValidate }) {
     d.innerHTML = `
         <div class="cori-turtle-view-header">
             <h3 class="cori-turtle-view-title"></h3>
-            <a href="#" class="cori-turtle-view-add">Triple hinzufügen</a>
-            <a href="#" class="cori-turtle-view-validate">Profil validieren</a>
+            <a href="#" class="cori-turtle-view-tool cori-turtle-view-add">Triple hinzufügen</a>
+            <a href="#" class="cori-turtle-view-tool cori-turtle-view-validate">Profil validieren</a>
             <button type="button" class="cori-turtle-view-close">Schließen</button>
         </div>
         <pre class="cori-turtle-view-body" style="margin: 0; max-height: 60vh; overflow: auto;"><code class="language-turtle"></code></pre>`
@@ -423,10 +427,32 @@ export class CoriProfile extends HTMLElement {
                 this.appendChild(this._turtleDialog)
             }
             this._turtleDialog.querySelector(".cori-turtle-view-title").textContent = getStorageEntryName()
+            this._renderExpertTools()
             await this._renderTurtle()
             this._turtleDialog.showModal()
         } catch (err) {
             console.error("[cori-profile] turtle view failed:", err)
+        }
+    }
+
+    // The app's tools (expertTools) as links before "Schließen", rebuilt per opening:
+    // what is available can change with the storage in use.
+    _renderExpertTools() {
+        const header = this._turtleDialog.querySelector(".cori-turtle-view-header")
+        for (const link of header.querySelectorAll(".cori-turtle-view-app-tool")) link.remove()
+        const close = header.querySelector(".cori-turtle-view-close")
+        for (const tool of this.expertTools ?? []) {
+            if (tool.available && !tool.available()) continue
+            const link = document.createElement("a")
+            link.href = "#"
+            link.className = "cori-turtle-view-tool cori-turtle-view-app-tool"
+            link.textContent = tool.label
+            link.addEventListener("click", (e) => {
+                e.preventDefault()
+                this._turtleDialog.close()
+                tool.run()
+            })
+            close.before(link)
         }
     }
 

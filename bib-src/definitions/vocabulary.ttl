@@ -168,9 +168,10 @@ bp:explanationPhrase a rdf:Property .
 
 # ----- Profile sections -----
 # cori:PersonalSection (cori-sdk) opens the profile at cori:order 10; the library
-# sections follow. Sections nothing in the app fills (its Persönliches, and the
-# sketches for future fields: Hobbys, Projekte) stay out of the profile's list of
-# empty sections: cori:listWhenEmpty false.
+# sections follow. Sections no regular part of the app fills (its Persönliches, the
+# sketches for future fields: Hobbys, Projekte, and Bibliothek, which only the pod
+# import demo writes) stay out of the profile's list of empty sections:
+# cori:listWhenEmpty false.
 
 cori:PersonalSection cori:listWhenEmpty false .
 
@@ -196,7 +197,8 @@ bp:ProjectsSection a cori:ProfileSection ;
 
 bp:LibrarySection a cori:ProfileSection ;
     rdfs:label "library"@en, "Bibliothek"@de ;
-    cori:order 70 .
+    cori:order 70 ;
+    cori:listWhenEmpty false .
 
 # order > cori:EmptySectionsBlock (100): the Merkliste fills itself through catalogue
 # clicks rather than curation, so it sits below the "noch leere Bereiche" disclosure.

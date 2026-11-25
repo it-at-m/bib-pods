@@ -192,7 +192,6 @@ dialog.bp-pods-modal {
 .bp-aside { margin: 4px 0 0; font-size: 0.85em; color: #888; }
 .bp-aside a { color: #888; text-decoration: underline; }
 .bp-aside a:hover { color: var(--contrastcolor, #d14900); }
-#bp-account .bp-aside { margin: 0; }
 #bp-account .bp-logout { margin: 0 0 0 auto; }
 /* The grant/revoke dialog: a narrow prompt. px box sizing for the TYPO3 root-font
    mismatch (see dialog.bp-pods-modal). */
@@ -676,7 +675,6 @@ cori-profile .cori-profile-actions button[hidden] { display: none; }
 cori-profile .cori-profile-actions button:hover { background: #f5f5f5; color: #222; }
 /* the way to the raw data stands apart from what manages the profile */
 cori-profile .cori-profile-actions button:not([hidden]) + button[data-action="inspect"] { margin-top: 6px; padding-top: 12px; border-top: 1px solid #eee; }
-cori-profile .bp-enrich-btn[hidden] { display: none; }
 
 /* The title card's search hits: a plain list of full-width text buttons, one title
    each. Explicit background/border/font so host button styling can't leak in. */
@@ -1002,5 +1000,7 @@ dialog.cori-turtle-view {
 dialog.cori-turtle-view::backdrop { background: rgba(0, 0, 0, 0.4); }
 .cori-turtle-view-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
 .cori-turtle-view-header h3 { margin: 0; margin-right: auto; }
-.cori-turtle-view-add,
-.cori-turtle-view-validate { font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
+/* The expert tools: quiet grey links (as .bp-aside), brand colour only on hover. Pinned
+   so host anchor rules can't recolour them. */
+.cori-turtle-view-tool { font-size: 0.9em; color: #888; text-decoration: underline; white-space: nowrap; cursor: pointer; }
+.cori-turtle-view-tool:hover { color: var(--contrastcolor, #d14900); }
