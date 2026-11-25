@@ -152,38 +152,6 @@
         </div>
     </dialog>
 
-    <!-- Opened from "Titel hinzufügen" (the profile's heading line, the empty
-         Schaufenster, the lane status dialog). Takes a title or author to search the catalogue
-         for, or whatever identifies a title in a catalogue the widget can't be mounted
-         on: the aDIS OPAC's Zitierlink (the OPAC copies it to the clipboard itself), an
-         Onleihe link, an ISBN in any printed form, or a bare Datensatznummer. Saving is
-         the same path a card's "+" uses. -->
-    <dialog id="bp-add-title-dialog" class="bp-modal bp-add-title-dialog" aria-labelledby="bp-add-title-heading">
-        <div class="bp-modal-content">
-            <h3 id="bp-add-title-heading">Titel hinzufügen</h3>
-            <p class="bp-add-title-lead">Titel oder Autor*in eintippen, oder Link bzw. ISBN einfügen.</p>
-            <input type="text" id="bp-add-title-input" autocomplete="off" spellcheck="false"
-                aria-labelledby="bp-add-title-heading">
-            <!-- What a text search found: one button per title, opening the save dialog. -->
-            <ul id="bp-add-title-hits" class="bp-add-title-hits" hidden></ul>
-            <!-- Each source links to where a patron would find it. A bare Datensatznummer
-                 also resolves (same path as the Zitierlink's tail) but isn't listed: nobody
-                 copies it, and the Zitierlink sits right beside it on the same OPAC page. -->
-            <ul id="bp-add-title-kinds" class="bp-add-title-kinds">
-                <li>Zitierlink aus dem <a href="https://ssl.muenchen.de/aDISWeb/app/opac" target="_blank" rel="noopener">Katalog (OPAC)</a></li>
-                <li>Link zu einem Titel in der <a href="https://muenchen.onleihe.de/" target="_blank" rel="noopener">Onleihe</a></li>
-                <li>ISBN, mit oder ohne Bindestriche</li>
-            </ul>
-            <!-- aria-live so the outcome reaches a screen reader: a resolved link moves
-                 focus into the save dialog, everything else only swaps this line's text. -->
-            <p id="bp-add-title-msg" class="bp-add-title-msg" role="status" aria-live="polite" hidden></p>
-            <p class="bp-add-title-actions">
-                <button id="bp-add-title-submit" class="button" type="button">Suchen</button>
-                <button id="bp-add-title-cancel" class="button" type="button">Abbrechen</button>
-            </p>
-        </div>
-    </dialog>
-
     <!-- Opened from the status line beside the Schaufenster heading, and the one place
          to steer the shelf: every recommendation strategy with its on/off checkbox and
          what its lane is doing (shows suggestions, waits for profile input, found

@@ -1,11 +1,12 @@
 import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, getAccessControlMode, warmupStorage, loadStore, replaceSubjectObjects, removeProfileFact, PROFILE_SAVED } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
-import { getProfileSubject, getLabel, contractTerm, storageErrorMessage, factory } from "cori-sdk/utils.js"
+import { getProfileSubject, getVocab, getLabel, contractTerm, storageErrorMessage, factory, RDF_TYPE } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
-import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
-import { sopacCatalogueUrl, fetchBook, searchBooks, parseCatalogueRef, resolveCatalogueRef, OnleiheUnavailableError } from "./catalogue.js"
+import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, countMatches, buildQuery, buildShelfQuery, hasPreferenceFilters, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
+import { sopacCatalogueUrl, fetchBook, searchBooks, suggestBooks, parseCatalogueRef, resolveCatalogueRef, OnleiheUnavailableError } from "./catalogue.js"
 import { installDismissPrompt } from "./book-prompt.js"
+import { createAssistantSource } from "./assistant-source.js"
 import { cleanAuthorName, bookHasOption } from "./book-options.js"
 import { grantMerklisteAccess, revokeMerklisteAccess, readMerklisteAccessControl } from "./publish.js"
 import { mountScanDialog } from "./scan-dialog.js"
@@ -28,11 +29,18 @@ const STORAGE_LABELS = {
     solid: "Speicherort: in deinem Solid Pod",
 }
 
+// The profile assistant's card that asks for liked titles; „Titel hinzufügen“ opens it
+// on its own.
+const TITLE_CARD = "titles"
+
 // Shown on the "Titel hinzufügen" launcher. The label says what the button does; this
 // says what it accepts, which is the part nobody would guess — a search is only one of
 // several handles on a title. Everything named here actually resolves.
 const ADD_TITLE_TIP = "<strong>Einen Titel nennen, den du magst</strong>"
     + "<br>Nach Titel oder Autor*in suchen, oder Zitierlink aus dem Katalog (OPAC), Link aus der Onleihe oder ISBN einfügen."
+
+// How long the title card waits after a keystroke before it asks the catalogue.
+const TITLE_SUGGEST_DELAY_MS = 250
 
 // Shown on "Jetzt aktualisieren" in the lane status dialog: the click is only a
 // shortcut, since the shelf keeps itself up to date.
@@ -473,16 +481,9 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const publishBlock = root.querySelector("#bp-publish")
     const grantLink = root.querySelector("#bp-grant-link")
     const revokeLink = root.querySelector("#bp-revoke-link")
-    const addTitleDialog = root.querySelector("#bp-add-title-dialog")
     const laneStatus = root.querySelector("#bp-lane-status")
     const laneStatusDialog = root.querySelector("#bp-lane-status-dialog")
     const laneStatusList = root.querySelector("#bp-lane-status-list")
-    const addTitleInput = root.querySelector("#bp-add-title-input")
-    const addTitleSubmit = root.querySelector("#bp-add-title-submit")
-    const addTitleCancel = root.querySelector("#bp-add-title-cancel")
-    const addTitleMsg = root.querySelector("#bp-add-title-msg")
-    const addTitleHits = root.querySelector("#bp-add-title-hits")
-    const addTitleKinds = root.querySelector("#bp-add-title-kinds")
     const accessDialog = root.querySelector("#bp-access-dialog")
     const accessTitle = root.querySelector("#bp-access-title")
     const accessConfirm = root.querySelector("#bp-access-confirm")
@@ -579,6 +580,26 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const coverBase = qdrantEndpoint ? new URL("/image/", qdrantEndpoint).href : null
     const tip = createTip(root)
 
+    // What the profile assistant's cards know about the catalogue (see
+    // assistant-source.js), plus the two things only this page can add: a first card
+    // that asks for liked titles, and the way from the last card to the Schaufenster.
+    const catalogueSource = createAssistantSource({ solrEndpoint })
+    profileEl.assistantSource = {
+        ...catalogueSource,
+        cards: [{
+            id: TITLE_CARD,
+            // a question among the deck's questions; on its own, what its launcher says
+            title: (store, { alone }) => alone ? "Titel hinzufügen" : "Welche Bücher hast du zuletzt gern gelesen?",
+            hint: (store, { alone }) => [catalogueSource.hint(BP + "savedBook", store), alone ? null : "Ein Titel genügt für den Anfang."].filter(Boolean).join(" "),
+            render: renderTitleCard,
+        }],
+        finish: {
+            text: "Dein Schaufenster stellt sich jetzt neu zusammen.",
+            label: "Zum Schaufenster",
+            action: () => root.querySelector("#bp-showcase-heading")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        },
+    }
+
     // Logged-out flow as a small state machine; each step reveals exactly one block.
     let loginStep = "cta"   // 'cta' | 'chooser' | 'solid'
     // Tracks the last activation state so the top blocks collapse/expand only on the
@@ -653,63 +674,43 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
         scanLauncher.hidden = !canPublish()
     }
-    // The profile assistant is the SDK's; its launcher is the one handle on it.
+    // The profile assistant is the SDK's: its whole deck of cards.
     function openAssistant() {
-        profileEl.querySelector(".cori-profile-fill").click()
+        profileEl.assist()
     }
 
+    // „Titel hinzufügen“, wherever it is offered: the assistant's title card on its own.
     function openAddTitle() {
         tip.hide()
-        addTitleInput.value = ""
-        showAddTitleMsg(null)
-        showAddTitleHits([])
-        addTitleSubmit.disabled = false
-        addTitleDialog.showModal()
-        addTitleInput.focus()
-    }
-
-    function closeAddTitle() {
-        addTitleInput.value = ""
-        showAddTitleMsg(null)
-        showAddTitleHits([])
-        addTitleDialog.close()
-    }
-
-    function showAddTitleMsg(text, isError = true) {
-        addTitleMsg.hidden = !text
-        addTitleMsg.textContent = text ?? ""
-        addTitleMsg.classList.toggle("is-error", Boolean(text) && isError)
+        profileEl.assist(TITLE_CARD)
     }
 
     // What a text search found, one button per record: the same work often exists as
-    // print, e-book and audio, so medium and year sit beside title and author. While
-    // hits are on display they take the place of the list of accepted link kinds.
-    function showAddTitleHits(docs) {
-        addTitleHits.replaceChildren(...docs.map(doc => {
+    // print, e-book and audio, so medium and year sit beside title and author.
+    function titleHits(docs, onPick) {
+        return docs.map(doc => {
             const btn = document.createElement("button")
             btn.type = "button"
             const title = document.createElement("strong")
             title.textContent = doc.title?.[0]?.split(" | ")[0] ?? doc.id
             const rest = [doc.author?.[0] && cleanAuthorName(doc.author[0]), doc.format?.[0], doc.publishDate?.[0]].filter(Boolean)
             btn.append(title, ...rest.map(part => ` · ${part}`))
-            btn.addEventListener("click", () => { closeAddTitle(); openBookPrompt(doc.id, doc) })
+            btn.addEventListener("click", () => onPick(doc))
             const li = document.createElement("li")
             li.appendChild(btn)
             return li
-        }))
-        addTitleHits.hidden = docs.length === 0
-        addTitleKinds.hidden = docs.length > 0
+        })
     }
 
     // Counterpart to a card's "+" for every title that isn't on a card. A link, ISBN or
     // Datensatznummer names one record and goes straight to the shared book prompt;
     // anything else is searched as title or author and offers its hits to pick from.
     // The book prompt owns what gets saved, so a typed, pasted and clicked title all
-    // land identically.
-    async function submitAddTitle() {
-        const text = addTitleInput.value.trim()
+    // land identically. `ui` is the title card: say(text, isError) for the status line,
+    // hits(docs), busy(on) while the lookup runs, open(id, book) for a title found.
+    async function lookUpTitle(text, ui) {
         if (!text) {
-            showAddTitleMsg("Bitte einen Titel, eine*n Autor*in, einen Link oder eine ISBN eingeben.")
+            ui.say("Bitte einen Titel, eine*n Autor*in, einen Link oder eine ISBN eingeben.")
             return
         }
         const ref = parseCatalogueRef(text)
@@ -717,28 +718,28 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         // the format and point at the way out rather than letting the lookup report the
         // title as missing.
         if (ref?.kind === "goodreads") {
-            showAddTitleMsg("Goodreads-Links enthalten keine ISBN, nur eine Goodreads-eigene Nummer. Bitte den Titel eintippen oder die ISBN einfügen.")
+            ui.say("Goodreads-Links enthalten keine ISBN, nur eine Goodreads-eigene Nummer. Bitte den Titel eintippen oder die ISBN einfügen.")
             return
         }
-        addTitleSubmit.disabled = true
-        showAddTitleHits([])
-        showAddTitleMsg("Titel wird im Katalog gesucht …", false)
+        ui.busy(true)
+        ui.hits([])
+        ui.say("Titel wird im Katalog gesucht …", false)
         try {
             const found = ref ? await resolveCatalogueRef(solrEndpoint, ref) : null
             if (found?.book) {
-                closeAddTitle()
-                openBookPrompt(found.id, found.book)
+                ui.say(null)
+                ui.open(found.id, found.book)
                 return
             }
             // A reference that names no record is a miss. Only a bare number goes on to
             // the text search: it reads as a Datensatznummer, but may be a title ("1984").
             const { docs, total } = ref && !/^\d+$/.test(text) ? { docs: [], total: 0 } : await searchBooks(solrEndpoint, text)
             if (docs.length === 0) {
-                showAddTitleMsg("Dazu wurde im Katalog kein Titel gefunden.")
+                ui.say("Dazu wurde im Katalog kein Titel gefunden.")
                 return
             }
-            showAddTitleHits(docs)
-            showAddTitleMsg(total > docs.length
+            ui.hits(docs)
+            ui.say(total > docs.length
                 ? `Die ersten ${docs.length} von ${total.toLocaleString("de-DE")} Treffern. Mit mehr Wörtern wird die Suche genauer.`
                 : null, false)
         } catch (err) {
@@ -749,15 +750,138 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             // its own, so offer the same degraded save a card click falls back to; an
             // unresolved Onleihe id has no AK id to save under.
             if (ref?.kind === "sopac") {
-                closeAddTitle()
-                openBookPrompt(ref.id, null)
+                ui.say(null)
+                ui.open(ref.id, null)
             } else if (err instanceof OnleiheUnavailableError) {
-                showAddTitleMsg("Die Onleihe ist gerade nicht erreichbar. Bitte versuche es später erneut oder füge die ISBN des Titels ein.")
+                ui.say("Die Onleihe ist gerade nicht erreichbar. Bitte versuche es später erneut oder füge die ISBN des Titels ein.")
             } else {
-                showAddTitleMsg("Der Katalog ist gerade nicht erreichbar. Bitte versuche es später erneut.")
+                ui.say("Der Katalog ist gerade nicht erreichbar. Bitte versuche es später erneut.")
             }
         } finally {
-            addTitleSubmit.disabled = false
+            ui.busy(false)
+        }
+    }
+
+    // The assistant's title card, first in the deck and on its own behind „Titel
+    // hinzufügen“: titles offered while typing, and Enter or „Suchen“ for the full
+    // lookup (which also resolves a link or ISBN). A title picked opens the book prompt
+    // on top; what it saves shows up here as the Merkliste grows. Returns the card's
+    // cleanup.
+    function renderTitleCard(body) {
+        const row = document.createElement("div")
+        row.className = "bp-title-card-row"
+        const input = document.createElement("input")
+        input.type = "text"
+        input.className = "cori-assistant-input"
+        input.autocomplete = "off"
+        input.spellcheck = false
+        input.placeholder = "Titel oder Autor*in suchen, oder Link bzw. ISBN einfügen"
+        input.setAttribute("aria-label", "Titel suchen")
+        const submit = document.createElement("button")
+        submit.type = "button"
+        submit.className = "button"
+        submit.textContent = "Suchen"
+        row.append(input, submit)
+        const msg = document.createElement("p")
+        msg.className = "bp-title-msg"
+        msg.setAttribute("role", "status")
+        msg.hidden = true
+        const hits = document.createElement("ul")
+        hits.className = "bp-title-hits"
+        hits.hidden = true
+        // What can be pasted in place of a typed title, each source linking to where a
+        // patron finds it. A bare Datensatznummer also resolves (same path as the
+        // Zitierlink's tail) but isn't named: nobody copies it, and the Zitierlink sits
+        // right beside it on the same OPAC page. Hits take this line's place.
+        const kinds = document.createElement("p")
+        kinds.className = "bp-title-kinds"
+        kinds.innerHTML = `Oder einfügen: Zitierlink aus dem <a href="https://ssl.muenchen.de/aDISWeb/app/opac" target="_blank" rel="noopener">Katalog (OPAC)</a>, `
+            + `Link aus der <a href="https://muenchen.onleihe.de/" target="_blank" rel="noopener">Onleihe</a> oder ISBN.`
+        const savedLabel = document.createElement("p")
+        savedLabel.className = "cori-assistant-label"
+        savedLabel.textContent = "Auf deiner Merkliste"
+        const saved = document.createElement("ul")
+        saved.className = "cori-profile-chips"
+        body.append(row, msg, hits, kinds, savedLabel, saved)
+
+        const ui = {
+            say: (text, isError = true) => {
+                msg.hidden = !text
+                msg.textContent = text ?? ""
+                msg.classList.toggle("is-error", Boolean(text) && isError)
+            },
+            hits: (docs) => {
+                hits.replaceChildren(...titleHits(docs, doc => ui.open(doc.id, doc)))
+                hits.hidden = docs.length === 0
+                kinds.hidden = docs.length > 0
+            },
+            busy: on => { submit.disabled = on },
+            open: (id, book) => {
+                input.value = ""
+                ui.hits([])
+                ui.say(null)
+                openBookPrompt(id, book)
+            },
+        }
+        let typed = 0       // counts lookups: an answer to an earlier input is dropped
+        let timer = 0
+        const run = () => {
+            clearTimeout(timer)
+            typed++
+            return lookUpTitle(input.value.trim(), ui)
+        }
+        async function suggest() {
+            const text = input.value.trim()
+            const lookup = ++typed
+            if (parseCatalogueRef(text)) return ui.hits([])
+            try {
+                const { docs, total } = await suggestBooks(solrEndpoint, text)
+                if (lookup !== typed) return
+                ui.hits(docs)
+                ui.say(total > docs.length
+                    ? `Die ersten ${docs.length} von ${total.toLocaleString("de-DE")} Treffern. Mit mehr Wörtern wird die Suche genauer.`
+                    : null, false)
+            } catch (err) {
+                // typing on is the retry; Enter and „Suchen“ report an unreachable catalogue
+                console.error("[bib-pods] title suggestions failed:", err)
+            }
+        }
+        submit.addEventListener("click", run)
+        input.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter") return
+            e.preventDefault()
+            run()
+        })
+        input.addEventListener("input", () => {
+            if (!msg.hidden) ui.say(null)
+            clearTimeout(timer)
+            timer = setTimeout(suggest, TITLE_SUGGEST_DELAY_MS)
+        })
+
+        let renders = 0
+        async function renderSaved() {
+            const render = ++renders
+            let ids = []
+            try {
+                ids = (await loadStore()).getObjects(getProfileSubject(), BP + "savedBook", null).map(o => o.value)
+            } catch (err) {
+                console.error("[bib-pods] reading the Merkliste failed:", err)
+            }
+            if (render !== renders) return
+            savedLabel.hidden = saved.hidden = ids.length === 0
+            saved.replaceChildren(...ids.map(id => {
+                const li = document.createElement("li")
+                li.textContent = id
+                fetchDocCached(id).then(doc => { if (doc?.title?.[0]) li.textContent = doc.title[0].split(" | ")[0] })
+                return li
+            }))
+        }
+        renderSaved()
+        window.addEventListener(PROFILE_SAVED, renderSaved)
+        return () => {
+            clearTimeout(timer)
+            typed++
+            window.removeEventListener(PROFILE_SAVED, renderSaved)
         }
     }
 
@@ -786,10 +910,12 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     // offers the two ways to give the profile something to work with.
     const SHELF_NOTES = {
         empty: "Noch keine Vorschläge. Sobald dein Profil passende Angaben enthält, erscheinen sie hier.",
+        filtered: "Mit deinen Einschränkungen bleibt gerade kein Vorschlag übrig.",
         unreachable: "Das Schaufenster kann gerade nicht geladen werden. Bitte versuche es später erneut.",
     }
     let shelf = null            // [{ strategy, docs }] of the latest run; null until it lands
     let shelfNote = null        // a SHELF_NOTES text while the shelf is empty
+    let shelfUnfiltered = 0     // with shelfNote "filtered": how many titles match without the filters
     let shelfRun = 0            // a run whose number is no longer current drops its result
     let shelfLoading = false
     const checkRecLabel = checkRecLink.textContent
@@ -825,6 +951,15 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             if (run !== shelfRun) return
             shelf = results.filter(({ docs }) => docs.length > 0)
             shelfNote = shelf.length > 0 ? null : serverUnreachable ? SHELF_NOTES.unreachable : SHELF_NOTES.empty
+            // An empty shelf with filters set: is it the filters that leave nothing?
+            if (shelfNote === SHELF_NOTES.empty && hasPreferenceFilters(profileStore, getProfileSubject())) {
+                const unfiltered = await countMatches(buildShelfQuery(profileStore, getProfileSubject(), { preferences: false }), solrEndpoint)
+                if (run !== shelfRun) return
+                if (unfiltered) {
+                    shelfNote = SHELF_NOTES.filtered
+                    shelfUnfiltered = unfiltered
+                }
+            }
             renderLanes()
         } catch (err) {
             if (run !== shelfRun) return
@@ -894,7 +1029,9 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         if (!current?.length) {
             clearLanes()
             if (shelfNote) {
-                lanes.append(shelfNote === SHELF_NOTES.empty ? buildShelfEmpty() : buildShelfNote(shelfNote))
+                lanes.append(shelfNote === SHELF_NOTES.empty ? buildShelfEmpty()
+                    : shelfNote === SHELF_NOTES.filtered ? buildShelfFiltered()
+                    : buildShelfNote(shelfNote))
                 lanes.hidden = false
             }
             return
@@ -974,6 +1111,20 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         const actions = document.createElement("p")
         actions.className = "bp-shelf-empty-actions"
         actions.append(actionButton("Fragen beantworten", openAssistant), actionButton("Titel hinzufügen", openAddTitle))
+        box.append(note, actions)
+        return box
+    }
+    // The filters (Sprache, Medienart) leave nothing of what the profile would find:
+    // say so, with the number they hide and the way to the cards that hold them.
+    function buildShelfFiltered() {
+        const box = document.createElement("div")
+        box.className = "bp-shelf-empty"
+        const note = document.createElement("p")
+        note.textContent = `${SHELF_NOTES.filtered} Ohne sie ${shelfUnfiltered === 1 ? "passt 1 Titel" : `passen ${shelfUnfiltered.toLocaleString("de-DE")} Titel`}.`
+        const actions = document.createElement("p")
+        actions.className = "bp-shelf-empty-actions"
+        const filters = getVocab().getSubjects(RDF_TYPE, BP + "RecommendationFilter", null).map(t => t.value)
+        actions.append(actionButton("Einschränkungen ändern", () => profileEl.assist(filters)))
         box.append(note, actions)
         return box
     }
@@ -1216,21 +1367,9 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     // A profile mutation (add / clear) can wipe the whole store, so re-run the broad state.
     profileEl.addEventListener("cori-profile:change", () => applyState())
 
-    addTitleSubmit.addEventListener("click", submitAddTitle)
-    addTitleCancel.addEventListener("click", closeAddTitle)
-    addTitleDialog.addEventListener("click", (e) => { if (e.target === addTitleDialog) closeAddTitle() })
     laneStatus.addEventListener("click", openLaneStatus)
     laneStatusDialog.addEventListener("click", (e) => { if (e.target === laneStatusDialog) laneStatusDialog.close() })
     root.querySelector("#bp-lane-status-close").addEventListener("click", () => laneStatusDialog.close())
-    // Enter submits. The row is deliberately not a <form> — the host page (TYPO3) may
-    // already have one open around our mount point, and nesting forms is invalid.
-    addTitleInput.addEventListener("keydown", (e) => {
-        if (e.key !== "Enter") return
-        e.preventDefault()
-        submitAddTitle()
-    })
-    // Editing after a rejection retracts the complaint about the previous input.
-    addTitleInput.addEventListener("input", () => { if (!addTitleMsg.hidden) showAddTitleMsg(null) })
     // A modal dialog sits in the top layer, above the page's tip, so the dialog gets a
     // tip of its own. show(), not schedule(): like the „Titel hinzufügen“ launcher,
     // the explanation arrives on contact.

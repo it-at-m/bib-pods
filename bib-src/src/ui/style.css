@@ -262,18 +262,10 @@ cori-profile .cori-profile-section h4 {
     margin: 0;
     font-size: 1em;
 }
-/* Section heading rows: title left, assistant launcher right. */
-cori-profile .cori-profile-section-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-}
 cori-profile .cori-profile-header .cori-profile-heading { margin: 0; }
 /* Launchers as quiet outlined pills; explicit background/border so host button
    styling can't leak in. */
 cori-profile .cori-profile-fill,
-cori-profile .cori-profile-add,
 cori-profile .bp-enrich-btn {
     padding: 3px 14px;
     background: #fff;
@@ -287,7 +279,6 @@ cori-profile .bp-enrich-btn {
     white-space: nowrap;
 }
 cori-profile .cori-profile-fill:hover,
-cori-profile .cori-profile-add:hover,
 cori-profile .bp-enrich-btn:hover {
     background: #fff;
     border-color: var(--contrastcolor, #d14900);
@@ -318,14 +309,14 @@ cori-profile .cori-profile-add-one { font-weight: 700; }
 cori-profile .cori-profile-field-notice { font-size: 1.35em; vertical-align: middle; }
 cori-profile .cori-profile-add-one:hover,
 cori-profile .cori-profile-field-notice:hover { background: none; color: var(--contrastcolor, #d14900); }
-/* what an empty section could hold: its fields as "+ <label>" launcher chips
-   (plain muted text for fields the assistant doesn't ask about). Explicit list
-   resets — host globals (.maincontents ul/li) leak into the light DOM. */
+/* what a section can still hold: its empty fields as "+ <label>" chips that open the
+   assistant's card (plain muted text for fields the assistant doesn't ask about).
+   Explicit list resets — host globals (.maincontents ul/li) leak into the light DOM. */
 cori-profile .cori-profile-gap-fields {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin: 8px 0 0;
+    margin: 10px 0 0;
     padding: 0;
     list-style: none;
 }
@@ -333,17 +324,18 @@ cori-profile .cori-profile-gap-fields li { margin: 0; padding: 0; list-style: no
 cori-profile .cori-profile-add-field {
     padding: 3px 12px;
     background: #fff;
-    border: 1px dashed #ccc;
+    border: 1px dashed #d9b7a3;
     border-radius: 999px;
     box-shadow: none;
     font: inherit;
     font-size: 0.85em;
-    color: #666;
+    color: var(--contrastcolor, #d14900);
     cursor: pointer;
     white-space: nowrap;
 }
 cori-profile .cori-profile-add-field:hover {
     background: #fff;
+    border-style: solid;
     border-color: var(--contrastcolor, #d14900);
     color: var(--contrastcolor, #d14900);
 }
@@ -412,84 +404,189 @@ cori-profile .cori-profile-collapsible > summary h4::before { content: "▶ "; d
 cori-profile .cori-profile-collapsible[open] > summary h4::before { content: "▼ "; }
 cori-profile .cori-profile-collapsible[open] > summary { margin-bottom: 8px; }
 cori-profile .cori-profile-more .cori-profile-section h4 { color: #666; }
-/* the in-section variant ("Noch leere Felder" inside a populated section): quieter,
-   carries no separator of its own */
-cori-profile .cori-profile-field-gaps { margin: 10px 0 0; padding: 0; border-top: none; }
 
 /* ----- Profile assistant dialog ----- */
-/* px box sizing for the TYPO3 root-font mismatch (see dialog.bp-pods-modal). */
+/* A deck of cards, one question each. px box sizing for the TYPO3 root-font mismatch
+   (see dialog.bp-pods-modal). Every button kind resets the host's global <button>
+   styling, :hover included; every list resets the host's ul/li rules. */
 dialog.cori-assistant {
-    padding: 22px 26px;
+    padding: 28px 30px 22px;
     border: none;
     border-radius: var(--border-radius, 12px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-    max-width: min(440px, 92vw) !important;
-    width: min(440px, 92vw) !important;
+    max-width: min(600px, 94vw) !important;
+    width: min(600px, 94vw) !important;
+    max-height: 92vh;
+    box-sizing: border-box;
+    color: #222;
 }
 dialog.cori-assistant::backdrop { background: rgba(0, 0, 0, 0.4); }
-.cori-assistant-topline {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 0 0 10px;
-    font-size: 0.85em;
-    color: #888;
-}
-.cori-assistant-question { margin: 0 0 14px; font-weight: 600; }
-cori-profile .cori-assistant-existing { margin: 0 0 14px; }
-/* the chips base sets display:flex, which would override the hidden attribute */
-cori-profile .cori-assistant-existing[hidden] { display: none; }
-.cori-assistant-form { display: flex; gap: 8px; margin: 0 0 16px; }
-.cori-assistant-form[hidden] { display: none; }
+/* display values set below would otherwise override the hidden attribute */
+dialog.cori-assistant [hidden] { display: none !important; }
+.cori-assistant-question { margin: 0 0 6px; font-size: 20px; line-height: 1.25; font-weight: 600; }
+.cori-assistant-hint { margin: 0; font-size: 0.85em; color: #777; }
+.cori-assistant-body { margin-top: 18px; min-height: 96px; }
+/* quiet small-print lines: "Deine Auswahl", "Neu dazugekommen", and where
+   a list of chips comes from */
+.cori-assistant-label,
+.cori-assistant-caption { margin: 18px 0 8px; font-size: 0.8em; line-height: 1.4; color: #888; }
+.cori-assistant-body > .cori-assistant-label:first-child { margin-top: 0; }
+/* where a closed set comes from: under its chips, not above a list like the others */
+.cori-assistant-source { margin: 10px 0 0; }
+.cori-assistant-status { margin: 8px 0 0; font-size: 0.85em; color: #888; }
 /* same host-input overrides as the Solid connect field */
-.cori-assistant-form input,
-.cori-assistant-form select {
-    flex: 1;
-    min-width: 0;
-    padding: 6px 10px !important;
-    border: 1px solid #ccc !important;
-    border-radius: 4px !important;
+.cori-assistant-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 9px 12px !important;
+    border: 1.5px solid #222 !important;
+    border-radius: 8px !important;
     background: #fff !important;
     color: inherit !important;
     font: inherit !important;
     box-shadow: none !important;
 }
-.cori-assistant-form input[hidden],
-.cori-assistant-form select[hidden] { display: none; }
-.cori-assistant-form .button { min-width: 0; white-space: nowrap; }
-/* provenance help for picker values: a quiet round ?-trigger, the text folds out below */
-.cori-assistant-form .cori-assistant-info {
-    flex: 0 0 auto;
-    width: 32px;
+.cori-assistant-results {
+    margin: 4px 0 0;
     padding: 0;
+    list-style: none;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+.cori-assistant-results li { margin: 0; padding: 0; list-style: none; }
+.cori-assistant-results li + li { border-top: 1px solid #f0eee9; }
+.cori-assistant-result {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    padding: 8px 12px;
     background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 50%;
+    border: none;
+    border-radius: 0;
     box-shadow: none;
     font: inherit;
-    color: #888;
+    color: #222;
+    text-align: left;
     cursor: pointer;
 }
-.cori-assistant-form .cori-assistant-info:hover {
+.cori-assistant-result:hover,
+.cori-assistant-result.is-active { background: #f6f4ef; color: #222; }
+.cori-assistant-note,
+.cori-assistant-result-hint { font-size: 0.85em; color: #888; white-space: nowrap; }
+.cori-assistant-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.cori-assistant-chips li { margin: 0; padding: 0; list-style: none; }
+.cori-assistant-chip {
+    min-width: 0;
+    padding: 5px 13px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 999px;
+    box-shadow: none;
+    font: inherit;
+    font-size: 0.9em;
+    color: #222;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.cori-assistant-chip:hover {
     background: #fff;
     border-color: var(--contrastcolor, #d14900);
     color: var(--contrastcolor, #d14900);
 }
-.cori-assistant-form .cori-assistant-info[hidden] { display: none; }
-.cori-assistant-source { margin: -6px 0 16px; font-size: 0.85em; color: #888; }
-.cori-assistant-source[hidden] { display: none; }
-.cori-assistant-actions { display: flex; justify-content: space-between; }
-.cori-assistant-actions button {
+.cori-assistant-chip[aria-pressed="true"],
+.cori-assistant-chip[aria-pressed="true"]:hover { background: #222; border-color: #222; color: #fff; }
+.cori-assistant-chip:disabled { opacity: 0.4; cursor: default; }
+/* which field a neighbour belongs to */
+.cori-assistant-kind {
+    padding: 0 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.8em;
+    color: #888;
+}
+.cori-assistant-chip[aria-pressed="true"] .cori-assistant-kind { border-color: #777; color: #ccc; }
+/* text actions: the fold at the end of a chip list, and the footer's quiet steps */
+.cori-assistant-more,
+.cori-assistant-nav button:not(.button) {
+    min-width: 0;
+    padding: 5px 2px;
     background: none;
     border: none;
-    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    font: inherit;
+    font-size: 0.9em;
+    font-weight: normal;
     color: #555;
     text-decoration: underline;
-    font: inherit;
-    font-weight: normal;
     cursor: pointer;
 }
-.cori-assistant-actions button:hover { background: none; color: #222; }
+.cori-assistant-more:hover,
+.cori-assistant-nav button:not(.button):hover { background: none; color: var(--contrastcolor, #d14900); }
+cori-profile .cori-assistant-chosen { margin: 0; }
+.cori-assistant-preview { margin-top: 18px; }
+.cori-assistant-preview:empty { margin: 0; }
+/* The footer stays in view while a long card scrolls. Sticky offsets count from the
+   dialog's content edge, so the negative bottom (and margins) take it out over the
+   padding: nothing shows beside or below it. */
+.cori-assistant-foot {
+    position: sticky;
+    bottom: -22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin: 22px -30px -22px;
+    padding: 14px 30px 22px;
+    background: #fff;
+    border-top: 1px solid #eee;
+}
+.cori-assistant-progress { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.8em; color: #888; }
+.cori-assistant-dots { display: flex; gap: 5px; }
+.cori-assistant-dots span { width: 20px; height: 4px; border-radius: 2px; background: #e6e4de; }
+.cori-assistant-dots .is-done { background: #9a9a94; }
+.cori-assistant-dots .is-now { background: #222; }
+.cori-assistant-nav { display: flex; align-items: center; gap: 16px; margin: 0 0 0 auto; }
+.cori-assistant-nav .button { min-width: 0; white-space: nowrap; }
+/* the closing card: what the profile gained */
+.cori-assistant-gains { margin: 0 0 16px; padding: 0; list-style: none; }
+.cori-assistant-gains li { margin: 0; padding: 3px 0; list-style: none; }
+.cori-assistant-closing { margin: 0; font-size: 0.9em; color: #555; }
+/* The title card: the lookup row. */
+.bp-title-card-row { display: flex; gap: 8px; }
+.bp-title-card-row .cori-assistant-input { flex: 1; min-width: 0; width: auto; }
+.bp-title-card-row .button { min-width: 0; white-space: nowrap; }
+.bp-title-card-row .button:disabled { opacity: 0.35; cursor: default; }
+/* On the filter cards: how much the filters leave over. The warm tint marks "nothing
+   left". */
+.bp-filter-note {
+    margin: 0;
+    padding: 9px 12px;
+    background: #faf9f5;
+    border: 1px solid #eceae4;
+    border-radius: 8px;
+    font-size: 0.85em;
+}
+.bp-filter-note.is-empty { background: #fff5ee; border-color: #f0c9b1; }
+@media (max-width: 480px) {
+    dialog.cori-assistant { padding: 22px 18px 18px; }
+    .cori-assistant-foot { bottom: -18px; margin: 22px -18px -18px; padding: 12px 18px 18px; }
+}
 /* Solid connect row: URL input + "Verbinden" button side-by-side. Without the input
    overrides TYPO3 styles the field as a pill with a thick orange border, which clashes
    with the surrounding block and pushes the button onto its own line. */
@@ -509,22 +606,22 @@ cori-profile .cori-assistant-existing[hidden] { display: none; }
     box-shadow: none !important;
 }
 .bp-solid-connect input { flex: 1; min-width: 0; }
-/* The profile header: heading, launchers and the "⋯" menu in one line, what the profile is
-   for below it. A narrow block moves the launchers to a line of their own. px gaps: see
-   dialog.bp-pods-modal for the TYPO3 root-font mismatch. */
+/* The profile header in one line: heading, beside it what the profile is for, then the
+   launchers and the "⋯" menu. A narrow block gives that line and the launchers lines of
+   their own. px gaps: see dialog.bp-pods-modal for the TYPO3 root-font mismatch. */
 cori-profile .cori-profile-header {
     display: grid;
-    grid-template: "heading launchers menu" auto "lead lead lead" auto / auto 1fr auto;
+    grid-template: "heading lead launchers menu" auto / auto 1fr auto auto;
     align-items: center;
     gap: 4px 12px;
     margin-bottom: 14px;
 }
-cori-profile .cori-profile-heading { grid-area: heading; }
+/* heading and the line beside it sit on one text baseline */
+cori-profile .cori-profile-heading { grid-area: heading; align-self: baseline; }
 cori-profile .cori-profile-launchers { grid-area: launchers; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 10px; }
 cori-profile .cori-profile-menu { grid-area: menu; }
-cori-profile .cori-profile-header .bp-profile-lead { grid-area: lead; margin: 0; font-size: 0.85em; color: #888; }
+cori-profile .cori-profile-header .bp-profile-lead { grid-area: lead; align-self: baseline; min-width: 0; margin: 0; font-size: 0.85em; color: #888; }
 cori-profile:not([data-empty]) .bp-profile-lead-empty { display: none; }
-cori-profile[data-empty] .cori-profile-header { margin-bottom: 0; }
 @container (max-width: 640px) {
     cori-profile .cori-profile-header { grid-template: "heading menu" auto "lead lead" auto "launchers launchers" auto / 1fr auto; }
     cori-profile .cori-profile-launchers { justify-content: flex-start; margin-top: 8px; }
@@ -581,35 +678,11 @@ cori-profile .cori-profile-actions button:hover { background: #f5f5f5; color: #2
 cori-profile .cori-profile-actions button:not([hidden]) + button[data-action="inspect"] { margin-top: 6px; padding-top: 12px; border-top: 1px solid #eee; }
 cori-profile .bp-enrich-btn[hidden] { display: none; }
 
-/* A narrow prompt, like the grant/revoke dialog — the shared dialog.bp-modal default
-   (60rem) is sized for the lane views, not a single field. */
-dialog.bp-add-title-dialog {
-    max-width: min(520px, 92vw) !important;
-    width: min(520px, 92vw) !important;
-}
-.bp-add-title-dialog .bp-modal-content { padding: 22px 26px; }
-.bp-add-title-dialog h3 { margin: 0 0 6px; font-size: 18px; }
-.bp-add-title-lead { margin: 0 0 14px; color: #888; font-size: 0.9em; }
-/* px, not rem: the field inherits the host's body text (18px on TYPO3, 16px on docs)
-   while rem tracks the root (10px vs 16px), so rem padding would shrink exactly where
-   the text grows. The box has to scale with what it contains. */
-.bp-add-title-dialog input[type="text"] {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 8px 12px !important;
-    border: 1px solid #ccc !important;
-    border-radius: 4px !important;
-    background: #fff !important;
-    color: inherit !important;
-    font: inherit !important;
-    box-shadow: none !important;
-}
-/* Search hits: a plain list of full-width text buttons, one title each. Explicit
-   background/border/font so host button styling can't leak in. */
-.bp-add-title-hits { margin: 10px 0 0; padding: 0; list-style: none; max-height: 46vh; overflow-y: auto; }
-.bp-add-title-hits li { margin: 0; border-top: 1px solid #eee; }
-.bp-add-title-hits button {
+/* The title card's search hits: a plain list of full-width text buttons, one title
+   each. Explicit background/border/font so host button styling can't leak in. */
+.bp-title-hits { margin: 10px 0 0; padding: 0; list-style: none; max-height: 46vh; overflow-y: auto; }
+.bp-title-hits li { margin: 0; border-top: 1px solid #eee; list-style: none; }
+.bp-title-hits button {
     display: block;
     width: 100%;
     padding: 8px 4px;
@@ -624,24 +697,16 @@ dialog.bp-add-title-dialog {
     text-align: left;
     cursor: pointer;
 }
-.bp-add-title-hits button:hover,
-.bp-add-title-hits button:focus-visible { background: #f6f4ef; color: #222; }
-.bp-add-title-kinds {
-    margin: 12px 0 0;
-    padding-left: 1.2em;
-    color: #888;
-    font-size: 0.85em;
-    line-height: 1.6;
-}
-.bp-add-title-kinds li { margin: 0; }
-/* Same quiet-link treatment as .bp-aside: stays in the list's grey, underline marks it
-   as a link, brand colour only on hover. Pinned so host anchor rules can't recolour it. */
-.bp-add-title-kinds a { color: #888; text-decoration: underline; }
-.bp-add-title-kinds a:hover { color: var(--contrastcolor, #d14900); }
-.bp-add-title-actions { display: flex; gap: 10px; margin: 18px 0 0; }
-.bp-add-title-actions .button:disabled { opacity: 0.35; cursor: default; }
-.bp-add-title-msg { margin: 12px 0 0; font-size: 0.85em; color: #888; }
-.bp-add-title-msg.is-error { color: #b3261e; }
+.bp-title-hits button:hover,
+.bp-title-hits button:focus-visible { background: #f6f4ef; color: #222; }
+/* What can be pasted instead of typed. Same quiet-link treatment as .bp-aside: the
+   links stay in the line's grey, underline marks them, brand colour only on hover.
+   Pinned so host anchor rules can't recolour them. */
+.bp-title-kinds { margin: 10px 0 0; font-size: 0.85em; line-height: 1.5; color: #888; }
+.bp-title-kinds a { color: #888; text-decoration: underline; }
+.bp-title-kinds a:hover { color: var(--contrastcolor, #d14900); }
+.bp-title-msg { margin: 10px 0 0; font-size: 0.85em; color: #888; }
+.bp-title-msg.is-error { color: #b3261e; }
 
 /* Scan review uses the same native dialog and host buttons as other profile actions. */
 dialog.bp-scan-dialog {

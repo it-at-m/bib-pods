@@ -9,20 +9,26 @@ const PROFILE_TYPE = CORI + "Profile"
 // <cori-profile> — a light-DOM UI primitive. Renders the user's profile triples
 // grouped into the profile sections the merged vocabulary declares
 // (cori:ProfileSection / cori:inSection / cori:order), wired straight to cori-sdk
-// storage. Sections without entries collapse under a trailing "noch leere Bereiche"
-// disclosure (left out while the whole profile is empty); profile facts whose predicate
-// belongs to no section land in a catch-all group, so nothing is silently hidden.
-// The header carries a "Fragen beantworten" launcher and every section with
-// currently askable fields an "Ergänzen" launcher — both open the derived dialog
-// assistant (./assistant.js), scoped to the whole profile or to that section. The app
+// storage. A section the dialog assistant (./assistant.js) can ask about is always in
+// view: its entries, and each field still empty as a "+ <label>" chip that opens the
+// card for that field, so the profile doubles as the map of what it can hold. Sections
+// with neither entries nor anything to ask collapse under a trailing "noch leere
+// Bereiche" disclosure, except those the vocabulary marks cori:listWhenEmpty false
+// (nothing fills them); profile facts whose predicate belongs to no section land in a
+// catch-all group, so nothing that is there is silently hidden.
+// The header's "Fragen beantworten" launcher opens the assistant's whole deck. The app
 // can add its own launchers to .cori-profile-launchers.
 // The header's "⋯" menu manages the profile as a whole (download; clear once there is
 // something to clear) and leads to the raw Turtle view, where the expert tools live:
 // adding a single triple, validating.
 // While the profile holds no facts the element carries the attribute data-empty.
 // No shadow root, no bundled styles.
-// Call refresh() to re-render after the profile changes elsewhere.
+// Call refresh() to re-render after the profile changes elsewhere, assist(only) to open
+// the assistant: the whole deck, or just the cards named (one or a list: a field's IRI,
+// or the id of one of the app's own cards).
 // Assignable properties:
+//   assistantSource: what the app knows about a field's values (search, suggestions,
+//     preview, cards of its own); see ./assistant.js.
 //   renderFieldValues: async (predicateIri, objectTerms) => Element | null
 //     lets the app take over rendering of one field's values (e.g. saved books
 //     as cover tiles); null/undefined or a throw falls back to the default chips.
@@ -102,7 +108,7 @@ export class CoriProfile extends HTMLElement {
         this._refreshSeq = 0
         this._openSections = new Set()    // cori:collapsed sections the user opened
 
-        this.querySelector(".cori-profile-fill").addEventListener("click", () => this._assist())
+        this.querySelector(".cori-profile-fill").addEventListener("click", () => this.assist())
         this.querySelector('[data-action="download"]').addEventListener("click", () => this._download())
         this.querySelector('[data-action="inspect"]').addEventListener("click", () => this._inspect())
         this.querySelector('[data-action="clear"]').addEventListener("click", () => this._clear())
@@ -181,10 +187,9 @@ export class CoriProfile extends HTMLElement {
             if (!values.has(q.predicate.value)) values.set(q.predicate.value, [])
             values.get(q.predicate.value).push(q.object)
         }
-        // counts snapshot for the launcher visibility — `values` is consumed below
+        // counts snapshot for what can still be asked — `values` is consumed below
         const counts = new Map([...values].map(([predicate, objects]) => [predicate, objects.length]))
-        const countOf = f => counts.get(f) ?? 0
-        const askable = f => askableFields([f], countOf).length > 0
+        const askable = f => askableFields([f], field => counts.get(field) ?? 0).length > 0
         // The "noch leere Bereiche" disclosure sorts among the sections at the
         // cori:EmptySectionsBlock anchor's order; filled sections beyond it (e.g. a
         // machine-fed saved list) render below the disclosure.
@@ -200,17 +205,9 @@ export class CoriProfile extends HTMLElement {
             const heading = document.createElement("h4")
             heading.textContent = s.label
             head.appendChild(heading)
-            // sections with something to ask right now get their own assistant launcher
-            if (askableFields(s.fields, countOf).length > 0) {
-                const addBtn = document.createElement("button")
-                addBtn.type = "button"
-                addBtn.className = "cori-profile-add"
-                addBtn.textContent = "Bereich ergänzen"
-                addBtn.addEventListener("click", () => this._assist(s.iri))
-                head.appendChild(addBtn)
-            }
             el.appendChild(head)
-            const emptyFields = []
+            const toAsk = []        // empty fields the assistant has a card for
+            const unasked = []      // empty fields that fill by other means
             const facts = []
             for (const field of s.fields) {
                 const objects = values.get(field)
@@ -218,33 +215,23 @@ export class CoriProfile extends HTMLElement {
                 if (objects?.length) {
                     facts.push(...objects.map(object => ({ predicate: field, object })))
                     el.appendChild(await this._buildFieldGroup(store, field, objects,
-                        askable(field) ? () => this._assist(s.iri, field) : null))
+                        askable(field) ? () => this.assist(field) : null))
                 } else {
-                    emptyFields.push(field)
+                    (askable(field) ? toAsk : unasked).push(field)
                 }
             }
-            // Empty fields show what could go there: each a "+ <label>" launcher (or
-            // plain text when the assistant has nothing to ask for it). In a fully
-            // empty section they sit inline (the section itself is collapsed away
-            // below); in a populated one they fold behind their own disclosure, as
-            // long as one of them can be filled from here.
-            const gapFields = this._buildGapFields(s.iri, emptyFields, askable)
-            if (el.children.length === 1) {
-                if (gapFields) el.appendChild(gapFields)
+            if (facts.length === 0 && toAsk.length === 0) {
+                // nothing in it and nothing to ask: under the disclosure, naming what it
+                // holds, unless nothing in the app fills it (cori:listWhenEmpty false)
+                if (getOne(getVocab(), s.iri, CORI + "listWhenEmpty") === "false") continue
+                if (unasked.length > 0) el.appendChild(this._buildGapFields(unasked, { ask: false }))
                 emptySections.push(el)
-            } else {
-                if (gapFields && emptyFields.some(askable)) {
-                    const gaps = document.createElement("details")
-                    gaps.className = "cori-profile-more cori-profile-field-gaps"
-                    const gapsSummary = document.createElement("summary")
-                    gapsSummary.textContent = `Noch leere Felder (${emptyFields.length})`
-                    gaps.append(gapsSummary, gapFields)
-                    el.appendChild(gaps)
-                }
-                if (s.clearable) el.appendChild(this._buildClearSection(s.label, facts))
-                const placed = s.collapsed ? this._foldSection(s.iri, el, facts.length) : el
-                ;(s.order > gapsOrder ? trailingSections : sections).push(placed)
+                continue
             }
+            if (toAsk.length > 0) el.appendChild(this._buildGapFields(toAsk, { ask: true }))
+            if (s.clearable && facts.length > 0) el.appendChild(this._buildClearSection(s.label, facts))
+            const placed = s.collapsed ? this._foldSection(s.iri, el, facts.length) : el
+            ;(s.order > gapsOrder ? trailingSections : sections).push(placed)
         }
         // facts whose predicate no section claims (e.g. manually added triples)
         if (values.size > 0) {
@@ -258,9 +245,7 @@ export class CoriProfile extends HTMLElement {
             }
             sections.push(el)
         }
-        // counts is empty when the profile holds no facts at all: a list of everything
-        // that is missing would be the only thing to see
-        if (emptySections.length > 0 && counts.size > 0) {
+        if (emptySections.length > 0) {
             const details = document.createElement("details")
             details.className = "cori-profile-more"
             const summary = document.createElement("summary")
@@ -311,32 +296,31 @@ export class CoriProfile extends HTMLElement {
         return btn
     }
 
-    // The "+ <label>" launcher chips for a section's empty fields (plain muted text
-    // for fields the assistant doesn't ask about). Null when there are no fields.
-    _buildGapFields(sectionIri, fields, askable) {
-        if (fields.length === 0) return null
+    // A section's empty fields. With `ask`: "+ <label>" chips, each opening the
+    // assistant's card for its field. Without: their names as plain muted text, for
+    // fields that fill by other means.
+    _buildGapFields(fields, { ask }) {
         const list = document.createElement("ul")
         list.className = "cori-profile-gap-fields"
         for (const field of fields) {
             const li = document.createElement("li")
-            const label = getLabel(field) ?? contractTerm(field)
-            if (askable(field)) {
+            if (ask) {
                 const btn = document.createElement("button")
                 btn.type = "button"
                 btn.className = "cori-profile-add-field"
-                btn.textContent = `+ ${label}`
-                btn.addEventListener("click", () => this._assist(sectionIri, field))
+                btn.textContent = `+ ${getPluralLabel(field) ?? getLabel(field) ?? contractTerm(field)}`
+                btn.addEventListener("click", () => this.assist(field))
                 li.appendChild(btn)
             } else {
                 li.className = "cori-profile-gap-field-static"
-                li.textContent = label
+                li.textContent = getLabel(field) ?? contractTerm(field)
             }
             list.appendChild(li)
         }
         return list
     }
 
-    // onAsk (optional): opens the assistant scoped to just this field — rendered as a
+    // onAsk (optional): opens the assistant's card for this field — rendered as a
     // small "+" beside the label when the field can still take entries.
     async _buildFieldGroup(store, predicate, objects, onAsk = null) {
         const group = document.createElement("div")
@@ -418,14 +402,14 @@ export class CoriProfile extends HTMLElement {
         return li
     }
 
-    // Opens the derived dialog assistant: whole-profile, scoped to one section, or
-    // down to a single field. Every stored answer refreshes the sections behind the
-    // dialog and notifies the app (same event as the other mutations).
-    _assist(sectionIri = null, fieldIri = null) {
-        openAssistant({
+    // Opens the derived dialog assistant: its whole deck, or the cards `only` names (one
+    // or a list: a field's IRI, or the id of one of the app's cards). Every stored
+    // answer refreshes the sections behind the dialog and notifies the app (same event
+    // as the other mutations).
+    assist(only = null) {
+        return openAssistant({
             host: this,
-            sectionIri,
-            fieldIri,
+            only,
             onChange: () => { this.refresh(); this._emitChange() },
         })
     }

@@ -187,20 +187,52 @@ function combinatorOf(v, iri) {
 //   Returns { q, fq: [filter-strings] } or null if no clauses applied.
 // Each profile fact becomes a group OR-ing across all of its bp:linkedToIndex fields
 // (e.g. author + author2). Groups are then combined via the strategy's bp:combine.
-// The fq carries what constrains rather than matches: -id: exclusions (see excludedIds),
-// one negative clause per blocked value (see blockFilters) and the profile's preference
-// filters (see preferenceFilters).
+// The fq carries what constrains rather than matches (see constraints).
 export function buildQuery(strategy, profileStore, profileSubject) {
-    const v = getVocab()
     const factGroups = profileFactGroups(strategy, profileStore, profileSubject)
     if (factGroups.length === 0) return null
     const op = strategy.combine?.iri === BP + "And" ? " AND " : " OR "
     const q = factGroups.length === 1 ? factGroups[0] : `(${factGroups.join(op)})`
-    return { q, fq: [
+    return { q, fq: constraints(profileStore, profileSubject) }
+}
+
+// What every Solr query of this profile runs under: -id: exclusions (see excludedIds),
+// one negative clause per blocked value (see blockFilters) and, unless left out, the
+// profile's preference filters (see preferenceFilters).
+function constraints(profileStore, profileSubject, { preferences = true } = {}) {
+    const v = getVocab()
+    return [
         ...excludedIds(v, profileStore, profileSubject).map(id => `-id:"${escapeSolr(id)}"`),
         ...blockFilters(v, profileStore, profileSubject),
-        ...preferenceFilters(v, profileStore, profileSubject),
-    ] }
+        ...(preferences ? preferenceFilters(v, profileStore, profileSubject) : []),
+    ]
+}
+
+// One profile value as a Solr clause over its field's index mapping, or null when the
+// value has no index counterpart.
+export function buildValueQuery(property, obj, profileStore) {
+    const v = getVocab()
+    const clauses = factClauses(v, getLinkedIndices(v, property), obj, profileStore)
+    if (clauses.length === 0) return null
+    return clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`
+}
+
+// Everything the enabled Solr lanes draw on together, with or without the profile's
+// preference filters: the two counts side by side show what the filters leave over.
+// null when no enabled lane has anything to search with.
+export function buildShelfQuery(profileStore, profileSubject, { preferences = true } = {}) {
+    const choices = readStrategyChoices(profileStore)
+    const pools = getStrategies()
+        .filter(s => s.engine !== INSPIRA_ENGINE && resolveStrategyEnabled(s, choices))
+        .map(s => buildQuery(s, profileStore, profileSubject)?.q)
+        .filter(Boolean)
+    if (pools.length === 0) return null
+    return { q: pools.map(q => `(${q})`).join(" OR "), fq: constraints(profileStore, profileSubject, { preferences }) }
+}
+
+// Does the profile hold any preference filter (Sprache, Medienart)?
+export function hasPreferenceFilters(profileStore, profileSubject) {
+    return preferenceFilters(getVocab(), profileStore, profileSubject).length > 0
 }
 
 // The catalogue ids under every bp:RecommendationExclusion property (e.g. bp:savedBook):
@@ -377,7 +409,11 @@ function preferenceFilters(v, profileStore, profileSubject) {
 // request failed.
 export async function countStrategyMatches(strategy, profileStore, profileSubject, solrEndpoint) {
     if (strategy.engine === INSPIRA_ENGINE) return null
-    const query = buildQuery(strategy, profileStore, profileSubject)
+    return countMatches(buildQuery(strategy, profileStore, profileSubject), solrEndpoint)
+}
+
+// How many index records a query matches; null for no query or a failed request.
+export async function countMatches(query, solrEndpoint) {
     if (!query) return null
     try {
         return (await fetchSolr(solrEndpoint, query, 0)).response?.numFound ?? null
@@ -506,7 +542,7 @@ async function solrReachable(solrEndpoint) {
     }
 }
 
-function getLinkedIndices(v, prop) {
+export function getLinkedIndices(v, prop) {
     return v.getObjects(prop, BP + "linkedToIndex", null).map(l => ({
         labelField: v.getObjects(l, BP + "labelField", null)[0]?.value,
         iriField: v.getObjects(l, BP + "iriField", null)[0]?.value,
@@ -523,7 +559,7 @@ function labelOf(store, iri) {
     return germanText(store, iri, RDFS_LABEL) ?? contractTerm(iri)
 }
 
-function escapeSolr(s) {
+export function escapeSolr(s) {
     return s.replace(/(["\\])/g, "\\$1")
 }
 

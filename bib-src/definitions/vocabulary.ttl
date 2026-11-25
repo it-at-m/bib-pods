@@ -28,7 +28,7 @@ bp:favoriteWork a rdf:Property ;
     rdfs:domain cori:Profile ;
     rdfs:range bf:Work ;
     cori:inSection bp:TasteSection ;
-    cori:order 30 ;
+    cori:order 50 ;
     cori:assistantQuestion false . # free text no strategy reads; a liked book goes in through „Titel hinzufügen“
 
 bp:favoriteAuthor a rdf:Property ;
@@ -39,9 +39,9 @@ bp:favoriteAuthor a rdf:Property ;
     cori:inSection bp:TasteSection ;
     cori:order 10 ;
     bp:explanationPhrase "dir {value} gefällt"@de ;
-    cori:assistantPrompt "Welche Autor*innen liest du gern?"@de ;
-    # the catalogue's own "Nachname, Vorname" form — the typed "Cornelia Funke" matches nothing
-    cori:assistantExample "Nachname, Vorname – z. B. Funke, Cornelia"@de ;
+    cori:assistantPrompt "Wen liest du gern?"@de ;
+    cori:assistantHint "Drei Namen reichen für den Anfang."@de ;
+    cori:assistantExample "Name suchen, z. B. Cornelia Funke"@de ;
     bp:linkedToIndex [
         bp:labelField "author" ;
         bp:iriField "author_uri_str_mv"
@@ -56,9 +56,9 @@ bp:favoriteGenre a rdf:Property ;
     rdfs:domain cori:Profile ;
     rdfs:range bf:GenreForm ;
     cori:inSection bp:TasteSection ;
-    cori:order 20 ;
-    # Picker values extracted from the catalogue (resources/genre-values.ttl); stored
-    # as label literals since the index's genre field carries no authority IRIs.
+    cori:order 40 ;
+    # Choices extracted from the catalogue (resources/genre-values.ttl); stored as
+    # label literals since the index's genre field carries no authority IRIs.
     cori:allowedValues bp:GenreValues ;
     cori:storeAs cori:LabelLiteral ;
     bp:explanationPhrase "du das Genre {value} magst"@de ;
@@ -74,11 +74,10 @@ bp:interestedIn a rdf:Property ;
     rdfs:domain cori:Profile ;
     rdfs:range bf:Topic ;
     cori:inSection bp:TasteSection ;
-    cori:order 40 ;
+    cori:order 20 ;
     bp:explanationPhrase "du dich für {value} interessierst"@de ;
-    cori:assistantPrompt "Welche Themen interessieren dich?"@de ;
-    # one topic per entry, in the singular of the catalogue's subject headings ("Pferd", not "Pferde")
-    cori:assistantExample "ein Thema, z. B. Fotografie"@de ;
+    cori:assistantPrompt "Was interessiert dich?"@de ;
+    cori:assistantExample "Thema suchen, z. B. Fotografie"@de ;
     bp:linkedToIndex [
         bp:labelField "topic" ;
         bp:iriField "topic_uri_str_mv"
@@ -93,19 +92,16 @@ bp:interestedInPlace a rdf:Property ;
     rdfs:domain cori:Profile ;
     rdfs:range bf:Place ;
     cori:inSection bp:TasteSection ;
-    cori:order 50 ;
-    # Picker values extracted from the catalogue (resources/place-values.ttl); stored
-    # as label literals to match the index's geographic labels directly.
-    cori:allowedValues bp:PlaceValues ;
-    cori:storeAs cori:LabelLiteral ;
+    cori:order 30 ;
     bp:explanationPhrase "es um {value} geht"@de ;
     cori:assistantPrompt "Über welche Orte oder Regionen liest du gern?"@de ;
+    cori:assistantExample "Ort oder Region suchen, z. B. Südtirol"@de ;
     bp:linkedToIndex [
         bp:labelField "geographic" ;
         bp:iriField "geographic_uri_str_mv"
     ] .
 
-# The index stores ISO 639-2/B codes ("ger"), so the picker concepts display German
+# The index stores ISO 639-2/B codes ("ger"), so the concepts on offer display German
 # names and carry the code as bp:indexValue; the profile keeps the concept IRI.
 # A preference, not a taste: typed bp:RecommendationFilter, it narrows every Solr
 # lane instead of forming one of its own.
@@ -114,17 +110,18 @@ bp:preferredLanguage a rdf:Property, bp:RecommendationFilter ;
     cori:pluralLabel "preferred languages"@en, "Sprachen"@de ;
     rdfs:domain cori:Profile ;
     rdfs:range bf:Language ;
-    cori:inSection bp:LanguagesSection ;
+    cori:inSection bp:FilterSection ;
     cori:order 10 ;
     cori:allowedValues bp:LanguageValues ;
     cori:storeAs cori:ConceptIri ;
     bp:explanationPhrase "es auf {value} erschienen ist"@de ;
-    cori:assistantPrompt "In welchen Sprachen möchtest du lesen?"@de ;
+    cori:assistantPrompt "Möchtest du nur in bestimmten Sprachen lesen?"@de ;
+    cori:assistantHint "Optional. Ohne Auswahl bekommst du alle Sprachen; jede Auswahl hier verkleinert alle Reihen."@de ;
     bp:linkedToIndex [
         bp:labelField "language"
     ] .
 
-# Media types are catalogue jargon ("Druckschrift"), so the picker concepts carry
+# Media types are catalogue jargon ("Druckschrift"), so the concepts on offer carry
 # user labels plus the raw token(s) as bp:indexValue — combo values like "Buch + CD"
 # fold into their base medium. Also a filter, not a lane (see bp:preferredLanguage).
 bp:preferredMedium a rdf:Property, bp:RecommendationFilter ;
@@ -132,12 +129,13 @@ bp:preferredMedium a rdf:Property, bp:RecommendationFilter ;
     cori:pluralLabel "preferred media"@en, "Medienarten"@de ;
     rdfs:domain cori:Profile ;
     rdfs:range bf:Carrier ;
-    cori:inSection bp:TasteSection ;
-    cori:order 60 ;
+    cori:inSection bp:FilterSection ;
+    cori:order 20 ;
     cori:allowedValues bp:MediumValues ;
     cori:storeAs cori:ConceptIri ;
     bp:explanationPhrase "es als {value} vorliegt"@de ;
-    cori:assistantPrompt "Welche Medienarten bevorzugst du?"@de ;
+    cori:assistantPrompt "Möchtest du nur bestimmte Medienarten?"@de ;
+    cori:assistantHint "Optional. Ohne Auswahl bekommst du alle Medienarten; jede Auswahl hier verkleinert alle Reihen."@de ;
     bp:linkedToIndex [
         bp:labelField "format"
     ] .
@@ -170,24 +168,31 @@ bp:explanationPhrase a rdf:Property .
 
 # ----- Profile sections -----
 # cori:PersonalSection (cori-sdk) opens the profile at cori:order 10; the library
-# sections follow. Sections without fields yet are deliberate sketches: they render
-# empty and are the attachment points for future fields and dialog assistants.
+# sections follow. Sections nothing in the app fills (its Persönliches, and the
+# sketches for future fields: Hobbys, Projekte) stay out of the profile's list of
+# empty sections: cori:listWhenEmpty false.
+
+cori:PersonalSection cori:listWhenEmpty false .
 
 bp:TasteSection a cori:ProfileSection ;
     rdfs:label "reading taste"@en, "Lesegeschmack"@de ;
     cori:order 20 .
 
+# The bp:RecommendationFilter fields: asked after the tastes, and worded as what they
+# are, a narrowing of every lane.
+bp:FilterSection a cori:ProfileSection ;
+    rdfs:label "narrow down"@en, "Einschränken"@de ;
+    cori:order 30 .
+
 bp:HobbiesSection a cori:ProfileSection ;
     rdfs:label "hobbies"@en, "Hobbys"@de ;
-    cori:order 40 .
+    cori:order 40 ;
+    cori:listWhenEmpty false .
 
 bp:ProjectsSection a cori:ProfileSection ;
     rdfs:label "projects"@en, "Projekte"@de ;
-    cori:order 50 .
-
-bp:LanguagesSection a cori:ProfileSection ;
-    rdfs:label "languages"@en, "Sprachen"@de ;
-    cori:order 60 .
+    cori:order 50 ;
+    cori:listWhenEmpty false .
 
 bp:LibrarySection a cori:ProfileSection ;
     rdfs:label "library"@en, "Bibliothek"@de ;
@@ -213,8 +218,6 @@ bp:linkedToIndex a rdf:Property .
 bp:labelField a rdf:Property .
 bp:iriField a rdf:Property .
 
-# On a picker concept: the raw index token(s) it stands for, when they differ from the
-# display label ("Deutsch" queries language:"ger"). Several tokens OR into one clause.
 bp:excludedBook a rdf:Property, bp:RecommendationExclusion ; # SOPAC identifier
     rdfs:label "excluded book"@en, "Buch"@de ;
     cori:pluralLabel "excluded books"@en, "Bücher"@de ;
@@ -267,6 +270,9 @@ bp:blockedPlace a rdf:Property ;
     cori:assistantQuestion false ;
     bp:negates bp:interestedInPlace .
 
+# On a concept of a value set: the raw index token(s) it stands for, when they differ
+# from the display label ("Deutsch" queries language:"ger"). Several tokens OR into one
+# clause.
 bp:indexValue a rdf:Property .
 
 # A blocklist field's positive counterpart. Every lane drops books carrying a blocked

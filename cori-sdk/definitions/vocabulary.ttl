@@ -52,7 +52,7 @@ cori:inSection a rdf:Property ;
 
 cori:order a rdf:Property ;
     rdfs:range xsd:integer ;
-    rdfs:comment "Display order among siblings: sections within the profile, fields within their section. Lower comes first." .
+    rdfs:comment "Display order among siblings: sections within the profile, fields within their section, concepts within a cori:allowedValues scheme. Lower comes first." .
 
 cori:collapsed a rdf:Property ;
     rdfs:domain cori:ProfileSection ;
@@ -63,6 +63,11 @@ cori:clearable a rdf:Property ;
     rdfs:domain cori:ProfileSection ;
     rdfs:range xsd:boolean ;
     rdfs:comment "The profile UI offers to empty the section in one step, after a confirmation." .
+
+cori:listWhenEmpty a rdf:Property ;
+    rdfs:domain cori:ProfileSection ;
+    rdfs:range xsd:boolean ;
+    rdfs:comment "Whether the profile UI names the section among the still empty ones while it holds no entries. false = nothing in the app fills it, so naming it would promise something that can't happen; with entries it shows like any other. Unset counts as true. An app may say this about a section of another vocabulary." .
 
 cori:EmptySectionsBlock cori:order 100 ;
     rdfs:comment "UI anchor, not a section: where the profile UI's 'still empty sections' disclosure sorts among the sections. Sections with a higher cori:order render below the disclosure." .
@@ -78,19 +83,24 @@ cori:assistantQuestion a rdf:Property ;
 cori:assistantPrompt a rdf:Property ;
     rdfs:domain rdf:Property ;
     rdfs:range rdf:langString ;
-    rdfs:comment "The question the dialog assistant asks for an empty field. Unset: a generic question built from the field's label." .
+    rdfs:comment "The question on the dialog assistant's card for this profile field. Unset: the field's label." .
 
 cori:assistantExample a rdf:Property ;
     rdfs:domain rdf:Property ;
     rdfs:range rdf:langString ;
-    rdfs:comment "A sample answer the dialog assistant shows in a free-text field's input, e.g. in the spelling that matches best." .
+    rdfs:comment "Placeholder of the search or text input on a field's card, e.g. a sample of what to type." .
+
+cori:assistantHint a rdf:Property ;
+    rdfs:domain rdf:Property ;
+    rdfs:range rdf:langString ;
+    rdfs:comment "One short line under the question on the dialog assistant's card for this profile field. Follows whatever the app says about the field (see the assistantSource hint in ui/assistant.js)." .
 
 # ----- Closed value sets for profile fields -----
 
 cori:allowedValues a rdf:Property ;
     rdfs:domain rdf:Property ;
     rdfs:range skos:ConceptScheme ;
-    rdfs:comment "Closed value set for a profile field: a skos:ConceptScheme whose skos:hasTopConcept concepts are the choices on offer (German skos:prefLabel = display text). The dialog assistant renders a picker instead of a free-text input for such fields. Value-set schemes come from the consuming app's registered vocabularies, e.g. snapshots extracted from a catalogue index. A skos:definition on the scheme (German preferred) is surfaced next to the picker as provenance help: where do these values come from." .
+    rdfs:comment "Closed value set for a profile field: a skos:ConceptScheme whose skos:hasTopConcept concepts are the choices on offer (German skos:prefLabel = display text). The dialog assistant offers them as chips to switch on and off, sorted by the concepts' cori:order, and such a field takes no other values there. Value-set schemes come from the consuming app's registered vocabularies, e.g. snapshots extracted from a catalogue index. A skos:definition on the scheme (German preferred) is shown with the chips: where do these values come from." .
 
 cori:StorageForm a rdfs:Class .
 cori:LabelLiteral a cori:StorageForm .

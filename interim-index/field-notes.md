@@ -141,8 +141,9 @@ entry):
   "Deutsch"/"Englisch"/"Fremdsprache" appear as topic labels in their own right
   (5,080/1,854/1,639 records — language-learning materials), which would collide
   semantically with any language facet built from the `language` field. A
-  user-facing topic picker needs live autocomplete (`facet.prefix` against the
-  live index) rather than a static snapshot.
+  user-facing topic choice therefore works on the live index rather than a static
+  snapshot: the plugin's profile assistant searches the field as the user types and
+  suggests what is frequent in recent books (see §7).
 - **author**: 730,869 docs; 17.4% (of all docs) carry an unresolvable author →
   roughly 70% of authored records have a GND-linked main author; ~112,000 distinct
   author IRIs.
@@ -155,10 +156,11 @@ entry):
   `extract-value-sets.js` keeps 43 of 959 values at a ≥300-records cutoff, plus a
   15-term carrier/medium blocklist for the qualifier-stripped label.
 - **geographic**: 95,229 docs, only 0.5% unresolvable; 8.8k distinct values
-  (Deutschland 19k, München 4.9k, Bayern 3.2k, …). Also turned into a bib-src
-  picker: 47 of 8,835 `geographic_str` facet values clear a ≥300-records cutoff,
-  no exclude list needed — even the historically scoped values (Deutschland \<DDR\>,
-  Römisches Reich) are things readers pick deliberately.
+  (Deutschland 19k, München 4.9k, Bayern 3.2k, …). 47 of 8,835 `geographic_str`
+  facet values clear a ≥300-records cutoff, and the head needs no exclude list — even
+  the historically scoped values (Deutschland \<DDR\>, Römisches Reich) are things
+  readers pick deliberately. The plugin offers the whole field through a live search,
+  with the most frequent places of recent books as suggestions (see §7).
 - **era**: 44,963 docs, **zero** resolvable IRIs, 11,578 distinct values that are
   mostly free-form time phrases ("Geschichte 1933-1945"). Confirms it's unusable as
   a picker too: only **5** values clear even a 300-records cutoff (Geschichte 16.2k,
@@ -289,6 +291,16 @@ The TYPO3/docs plugin (bib-src) talks to the index read-only and relies on:
 - **Recommendation queries**: exact phrase matches of profile values against
   label fields (`author`, `author2`, `genre`, `topic`) and IRI fields
   (`*_uri_str_mv`), OR/AND-combined, with `-id:"…"` exclusions for saved books.
+- **Profile assistant** (search and suggestions while the user fills the profile):
+  prefix queries on the label fields (`author:(cornelia* AND fu*)`), facets on their
+  `*_str` twins including `facet.contains`, and exact `*_str` lookups that read a
+  value's authority IRI off the position-aligned arrays (§2). The suggestion queries
+  also filter on `format`, `language`, `genre`, `publishDateSort` and `title_sub`
+  (fiction carries no genre, so recent novels are recognised by a subtitle like
+  "Roman"), and titles are offered while typing through an edismax prefix query over
+  `title`, `author` and `author2`.
+  A production schema must keep facetable string twins of every label field and
+  prefix-searchable label and title fields, or replace both with a suggester.
 - **Explanations**: the "why recommended" tooltips re-check profile facts against the
   *stored* field values of a returned doc — string-exact. Stored values must remain
   verbatim (analysis may normalize indexed terms, but not stored ones).

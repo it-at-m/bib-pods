@@ -196,14 +196,30 @@ async function fetchFirst(endpoint, field, value) {
 // Free-text search for the "Titel hinzufügen" dialog: every typed word must occur in
 // the title or among the authors, title matches rank first. Returns whole records, so a
 // picked hit needs no second lookup, plus the total for "the first n of m".
-export async function searchBooks(endpoint, text, rows = 8) {
+export async function searchBooks(endpoint, text, rows = 8, extra = {}) {
     const params = new URLSearchParams({
-        q: text, defType: "edismax", qf: "title^3 author^2 author2", "q.op": "AND", rows: String(rows), wt: "json",
+        q: text, defType: "edismax", qf: "title^3 author^2 author2", "q.op": "AND", rows: String(rows), wt: "json", ...extra,
     })
     const res = await fetch(`${endpoint}?${params}`)
     if (!res.ok) throw new Error(`Solr ${res.status}: ${res.statusText}`)
     const { docs, numFound } = (await res.json()).response
     return { docs, total: numFound }
+}
+
+// Titles while typing: searchBooks with the word being typed matched as a prefix
+// ("unterleu" finds "Unterleuten"). The text is reduced to its words (letters and
+// digits), so nothing typed reaches the query parser as syntax; under three characters
+// there is nothing worth asking for. A prefix match carries no relevance of its own,
+// so that word is also asked for as it stands (a title that is exactly "Tschick" then
+// outranks the study guides about it), and the print and e-book records of a work are
+// lifted above its film and audio ones (the raw index tokens behind the media types
+// Buch and E-Book).
+export async function suggestBooks(endpoint, text, rows = 8) {
+    const words = text.toLocaleLowerCase("de-DE").split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+    if (words.join("").length < 3) return { docs: [], total: 0 }
+    const last = words.pop()
+    words.push(`(${last} OR ${last}*)`)
+    return searchBooks(endpoint, words.join(" "), rows, { bq: 'format:(Druckschrift OR "E-Book")' })
 }
 
 export function fetchBook(endpoint, id) {
