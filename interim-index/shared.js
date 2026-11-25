@@ -1,6 +1,7 @@
 import { XMLParser } from "fast-xml-parser"
 import path from "path"
 import fs from "fs"
+import { derivedGenres } from "./derived-genre.js"
 
 const DEFAULT_DATA_DIR = path.join(import.meta.dirname, "oai", "data")
 const CURSOR_FILE = path.join(import.meta.dirname, ".import-cursor.json")
@@ -145,6 +146,26 @@ function rdaCarrierCodes(marc) {
         .filter(code => /^[a-z]{2}$/.test(code))
 }
 
+// RDA content type codes from 336 (controlled by $2 = "rdacontent"), e.g. txt = text,
+// spw = spoken word, prm = performed music, ntm = notated music.
+function rdaContentCodes(marc) {
+    return (marc.datafield ?? [])
+        .filter(f => f["@_tag"] === "336"
+            && String((f.subfield ?? []).find(s => s["@_code"] === "2")?.["#text"] ?? "") === "rdacontent")
+        .map(f => String((f.subfield ?? []).find(s => s["@_code"] === "b")?.["#text"] ?? "").trim())
+        .filter(code => /^[a-z]{3}$/.test(code))
+}
+
+// Is the record something to read or listen to being read: a text or a spoken-word
+// recording? Decides whether its subtitle may state a literary genre (see
+// derived-genre.js): the subtitle of sheet music can say "sechs Gedichte" too. Records
+// without a content type count by their medium.
+function isReading(marc) {
+    const content = rdaContentCodes(marc)
+    if (content.length > 0) return content.includes("txt") || content.includes("spw")
+    return ["Druckschrift", "E-Book"].includes(mediumLabel(marc))
+}
+
 // Resolvable LoC IRI per RDA carrier code (id.loc.gov 303-redirects each, e.g.
 // cr → online resource). Mirrors authorityUris: mint IRIs at index time rather
 // than pushing bare codes onto consumers.
@@ -184,6 +205,14 @@ function mapRecord(oaiRecord) {
 
     const dates = getDates(marc)
     const carriers = rdaCarrierCodes(marc)
+
+    // Genre: the 655 terms, plus the literary genres a text's or reading's subtitle
+    // states (derived-genre.js) — the only genre information fiction carries, since
+    // 655 covers almost only non-fiction. They join the same field, so every consumer
+    // of `genre` reaches fiction without knowing about the rule; genre_derived keeps
+    // what was derived apart, and the IRI array stays position-aligned.
+    const genre655 = allAlphaSubfields(marc, ["655"])
+    const genreDerived = isReading(marc) ? derivedGenres(title_sub).filter(g => !genre655.includes(g)) : []
 
     return {
         id:               controlField(marc, "001"),
@@ -239,11 +268,12 @@ function mapRecord(oaiRecord) {
         // export already materializes them into these 6xx fields; see
         // field-notes.md for the measurements behind that decision.
         topic:                 allAlphaSubfields(marc, ["600", "610", "611", "630", "650", "653", "656"]),
-        genre:                 allAlphaSubfields(marc, ["655"]),
+        genre:                 [...genre655, ...genreDerived],
+        genre_derived:         genreDerived,
         geographic:            allAlphaSubfields(marc, ["651"]),
         era:                   allAlphaSubfields(marc, ["648"]),
         topic_uri_str_mv:      authorityUris(marc, ["600", "610", "611", "630", "650", "653", "656"]),
-        genre_uri_str_mv:      authorityUris(marc, ["655"]),
+        genre_uri_str_mv:      [...authorityUris(marc, ["655"]), ...genreDerived.map(() => NO_IRI)],
         geographic_uri_str_mv: authorityUris(marc, ["651"]),
         era_uri_str_mv:        authorityUris(marc, ["648"]),
 

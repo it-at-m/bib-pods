@@ -1,6 +1,7 @@
 {
   "type": "module",
   "scripts": {
+    "test":                    "node --test test/*.test.js",
     "oai:harvest-all":         "node oai/harvest-all.js",
     "oai:harvest-incremental": "node oai/harvest-incremental.js",
     "solr:up":                 "cd solr && docker compose up -d --build",

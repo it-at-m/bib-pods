@@ -101,7 +101,8 @@ Rationale: consumers should never have to know that `(DE-588)4211695-8` means
 | `author2` (+uri) | 700 abcqd | 33.1% | |
 | `author_corporate` (+uri) | 110/111/710/711 | 4.4% | |
 | `topic` (+uri) | 600/610/611/630/650/653/656 | 24.9% | best GND linkage, see §4 |
-| `genre` (+uri) | 655 | 25.3% | labels only in practice, see §4 |
+| `genre` (+uri) | 655, plus literary genres read off 245b | 25.3% from 655, +3.4 points derived | labels only in practice, see §4 |
+| `genre_derived` | 245b, by rule | 3.9% | the derived part of `genre` on its own, see §4 |
 | `geographic` (+uri) | 651 | 7.5% | well GND-linked |
 | `era` (+uri) | 648 | 3.6% | messy, zero GND, see §4 |
 | `language` | 008/35-37, 041 adhj | 100% | but 49% `unb`, see §4 |
@@ -155,6 +156,24 @@ entry):
   genre list for user-facing purposes should filter those. Done in bib-src:
   `extract-value-sets.js` keeps 43 of 959 values at a ≥300-records cutoff, plus a
   15-term carrier/medium blocklist for the qualifier-stripped label.
+  **655 covers almost only non-fiction.** A novel's record says what it is nowhere
+  but in the subtitle the publisher printed ("Roman", "Kriminalroman", "ein
+  Sylt-Krimi", "historischer Roman", "Gedichte"); the raw records carry no other
+  genre or classification field for it. `derived-genre.js` reads that convention
+  into `genre` (and, kept apart, `genre_derived`): a genre word counts only as the
+  head of the subtitle or of one of its ISBD segments, and only on texts and readings
+  (336 content type text or spoken word), since sheet music has subtitles like "sechs
+  Gedichte für Altstimme" too. Measured over the full dump with the importer's own
+  mapping (November 2026, 1,285,382 records): **50,642 records gain a derived
+  genre**, 43,706 of which had no 655 at all — Roman 35,242, Krimi 5,809, Thriller
+  3,837, Erzählungen 2,787, Lyrik 2,007, Historischer Roman 752; Kinderbuch,
+  Graphic Novel, Liebesroman, Science-Fiction, Jugendbuch and Fantasy stay below 200
+  each. On precision: 6,977 of the derived "Roman" records also carry 655
+  "Fiktionale Darstellung", while pairings that suggest a miss are rare (Roman with
+  655 Erlebnisbericht 22, Biografie 9, Führer 6). It is a heuristic on publisher
+  wording: novels without such a subtitle stay unreached, and "Roman" lumps literary
+  fiction with everything else a publisher calls a novel. Derived labels have no
+  authority IRI (the sentinel keeps `genre_uri_str_mv` aligned).
 - **geographic**: 95,229 docs, only 0.5% unresolvable; 8.8k distinct values
   (Deutschland 19k, München 4.9k, Bayern 3.2k, …). 47 of 8,835 `geographic_str`
   facet values clear a ≥300-records cutoff, and the head needs no exclude list — even
@@ -214,7 +233,9 @@ zweidimensionales bewegtes Bild, …. 337 (`$2=rdamedia`) is the third RDA axis
 (ohne Hilfsmittel zu benutzen / audio / Computermedien / video / Mikroform).
 Recipe: mirror the 338 handling — label from `$a`, LoC IRI from `$b`
 (`https://id.loc.gov/vocabulary/contentTypes/<code>`, e.g. `spw` for spoken word).
-This is what makes a "Hörbuch" preference expressible.
+This is what makes a "Hörbuch" preference expressible. The mapping already reads the
+336 codes, but only to decide which records may get a derived genre (§4); they are
+not indexed.
 
 ### Audience / age recommendation (521) — recommended for production
 
@@ -295,10 +316,10 @@ The TYPO3/docs plugin (bib-src) talks to the index read-only and relies on:
   prefix queries on the label fields (`author:(cornelia* AND fu*)`), facets on their
   `*_str` twins including `facet.contains`, and exact `*_str` lookups that read a
   value's authority IRI off the position-aligned arrays (§2). The suggestion queries
-  also filter on `format`, `language`, `genre`, `publishDateSort` and `title_sub`
-  (fiction carries no genre, so recent novels are recognised by a subtitle like
-  "Roman"), and titles are offered while typing through an edismax prefix query over
-  `title`, `author` and `author2`.
+  also filter on `format`, `genre` and `publishDateSort`, and titles are offered
+  while typing through an edismax prefix query over `title`, `author` and `author2`.
+  The snapshot script (`bib-src/scripts/extract-value-sets.js`) additionally filters
+  on `language` and uses the JSON Facet API (`unique(format_str)` per author).
   A production schema must keep facetable string twins of every label field and
   prefix-searchable label and title fields, or replace both with a suggester.
 - **Explanations**: the "why recommended" tooltips re-check profile facts against the

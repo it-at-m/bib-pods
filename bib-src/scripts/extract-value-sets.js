@@ -41,11 +41,13 @@ const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
 // produce lanes too thin to fill.
 const GENRE_MIN_COUNT = 300
 
-// The forms a reader would name as a taste, in the order they are offered. Everything
-// else (the academic and reference forms: Aufsatzsammlung, Kongress, Verzeichnis …)
-// follows by record count, behind the assistant's "weitere" fold. A curation point
-// like GENRE_EXCLUDE.
+// The forms a reader would name as a taste, in the order they are offered: fiction
+// first (the index derives those genres from subtitles, see
+// interim-index/derived-genre.js), then non-fiction. Everything else (the academic and
+// reference forms: Aufsatzsammlung, Kongress, Verzeichnis …) follows by record count,
+// behind the assistant's "weitere" fold. A curation point like GENRE_EXCLUDE.
 const GENRE_FIRST = [
+    "Roman", "Krimi", "Thriller", "Historischer Roman", "Erzählungen", "Lyrik",
     "Ratgeber", "Kochbuch", "Biografie", "Führer", "Bildband", "Reisebericht",
     "Erlebnisbericht", "Comic", "Kinderbuch", "Bilderbuch", "Jugendbuch", "Kindersachbuch",
     "Jugendsachbuch", "Autobiografie", "Humoristische Darstellung", "Fiktionale Darstellung",
@@ -131,8 +133,11 @@ const genres = frequent
     .sort((a, b) => rank(a) - rank(b) || b.count - a.count)
 const mediumLike = frequent.length - genres.length
 for (const label of GENRE_FIRST.filter(l => !genres.some(v => v.label === l))) {
-    console.warn(`GENRE_FIRST names a genre the catalogue no longer offers: ${label}`)
+    console.warn(`GENRE_FIRST names a genre the index doesn't offer (absent, or below ${GENRE_MIN_COUNT} records): ${label}`)
 }
+// Does the index carry genres derived from subtitles? Then the card says so.
+const derivedGenres = new Set((await facetValues("genre_derived_str")).map(v => v.label))
+const offersDerived = genres.some(v => derivedGenres.has(v.label))
 
 const outPath = resolve(OUT_DIR, "genre-values.ttl")
 writeFileSync(outPath, conceptScheme({
@@ -145,8 +150,9 @@ writeFileSync(outPath, conceptScheme({
         + `(a long tail of one-offs and typos covering ${belowThreshold.reduce((n, v) => n + v.count, 0).toLocaleString("en")} records in total) `
         + `and ${mediumLike} medium-like terms (physical form, not content genre). `
         + `Offered in GENRE_FIRST order, then by record count.`,
-    definition: `Die ${genres.length} häufigsten Genre-Angaben im Katalog. `
-        + `Romane tragen dort meist kein Genre: Sie findest du über Autor*innen und Titel.`,
+    definition: `Die ${genres.length} häufigsten Genre-Angaben im Katalog. ` + (offersDerived
+        ? `Bei Romanen, Krimis und anderer Literatur ist das Genre aus dem Untertitel abgelesen (etwa „Kriminalroman“): Was dort keins nennt, fehlt.`
+        : `Romane tragen dort meist kein Genre: Sie findest du über Autor*innen und Titel.`),
 }))
 console.log(`wrote ${outPath} (${genres.length} concepts; dropped ${belowThreshold.length} below min-count, ${mediumLike} medium-like)`)
 
