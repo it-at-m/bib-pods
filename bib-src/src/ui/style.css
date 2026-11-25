@@ -252,7 +252,8 @@ dialog.bp-access-dialog {
 /* Profile sections: calm stacked groups separated by hairlines; entries render
    as quiet chips. px (not rem) for box dimensions — the TYPO3 host's 62.5% root
    font-size would otherwise shrink them (see the box-sizing note below). */
-cori-profile .cori-profile-sections { margin: 8px 0 16px; }
+cori-profile .cori-profile-sections { margin: 8px 0 0; }
+cori-profile .cori-profile-sections:empty { margin: 0; }
 cori-profile .cori-profile-section { padding: 12px 0; }
 cori-profile .cori-profile-section + .cori-profile-section { border-top: 1px solid #eee; }
 /* sections sorted below the "noch leere Bereiche" disclosure (e.g. the Merkliste) */
@@ -261,8 +262,7 @@ cori-profile .cori-profile-section h4 {
     margin: 0;
     font-size: 1em;
 }
-/* Heading rows: title left, assistant launcher right. */
-cori-profile .cori-profile-header,
+/* Section heading rows: title left, assistant launcher right. */
 cori-profile .cori-profile-section-head {
     display: flex;
     align-items: baseline;
@@ -509,15 +509,76 @@ cori-profile .cori-assistant-existing[hidden] { display: none; }
     box-shadow: none !important;
 }
 .bp-solid-connect input { flex: 1; min-width: 0; }
-/* The profile header as three lines: the heading, what the profile is for, then
-   "Profil erweitern:" with every launcher that adds to it. Heading and lead each take
-   a full row of the wrapping flex; the label and launchers share the next and wrap on
-   narrow screens. px gaps: see dialog.bp-pods-modal for the TYPO3 root-font mismatch. */
-cori-profile .cori-profile-header { flex-wrap: wrap; justify-content: flex-start; gap: 8px 10px; margin-bottom: 14px; }
-cori-profile .cori-profile-header .cori-profile-heading,
-cori-profile .cori-profile-header .bp-profile-lead { flex: 0 0 100%; }
-cori-profile .cori-profile-header .bp-profile-lead { margin: -6px 0 6px; font-size: 0.85em; color: #888; }
-cori-profile .bp-enrich-label { font-weight: bold; font-size: 0.9em; }
+/* The profile header: heading, launchers and the "⋯" menu in one line, what the profile is
+   for below it. A narrow block moves the launchers to a line of their own. px gaps: see
+   dialog.bp-pods-modal for the TYPO3 root-font mismatch. */
+cori-profile .cori-profile-header {
+    display: grid;
+    grid-template: "heading launchers menu" auto "lead lead lead" auto / auto 1fr auto;
+    align-items: center;
+    gap: 4px 12px;
+    margin-bottom: 14px;
+}
+cori-profile .cori-profile-heading { grid-area: heading; }
+cori-profile .cori-profile-launchers { grid-area: launchers; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 10px; }
+cori-profile .cori-profile-menu { grid-area: menu; }
+cori-profile .cori-profile-header .bp-profile-lead { grid-area: lead; margin: 0; font-size: 0.85em; color: #888; }
+cori-profile:not([data-empty]) .bp-profile-lead-empty { display: none; }
+cori-profile[data-empty] .cori-profile-header { margin-bottom: 0; }
+@container (max-width: 640px) {
+    cori-profile .cori-profile-header { grid-template: "heading menu" auto "lead lead" auto "launchers launchers" auto / 1fr auto; }
+    cori-profile .cori-profile-launchers { justify-content: flex-start; margin-top: 8px; }
+}
+/* The menu: a quiet round "⋯" whose panel hangs from its right edge, over the sections. */
+cori-profile .cori-profile-menu { position: relative; }
+cori-profile .cori-profile-menu > summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    list-style: none;
+    font-size: 18px;
+    line-height: 1;
+    color: #555;
+    cursor: pointer;
+}
+cori-profile .cori-profile-menu > summary::-webkit-details-marker { display: none; }
+cori-profile .cori-profile-menu > summary:hover,
+cori-profile .cori-profile-menu[open] > summary { background: #f2f2f2; color: #222; }
+cori-profile .cori-profile-actions {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 20;
+    min-width: 190px;
+    padding: 6px 0;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+}
+cori-profile .cori-profile-actions button {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-align: left;
+    white-space: nowrap;
+    font: inherit;
+    font-size: 0.9em;
+    color: #333;
+    cursor: pointer;
+}
+cori-profile .cori-profile-actions button[hidden] { display: none; }
+cori-profile .cori-profile-actions button:hover { background: #f5f5f5; color: #222; }
+/* the way to the raw data stands apart from what manages the profile */
+cori-profile .cori-profile-actions button:not([hidden]) + button[data-action="inspect"] { margin-top: 6px; padding-top: 12px; border-top: 1px solid #eee; }
 cori-profile .bp-enrich-btn[hidden] { display: none; }
 
 /* A narrow prompt, like the grant/revoke dialog — the shared dialog.bp-modal default
@@ -648,35 +709,21 @@ dialog.bp-scan-dialog {
 }
 #bp-chooser[hidden] { display: none; }
 #bp-chooser .button { align-self: flex-start; }
-/* Admin/dev actions render as small inline links rather than pills — they're
-   secondary affordances and shouldn't compete visually with the primary buttons.
-   The buttons omit class="button" so the host's pill styling never applies (the
-   <cori-profile> primitive's action buttons share this treatment). */
-.bp-actions,
-cori-profile .cori-profile-actions {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 0.4rem 1.25rem;
-    font-size: 0.85em;
-}
-.bp-actions button,
-cori-profile .cori-profile-actions button,
+/* "Bereich leeren" closes its section as a small inline link, not a pill: it shouldn't
+   compete with the launchers. */
 cori-profile .cori-profile-clear-section {
+    display: block;
+    margin-top: 10px;
+    padding: 0;
     background: none;
     border: none;
-    padding: 0;
     color: #555;
     text-decoration: underline;
-    font-weight: normal;
-    cursor: pointer;
     font: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
 }
-.bp-actions button:hover,
-cori-profile .cori-profile-actions button:hover,
 cori-profile .cori-profile-clear-section:hover { color: #222; }
-/* "Bereich leeren" closes its section, in the quiet link look of the actions row */
-cori-profile .cori-profile-clear-section { display: block; margin-top: 10px; font-size: 0.85em; }
 /* Override host's .button min-width: 12rem so pills fit our compact modal. */
 .bp-open-btn,
 #bp-chooser .button {
@@ -872,9 +919,9 @@ dialog.bp-lane-status-dialog {
 .bp-landing.is-activated .bp-collapsible[open] { flex: 1 0 100%; }
 
 /* <cori-profile> is a cori-sdk light-DOM primitive — the app owns its layout/look.
-   Custom elements are inline by default, so make it a block; its sections and action
-   buttons reuse the shared styles above. */
-cori-profile { display: block; }
+   Custom elements are inline by default, so make it a block; a size container so its
+   header can react to the column it sits in. */
+cori-profile { display: block; container-type: inline-size; }
 cori-profile .cori-profile-heading { margin-top: 0; }
 
 /* <cori-profile>'s Turtle inspector dialog — structure + Prism theme come from the
@@ -888,6 +935,7 @@ dialog.cori-turtle-view {
     max-height: 92vh;
 }
 dialog.cori-turtle-view::backdrop { background: rgba(0, 0, 0, 0.4); }
-.cori-turtle-view-header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
+.cori-turtle-view-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
 .cori-turtle-view-header h3 { margin: 0; margin-right: auto; }
+.cori-turtle-view-add,
 .cori-turtle-view-validate { font-size: 0.9rem; cursor: pointer; white-space: nowrap; }

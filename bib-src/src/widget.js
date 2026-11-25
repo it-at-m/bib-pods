@@ -458,7 +458,7 @@ function mountCompact({ root, solrEndpoint, openBookPrompt, mainHref }) {
 // Landing embed (the bib-pods main page): the whole control centre, inlined. Logged out it
 // walks a small state machine — Anmelden CTA → storage chooser → (optional) Solid setup;
 // logged in it shows the Konto block, the Schaufenster (recommendation lanes + "prüfen"),
-// and the profile with its "Profil erweitern" row. It also decorates any catalogue cards
+// and the profile with its launchers. It also decorates any catalogue cards
 // on the page.
 function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, openBookPrompt, redirectUri }) {
     root.insertAdjacentHTML("beforeend", landingHtml)
@@ -615,7 +615,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
-    // Every way to add to the profile, in one row under its heading: the SDK's own
+    // Every way to add to the profile, side by side in its heading line: the SDK's own
     // assistant launcher, then the two bib-pods adds, a title and (pod storage only)
     // what the pod already holds. The header belongs to the profile primitive, and its
     // refresh() replaces only .cori-profile-sections, so the row is built once and
@@ -627,18 +627,16 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         if (!scanLauncher) {
             const lead = document.createElement("p")
             lead.className = "bp-profile-lead"
-            lead.textContent = "Daraus entstehen deine Empfehlungen."
-            const label = document.createElement("span")
-            label.className = "bp-enrich-label"
-            label.textContent = "Profil erweitern:"
-            header.querySelector(".cori-profile-heading").after(lead, label)
+            lead.innerHTML = `<span class="bp-profile-lead-empty">Noch leer. </span>Daraus entstehen deine Empfehlungen.`
+            header.appendChild(lead)
+            const launchers = header.querySelector(".cori-profile-launchers")
             const launcher = (text, onClick) => {
                 const btn = document.createElement("button")
                 btn.type = "button"
                 btn.className = "bp-enrich-btn"
                 btn.textContent = text
                 btn.addEventListener("click", onClick)
-                header.appendChild(btn)
+                launchers.appendChild(btn)
                 return btn
             }
             const addTitle = launcher("Titel hinzufügen", openAddTitle)
@@ -979,14 +977,10 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         box.append(note, actions)
         return box
     }
-    // Beside the heading: that a run is under way, or how many strategies have a lane on
-    // the shelf. Before the first run lands and while the shelf can't be loaded there
-    // is nothing to count, so the button only names what it opens. An open dialog
-    // follows every change.
+    // Beside the heading: that a run is under way, otherwise what the button opens. An
+    // open dialog follows every change.
     function renderLaneStatus() {
-        laneStatus.textContent = shelfLoading ? "Lädt …"
-            : shelf === null || shelfNote === SHELF_NOTES.unreachable ? "Empfehlungsarten"
-            : `Vorschläge in ${shelf.length} von ${strategies.length} Reihen`
+        laneStatus.textContent = shelfLoading ? "Lädt …" : "Reihen auswählen"
         if (laneStatusDialog.open) renderLaneRows()
     }
     async function openLaneStatus() {

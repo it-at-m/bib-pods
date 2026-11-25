@@ -8,13 +8,18 @@ const PROFILE_TYPE = CORI + "Profile"
 
 // <cori-profile> — a light-DOM UI primitive. Renders the user's profile triples
 // grouped into the profile sections the merged vocabulary declares
-// (cori:ProfileSection / cori:inSection / cori:order), plus profile-actions,
-// wired straight to cori-sdk storage. Sections without entries collapse under a
-// trailing "noch leere Bereiche" disclosure; profile facts whose predicate
+// (cori:ProfileSection / cori:inSection / cori:order), wired straight to cori-sdk
+// storage. Sections without entries collapse under a trailing "noch leere Bereiche"
+// disclosure (left out while the whole profile is empty); profile facts whose predicate
 // belongs to no section land in a catch-all group, so nothing is silently hidden.
-// The heading carries a "Fragen beantworten" launcher and every section with
+// The header carries a "Fragen beantworten" launcher and every section with
 // currently askable fields an "Ergänzen" launcher — both open the derived dialog
-// assistant (./assistant.js), scoped to the whole profile or to that section.
+// assistant (./assistant.js), scoped to the whole profile or to that section. The app
+// can add its own launchers to .cori-profile-launchers.
+// The header's "⋯" menu manages the profile as a whole (download; clear once there is
+// something to clear) and leads to the raw Turtle view, where the expert tools live:
+// adding a single triple, validating.
+// While the profile holds no facts the element carries the attribute data-empty.
 // No shadow root, no bundled styles.
 // Call refresh() to re-render after the profile changes elsewhere.
 // Assignable properties:
@@ -55,16 +60,18 @@ function loadScript(src) {
     })
 }
 
-function buildTurtleDialog(onValidate) {
+function buildTurtleDialog({ onAdd, onValidate }) {
     const d = document.createElement("dialog")
     d.className = "cori-turtle-view"
     d.innerHTML = `
         <div class="cori-turtle-view-header">
             <h3 class="cori-turtle-view-title"></h3>
+            <a href="#" class="cori-turtle-view-add">Triple hinzufügen</a>
             <a href="#" class="cori-turtle-view-validate">Profil validieren</a>
             <button type="button" class="cori-turtle-view-close">Schließen</button>
         </div>
         <pre class="cori-turtle-view-body" style="margin: 0; max-height: 60vh; overflow: auto;"><code class="language-turtle"></code></pre>`
+    d.querySelector(".cori-turtle-view-add").addEventListener("click", (e) => { e.preventDefault(); onAdd() })
     d.querySelector(".cori-turtle-view-validate").addEventListener("click", (e) => { e.preventDefault(); onValidate() })
     d.querySelector(".cori-turtle-view-close").addEventListener("click", () => d.close())
     d.addEventListener("click", (e) => { if (e.target === d) d.close() })
@@ -77,26 +84,58 @@ export class CoriProfile extends HTMLElement {
         this.innerHTML = `
             <div class="cori-profile-header">
                 <h3 class="cori-profile-heading">Profil</h3>
-                <button type="button" class="cori-profile-fill">Fragen beantworten</button>
+                <div class="cori-profile-launchers">
+                    <button type="button" class="cori-profile-fill">Fragen beantworten</button>
+                </div>
+                <details class="cori-profile-menu">
+                    <summary aria-label="Profil verwalten" title="Profil verwalten">⋯</summary>
+                    <div class="cori-profile-actions">
+                        <button type="button" data-action="download">Herunterladen</button>
+                        <button type="button" data-action="clear" hidden>Leeren</button>
+                        <button type="button" data-action="inspect">Rohdaten anzeigen</button>
+                    </div>
+                </details>
             </div>
-            <div class="cori-profile-sections"></div>
-            <div class="cori-profile-actions">
-                <button type="button" data-action="inspect">Als Turtle anzeigen</button>
-                <button type="button" data-action="add">Eintrag hinzufügen</button>
-                <button type="button" data-action="download">Profil herunterladen</button>
-                <button type="button" data-action="clear">Profil leeren</button>
-            </div>`
+            <div class="cori-profile-sections"></div>`
         this._sectionsEl = this.querySelector(".cori-profile-sections")
+        this._menuEl = this.querySelector(".cori-profile-menu")
         this._refreshSeq = 0
         this._openSections = new Set()    // cori:collapsed sections the user opened
 
         this.querySelector(".cori-profile-fill").addEventListener("click", () => this._assist())
-        this.querySelector('[data-action="add"]').addEventListener("click", () => this._add())
         this.querySelector('[data-action="download"]').addEventListener("click", () => this._download())
         this.querySelector('[data-action="inspect"]').addEventListener("click", () => this._inspect())
         this.querySelector('[data-action="clear"]').addEventListener("click", () => this._clear())
+        this._wireMenu()
 
         this.refresh()
+    }
+
+    // <details> opens and closes on its own summary only; a menu also closes once an
+    // item is chosen, on Escape, and when the user clicks or tabs elsewhere.
+    _wireMenu() {
+        const menu = this._menuEl
+        menu.querySelector(".cori-profile-actions").addEventListener("click", () => { menu.open = false })
+        menu.addEventListener("keydown", (e) => {
+            if (e.key !== "Escape" || !menu.open) return
+            menu.open = false
+            menu.querySelector("summary").focus()
+        })
+        const closeOutside = (e) => { if (!menu.contains(e.target)) menu.open = false }
+        menu.addEventListener("toggle", () => {
+            for (const type of ["pointerdown", "focusin"]) {
+                if (menu.open) document.addEventListener(type, closeOutside)
+                else document.removeEventListener(type, closeOutside)
+            }
+        })
+    }
+
+    // facts: the profile subject has facts. entries: the storage holds anything beyond
+    // the structural base triple (e.g. settings under another subject), which is what
+    // clearing acts on.
+    _setContentState({ facts, entries }) {
+        this.toggleAttribute("data-empty", !facts)
+        this.querySelector('[data-action="clear"]').hidden = !entries
     }
 
     // Empty sections alone would read as "no profile entries" — when the storage
@@ -119,6 +158,13 @@ export class CoriProfile extends HTMLElement {
             const store = await loadStore()
             const sections = await this._renderSections(store)
             if (seq !== this._refreshSeq) return
+            const isBase = q => q.subject.value === getProfileSubject()
+                && q.predicate.value === RDF_TYPE && q.object.value === PROFILE_TYPE
+            const quads = store.getQuads(null, null, null, null).filter(q => !isBase(q))
+            this._setContentState({
+                facts: quads.some(q => q.subject.value === getProfileSubject()),
+                entries: quads.length > 0,
+            })
             this._sectionsEl.replaceChildren(...sections)
         } catch (err) {
             console.error("[cori-profile] render failed:", err)
@@ -212,7 +258,9 @@ export class CoriProfile extends HTMLElement {
             }
             sections.push(el)
         }
-        if (emptySections.length > 0) {
+        // counts is empty when the profile holds no facts at all: a list of everything
+        // that is missing would be the only thing to see
+        if (emptySections.length > 0 && counts.size > 0) {
             const details = document.createElement("details")
             details.className = "cori-profile-more"
             const summary = document.createElement("summary")
@@ -386,19 +434,22 @@ export class CoriProfile extends HTMLElement {
         if (!isStorageReady()) return window.alert("Keine Verbindung zum Speicherort.")
         try {
             await ensurePrism()
-            const ttl = await loadAsTurtle()
             if (!this._turtleDialog) {
-                this._turtleDialog = buildTurtleDialog(() => this._validate())
+                this._turtleDialog = buildTurtleDialog({ onAdd: () => this._add(), onValidate: () => this._validate() })
                 this.appendChild(this._turtleDialog)
             }
             this._turtleDialog.querySelector(".cori-turtle-view-title").textContent = getStorageEntryName()
-            const code = this._turtleDialog.querySelector("code")
-            code.textContent = ttl
-            window.Prism.highlightElement(code)
+            await this._renderTurtle()
             this._turtleDialog.showModal()
         } catch (err) {
             console.error("[cori-profile] turtle view failed:", err)
         }
+    }
+
+    async _renderTurtle() {
+        const code = this._turtleDialog.querySelector("code")
+        code.textContent = await loadAsTurtle()
+        window.Prism.highlightElement(code)
     }
 
     async _validate() {
@@ -424,6 +475,7 @@ export class CoriProfile extends HTMLElement {
             await addTriple(s, p, o)
             await this.refresh()
             this._emitChange()
+            await this._renderTurtle()
         } catch (err) {
             console.error("[cori-profile] addTriple failed:", err)
             window.alert("Eintrag konnte nicht gespeichert werden:\n" + storageErrorMessage(err))
