@@ -1,5 +1,5 @@
 Pod scanning proposes profile entries or actions using supported data already
-stored in a connected Pod. Connect a Pod and click **scan pod** to review the findings.
+stored in a connected Pod. Connect a Pod and click **Aus deinem Pod übernehmen** to review the findings.
 
 Each scan definition describes where to look, how to recognize a supported data
 format, and which predefined mapping rules to apply. A shared runner handles all

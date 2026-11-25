@@ -12,7 +12,7 @@ const PROFILE_TYPE = CORI + "Profile"
 // wired straight to cori-sdk storage. Sections without entries collapse under a
 // trailing "noch leere Bereiche" disclosure; profile facts whose predicate
 // belongs to no section land in a catch-all group, so nothing is silently hidden.
-// The heading carries a "Profil ausfüllen" launcher and every section with
+// The heading carries a "Fragen beantworten" launcher and every section with
 // currently askable fields an "Ergänzen" launcher — both open the derived dialog
 // assistant (./assistant.js), scoped to the whole profile or to that section.
 // No shadow root, no bundled styles.
@@ -77,7 +77,7 @@ export class CoriProfile extends HTMLElement {
         this.innerHTML = `
             <div class="cori-profile-header">
                 <h3 class="cori-profile-heading">Profil</h3>
-                <button type="button" class="cori-profile-fill">Profil ausfüllen</button>
+                <button type="button" class="cori-profile-fill">Fragen beantworten</button>
             </div>
             <div class="cori-profile-sections"></div>
             <div class="cori-profile-actions">

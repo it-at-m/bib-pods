@@ -99,12 +99,13 @@
 .bp-cf-noimage { width: 100%; min-height: 160px; display: flex; color: #b3aea3; }
 .bp-cf-noimage svg { width: 56px; height: 56px; margin: auto; }
 
-/* Dismiss control over the cover's top-right corner — the .bp-round-btn look (see above),
+/* "+" and "✕" over the cover's top-right corner — the .bp-round-btn look (see above),
    colored to match the carousel's own accent (arrows/dots) rather than the host's. Sized a
    touch below .bp-round-btn's own default — the host's "+" button sits on a full-size
-   catalogue card, ours sits on this carousel's smaller cover. */
-.bp-cf-dismiss { position: absolute; top: 8px; right: 8px; width: 1.45em; height: 1.45em;
+   catalogue card, ours sit on this carousel's smaller cover. */
+.bp-cf-save, .bp-cf-dismiss { position: absolute; top: 8px; right: 8px; width: 1.45em; height: 1.45em;
     font-size: 1em; color: var(--bp-cf-accent); }
+.bp-cf-save { right: calc(8px + 1.45em + 6px); }
 
 /* circular arrows (their .swiper-button-*): white disc, brand-orange ring + chevron.
    Sized/positioned from --bp-cf-nav/--bp-cf-pad so they sit centered in the lane's own
@@ -182,16 +183,17 @@ dialog.bp-pods-modal {
 .bp-modal-content {
     padding: 2rem 2.5rem;
 }
-/* Konto block: a concise "where stored" line, then one quiet aside line per group of
-   secondary actions, then the Abmelden button. px spacing so the stack reads the same
-   on both hosts (see dialog.bp-pods-modal for the TYPO3 root-font mismatch). */
+/* Konto block, one row: the concise "where stored" line, the quiet Merkliste aside, and
+   the Abmelden button at the far end; it wraps on narrow screens. The block drops
+   .bp-block's min-height, which is sized for the text boxes. px spacing so the row reads
+   the same on both hosts (see dialog.bp-pods-modal for the TYPO3 root-font mismatch). */
+#bp-account:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; min-height: 0; }
 .bp-storage-label { margin: 0; color: #555; }
 .bp-aside { margin: 4px 0 0; font-size: 0.85em; color: #888; }
 .bp-aside a { color: #888; text-decoration: underline; }
 .bp-aside a:hover { color: var(--contrastcolor, #d14900); }
-#bp-account .bp-logout { margin-top: 12px; }
-/* Not yet implemented — listed so the step is discoverable, but not a link. */
-.bp-soon { cursor: default; }
+#bp-account .bp-aside { margin: 0; }
+#bp-account .bp-logout { margin: 0 0 0 auto; }
 /* The grant/revoke dialog: a narrow prompt. px box sizing for the TYPO3 root-font
    mismatch (see dialog.bp-pods-modal). */
 dialog.bp-access-dialog {
@@ -272,7 +274,7 @@ cori-profile .cori-profile-header .cori-profile-heading { margin: 0; }
    styling can't leak in. */
 cori-profile .cori-profile-fill,
 cori-profile .cori-profile-add,
-cori-profile .bp-add-title-open {
+cori-profile .bp-enrich-btn {
     padding: 3px 14px;
     background: #fff;
     border: 1px solid #ccc;
@@ -286,7 +288,7 @@ cori-profile .bp-add-title-open {
 }
 cori-profile .cori-profile-fill:hover,
 cori-profile .cori-profile-add:hover,
-cori-profile .bp-add-title-open:hover {
+cori-profile .bp-enrich-btn:hover {
     background: #fff;
     border-color: var(--contrastcolor, #d14900);
     color: var(--contrastcolor, #d14900);
@@ -507,11 +509,16 @@ cori-profile .cori-assistant-existing[hidden] { display: none; }
     box-shadow: none !important;
 }
 .bp-solid-connect input { flex: 1; min-width: 0; }
-/* "Titel hinzufügen": a launcher beside "Profil ausfüllen" plus the dialog it opens.
-   The header is space-between for its usual two children; a third would spread them
-   apart, so the heading takes the slack and the two launchers stay grouped right. */
-cori-profile .cori-profile-header { justify-content: flex-start; }
-cori-profile .cori-profile-header .cori-profile-heading { margin-right: auto; }
+/* The profile header as three lines: the heading, what the profile is for, then
+   "Profil erweitern:" with every launcher that adds to it. Heading and lead each take
+   a full row of the wrapping flex; the label and launchers share the next and wrap on
+   narrow screens. px gaps: see dialog.bp-pods-modal for the TYPO3 root-font mismatch. */
+cori-profile .cori-profile-header { flex-wrap: wrap; justify-content: flex-start; gap: 8px 10px; margin-bottom: 14px; }
+cori-profile .cori-profile-header .cori-profile-heading,
+cori-profile .cori-profile-header .bp-profile-lead { flex: 0 0 100%; }
+cori-profile .cori-profile-header .bp-profile-lead { margin: -6px 0 6px; font-size: 0.85em; color: #888; }
+cori-profile .bp-enrich-label { font-weight: bold; font-size: 0.9em; }
+cori-profile .bp-enrich-btn[hidden] { display: none; }
 
 /* A narrow prompt, like the grant/revoke dialog — the shared dialog.bp-modal default
    (60rem) is sized for the lane views, not a single field. */
@@ -537,6 +544,27 @@ dialog.bp-add-title-dialog {
     font: inherit !important;
     box-shadow: none !important;
 }
+/* Search hits: a plain list of full-width text buttons, one title each. Explicit
+   background/border/font so host button styling can't leak in. */
+.bp-add-title-hits { margin: 10px 0 0; padding: 0; list-style: none; max-height: 46vh; overflow-y: auto; }
+.bp-add-title-hits li { margin: 0; border-top: 1px solid #eee; }
+.bp-add-title-hits button {
+    display: block;
+    width: 100%;
+    padding: 8px 4px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    font: inherit;
+    font-size: 0.9em;
+    line-height: 1.4;
+    color: #444;
+    text-align: left;
+    cursor: pointer;
+}
+.bp-add-title-hits button:hover,
+.bp-add-title-hits button:focus-visible { background: #f6f4ef; color: #222; }
 .bp-add-title-kinds {
     margin: 12px 0 0;
     padding-left: 1.2em;
@@ -671,61 +699,79 @@ cori-profile .cori-profile-clear-section { display: block; margin-top: 10px; fon
 .bp-book-note { color: #888; font-size: 0.9em; }
 .bp-book-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
 
-/* Below the lanes, bottom left: "Empfehlungen prüfen" and the strategy multiselect as
-   small grey text controls. */
-.bp-showcase-controls { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px;
-    margin-top: 12px; font-size: 0.85em; }
-.bp-showcase-controls a { color: #888; text-decoration: underline; }
-.bp-showcase-controls a:hover { color: #555; }
-.bp-showcase-controls a.is-loading { text-decoration: none; cursor: default; pointer-events: none; }
-/* The strategy multiselect: a text trigger over an absolute popover of checkboxes,
-   opening upwards from the bottom of the section. Explicit background/border/font
-   throughout so host button and .maincontents globals can't leak in; px (not rem) for
-   box dimensions — the TYPO3 host's 62.5% root font-size would otherwise shrink them. */
-#bp-strategy-settings { position: relative; display: inline-block; }
-.bp-strategy-summary {
-    padding: 0;
-    background: none;
-    border: none;
-    box-shadow: none;
-    font: inherit;
-    color: #888;
-    text-decoration: underline;
-    cursor: pointer;
-    white-space: nowrap;
-}
-.bp-strategy-summary:hover { background: none; color: #555; }
-/* own glyph instead of a background icon: host-independent (FA exists only on TYPO3) */
-.bp-strategy-summary::after { content: "▾"; margin-left: 4px; display: inline-block; text-decoration: none; }
-.bp-strategy-popover {
-    position: absolute;
-    bottom: calc(100% + 4px);
-    left: 0;
-    z-index: 20;
-    min-width: 260px;
-    max-width: 340px;
-    padding: 10px 14px;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-}
-.bp-strategy-popover[hidden] { display: none; }
-.bp-strategy-bulk { display: flex; gap: 14px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid #eee; }
-.bp-strategy-bulk-btn {
+/* The empty Schaufenster: a centred note over the two ways to fill the profile. */
+.bp-shelf-empty { padding: 18px 0 6px; text-align: center; }
+.bp-shelf-empty p { margin: 0 0 14px; }
+.bp-shelf-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.bp-shelf-empty .bp-shelf-empty-actions { margin: 0; }
+/* The heading row: "Schaufenster" and, beside it, the lane count as a quiet grey text
+   button. Explicit background/border/font so host button styling can't leak in. The
+   spacing to the lanes sits on the lanes, so the row stands alone while they load. */
+.bp-showcase-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; }
+.bp-showcase-head h3 { margin: 0; }
+#bp-lanes { margin-top: 14px; }
+.bp-lane-status {
     padding: 0;
     background: none;
     border: none;
     box-shadow: none;
     font: inherit;
     font-size: 0.85em;
-    color: #666;
+    color: #888;
+    text-decoration: underline;
     cursor: pointer;
+    white-space: nowrap;
 }
-.bp-strategy-bulk-btn:hover { background: none; color: var(--contrastcolor, #d14900); }
+.bp-lane-status:hover { background: none; color: #555; }
+/* The lane status dialog: a narrow list, one row per strategy: its checkbox and name,
+   what its lane is doing, and the strategy's note. The dot before the state says at a
+   glance what the text spells out: filled = shows suggestions, ring = switched on but
+   empty. Explicit list resets so host list styling can't leak in; px (not rem) for box
+   dimensions, since the TYPO3 host's 62.5% root font-size would otherwise shrink them. */
+dialog.bp-lane-status-dialog {
+    max-width: min(520px, 92vw) !important;
+    width: min(520px, 92vw) !important;
+}
+.bp-lane-status-dialog .bp-modal-content { padding: 22px 26px; }
+.bp-lane-status-dialog h3 { margin: 0 0 6px; font-size: 18px; }
+.bp-lane-status-lead { margin: 0 0 14px; color: #888; font-size: 0.9em; }
+.bp-lane-status-lead a { color: inherit; text-decoration: underline; }
+.bp-lane-status-lead a:hover { color: var(--contrastcolor, #d14900); }
+.bp-lane-status-list { margin: 0; padding: 0; list-style: none; }
+.bp-lane-status-list li {
+    margin: 0;
+    padding: 10px 0;
+    border-top: 1px solid #eee;
+    font-size: 0.9em;
+    line-height: 1.4;
+    color: #666;
+    list-style: none;
+}
+.bp-lane-status-list li::before { content: none; }
+.bp-lane-status-list strong { color: #222; }
+.bp-lane-status-list li.is-off strong { color: #888; }
+.bp-lane-state { margin: 0 0 0 22px; }
+.bp-lane-status-list li.is-showing .bp-lane-state::before,
+.bp-lane-status-list li.is-waiting .bp-lane-state::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 6px;
+    box-sizing: border-box;
+    border: 2px solid var(--contrastcolor, #d14900);
+    border-radius: 50%;
+}
+.bp-lane-status-list li.is-showing .bp-lane-state::before { border-color: #3a8a4b; background: #3a8a4b; }
+.bp-lane-state a { color: inherit; text-decoration: underline; }
+.bp-lane-state a:hover { color: var(--contrastcolor, #d14900); }
+.bp-lane-status-actions { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 18px; margin: 18px 0 0; }
+.bp-lane-status-actions a { font-size: 0.85em; color: #888; text-decoration: underline; }
+.bp-lane-status-actions a:hover { color: #555; }
+.bp-lane-status-actions a.is-loading { text-decoration: none; cursor: default; pointer-events: none; }
 /* hanging indent: wrapped label lines align after the checkbox, not under it */
 .bp-strategy-option { display: block; cursor: pointer; padding: 2px 0 2px 22px; text-indent: -22px; }
-.bp-strategy-note { margin: 0 0 6px 22px; font-size: 0.8em; color: #666; }
+.bp-strategy-note { margin: 4px 0 0 22px; font-size: 0.9em; color: #888; }
 
 /* ----- Landing page ----- */
 

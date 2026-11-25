@@ -193,6 +193,19 @@ async function fetchFirst(endpoint, field, value) {
     return json.response.docs[0]
 }
 
+// Free-text search for the "Titel hinzufügen" dialog: every typed word must occur in
+// the title or among the authors, title matches rank first. Returns whole records, so a
+// picked hit needs no second lookup, plus the total for "the first n of m".
+export async function searchBooks(endpoint, text, rows = 8) {
+    const params = new URLSearchParams({
+        q: text, defType: "edismax", qf: "title^3 author^2 author2", "q.op": "AND", rows: String(rows), wt: "json",
+    })
+    const res = await fetch(`${endpoint}?${params}`)
+    if (!res.ok) throw new Error(`Solr ${res.status}: ${res.statusText}`)
+    const { docs, numFound } = (await res.json()).response
+    return { docs, total: numFound }
+}
+
 export function fetchBook(endpoint, id) {
     return fetchFirst(endpoint, "id", id)
 }

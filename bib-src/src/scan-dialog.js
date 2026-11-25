@@ -19,6 +19,7 @@ const element = (tag, className, text) => {
 // SCCON demo: use this Munich address for the lookup without changing the Pod contact file.
 const DEMO_ADDRESS = { street: "Milchstraße 1", postalCode: "81667", city: "München", country: "Deutschland" }
 
+// Installs the scan dialog and returns the function that opens it.
 export function mountScanDialog(root, { onSaved }) {
     root.insertAdjacentHTML("beforeend", dialogHtml)
     const get = id => root.querySelector(`#bp-scan-${id}`)
@@ -33,7 +34,6 @@ export function mountScanDialog(root, { onSaved }) {
     const accept = get("accept")
     const retry = get("retry")
     const cancel = get("cancel")
-    const launcher = root.querySelector("#bp-scan-pod-link")
     let generation = 0
     let saving = false
     let webId = null
@@ -241,8 +241,7 @@ export function mountScanDialog(root, { onSaved }) {
         }
     }
 
-    launcher.addEventListener("click", e => {
-        e.preventDefault()
+    function open() {
         if (saving || dialog.open) return
         heading.textContent = "Deinen Pod durchsuchen"
         permission.hidden = false
@@ -252,7 +251,7 @@ export function mountScanDialog(root, { onSaved }) {
         sources.replaceChildren()
         status.hidden = error.hidden = accept.hidden = retry.hidden = true
         dialog.showModal()
-    })
+    }
     permissionCheck.addEventListener("change", () => { start.disabled = !permissionCheck.checked })
     start.addEventListener("click", () => {
         if (!dialog.open || !permissionCheck.checked || start.disabled) return
@@ -296,4 +295,5 @@ export function mountScanDialog(root, { onSaved }) {
             console.error("[bib-pods] Anzeige nach Scan-Übernahme fehlgeschlagen:", err)
         }
     })
+    return open
 }

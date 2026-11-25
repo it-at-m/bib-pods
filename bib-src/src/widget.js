@@ -1,10 +1,10 @@
 import { getChoice, setChoice, clearChoice, isActivated, isStorageReady, canPublish, getAccessControlMode, warmupStorage, loadStore, replaceSubjectObjects, removeProfileFact, PROFILE_SAVED } from "cori-sdk/storage/index.js"
 import { initSession, login, logout, isLoggedIn, currentPageUrl } from "cori-sdk/storage/solid.js"
-import { getProfileSubject, storageErrorMessage, factory } from "cori-sdk/utils.js"
+import { getProfileSubject, getLabel, contractTerm, storageErrorMessage, factory } from "cori-sdk/utils.js"
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, buildQuery, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
-import { sopacCatalogueUrl, fetchBook, parseCatalogueRef, resolveCatalogueRef, OnleiheUnavailableError } from "./catalogue.js"
+import { sopacCatalogueUrl, fetchBook, searchBooks, parseCatalogueRef, resolveCatalogueRef, OnleiheUnavailableError } from "./catalogue.js"
 import { installDismissPrompt } from "./book-prompt.js"
 import { cleanAuthorName, bookHasOption } from "./book-options.js"
 import { grantMerklisteAccess, revokeMerklisteAccess, readMerklisteAccessControl } from "./publish.js"
@@ -29,15 +29,15 @@ const STORAGE_LABELS = {
 }
 
 // Shown on the "Titel hinzufügen" launcher. The label says what the button does; this
-// says what it accepts, which is the part nobody would guess — a catalogue link is only
-// one of several handles on a title. Everything named here actually resolves.
-const ADD_TITLE_TIP = "<strong>Titel von anderswo übernehmen</strong>"
-    + "<br>Zitierlink aus dem Katalog (OPAC), Link aus der Onleihe oder ISBN einfügen. Der Titel wird im Katalog gesucht."
+// says what it accepts, which is the part nobody would guess — a search is only one of
+// several handles on a title. Everything named here actually resolves.
+const ADD_TITLE_TIP = "<strong>Einen Titel nennen, den du magst</strong>"
+    + "<br>Nach Titel oder Autor*in suchen, oder Zitierlink aus dem Katalog (OPAC), Link aus der Onleihe oder ISBN einfügen."
 
-// Shown on "Empfehlungen prüfen": the click is only a shortcut, since the shelf keeps
-// itself up to date.
-const CHECK_TIP = "<strong>Vorschläge neu berechnen</strong>"
-    + "<br>Das passiert auch automatisch: beim Öffnen der Seite und nach jeder Änderung an deinem Profil."
+// Shown on "Jetzt aktualisieren" in the lane status dialog: the click is only a
+// shortcut, since the shelf keeps itself up to date.
+const CHECK_TIP = "<strong>Das Schaufenster aktualisiert sich von selbst</strong>"
+    + "<br>Beim Öffnen der Seite und nach jeder Änderung an deinem Profil. Hier kannst du es zusätzlich von Hand anstoßen."
 
 // The catalogue count deep-links into the docs query page — a power-user
 // affordance. On the docs site itself (recognizable by its <nav-bar>) the link stays
@@ -116,7 +116,7 @@ function buildNoCoverPlaceholder() {
 
 // A lane = an optional heading + the city library's coverflow carousel of book cards.
 // The DOM here is inert; initCarousel() wires the arrows and page dots once the lane
-// is in the document and its widths are measurable. ctx carries { onDismiss, tip }
+// is in the document and its widths are measurable. ctx carries { onSave, onDismiss, tip }
 // shared by every card in the lane, plus the lane-level `more`: how many further
 // catalogue records the lane's query matches beyond the cards on display.
 // buildSlide makes the full strategy card by default; the profile's Merkliste passes
@@ -170,10 +170,10 @@ function buildLane(label, items, ctx, buildSlide = buildCard) {
 }
 
 // One coverflow slide: the cover on top, then the title (linked to the catalogue when we
-// have a SOPAC id) and author below — the library's column-reverse card. Adds our two
-// affordances the library card lacks: a dismiss control over the cover, and the
-// card's own "why recommended" tooltip on hover.
-function buildCard(item, { onDismiss, tip }) {
+// have a SOPAC id) and author below — the library's column-reverse card. Adds the
+// affordances the library card lacks: a "+" and a "✕" over the cover to say "more like
+// this" and "not this", and the card's own "why recommended" tooltip on hover.
+function buildCard(item, { onSave, onDismiss, tip }) {
     const { title, author, sopacId, coverUrl, explanation } = item
     const slide = document.createElement("li")
     slide.className = "bp-cf-slide"
@@ -214,13 +214,20 @@ function buildCard(item, { onDismiss, tip }) {
         // for it" (coverage is partial — see cover_images note) — a 404 there must fall
         // back to the same placeholder as "no ISBN at all", not fail silently as a blank box.
         // replaceWith (not image.replaceChildren) swaps just the failed <img> in place — by
-        // the time "error" fires, the dismiss button is already a sibling in .bp-cf-image,
-        // and replaceChildren would have wiped it out along with the image.
+        // the time "error" fires, the round buttons are already siblings in .bp-cf-image,
+        // and replaceChildren would have wiped them out along with the image.
         img.addEventListener("error", () => img.replaceWith(buildNoCoverPlaceholder()), { once: true })
         image.appendChild(img)
     } else {
         image.appendChild(buildNoCoverPlaceholder())
     }
+    const save = document.createElement("button")
+    save.type = "button"
+    save.className = "bp-cf-save bp-round-btn"
+    save.textContent = "+"
+    save.title = "Buch merken"
+    save.setAttribute("aria-label", "Buch merken")
+    save.addEventListener("click", () => onSave(item))
     const dismiss = document.createElement("button")
     dismiss.type = "button"
     dismiss.className = "bp-cf-dismiss bp-round-btn"
@@ -228,7 +235,7 @@ function buildCard(item, { onDismiss, tip }) {
     dismiss.title = "Nicht mehr vorschlagen"
     dismiss.setAttribute("aria-label", "Nicht mehr vorschlagen")
     dismiss.addEventListener("click", () => onDismiss(item))
-    image.appendChild(dismiss)
+    image.append(save, dismiss)
 
     // DOM order desc → image; the wrap's column-reverse renders the cover on top, text below.
     wrap.append(desc, image)
@@ -368,6 +375,8 @@ function createTip(root) {
             if (!html) return
             el.innerHTML = html
             el.hidden = false
+            // measured from the corner: where the last tip sat must not squeeze this one
+            el.style.left = el.style.top = "0px"
             const a = anchor.getBoundingClientRect()
             const t = el.getBoundingClientRect()
             const left = Math.max(8, Math.min(a.left + a.width / 2 - t.width / 2, window.innerWidth - t.width - 8))
@@ -449,7 +458,8 @@ function mountCompact({ root, solrEndpoint, openBookPrompt, mainHref }) {
 // Landing embed (the bib-pods main page): the whole control centre, inlined. Logged out it
 // walks a small state machine — Anmelden CTA → storage chooser → (optional) Solid setup;
 // logged in it shows the Konto block, the Schaufenster (recommendation lanes + "prüfen"),
-// and the profile. It also decorates any catalogue cards on the page.
+// and the profile with its "Profil erweitern" row. It also decorates any catalogue cards
+// on the page.
 function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, openBookPrompt, redirectUri }) {
     root.insertAdjacentHTML("beforeend", landingHtml)
 
@@ -463,12 +473,16 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     const publishBlock = root.querySelector("#bp-publish")
     const grantLink = root.querySelector("#bp-grant-link")
     const revokeLink = root.querySelector("#bp-revoke-link")
-    const importBlock = root.querySelector("#bp-import")
     const addTitleDialog = root.querySelector("#bp-add-title-dialog")
+    const laneStatus = root.querySelector("#bp-lane-status")
+    const laneStatusDialog = root.querySelector("#bp-lane-status-dialog")
+    const laneStatusList = root.querySelector("#bp-lane-status-list")
     const addTitleInput = root.querySelector("#bp-add-title-input")
     const addTitleSubmit = root.querySelector("#bp-add-title-submit")
     const addTitleCancel = root.querySelector("#bp-add-title-cancel")
     const addTitleMsg = root.querySelector("#bp-add-title-msg")
+    const addTitleHits = root.querySelector("#bp-add-title-hits")
+    const addTitleKinds = root.querySelector("#bp-add-title-kinds")
     const accessDialog = root.querySelector("#bp-access-dialog")
     const accessTitle = root.querySelector("#bp-access-title")
     const accessConfirm = root.querySelector("#bp-access-confirm")
@@ -491,7 +505,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     }
     // Transparency marker: a populated field whose facts feed no *enabled* strategy
     // gets a ⓘ beside its label — the data sits idle until the matching lane is
-    // switched on, and clicking leads straight to the strategy chooser. Fields no
+    // switched on, and clicking leads straight to the lane status dialog. Fields no
     // strategy uses at all (Benutzername, Kommentar) stay unmarked: there is nothing
     // to switch on, so a permanent warning would only be noise.
     profileEl.annotateField = (predicate, store) => {
@@ -505,10 +519,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             : `die Empfehlungsart ${labels} ist ausgeschaltet`
         return {
             title: `Fließt noch nicht in deine Empfehlungen ein — ${state}. Klicken führt zur Auswahl.`,
-            onActivate: () => {
-                strategySettings.scrollIntoView({ behavior: "smooth", block: "center" })
-                setStrategyPopover(true)
-            },
+            onActivate: openLaneStatus,
         }
     }
     // the ⓘ markers reuse the lanes' tip for their tooltip — instant, unlike native title
@@ -561,7 +572,6 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     }
     const lanes = root.querySelector("#bp-lanes")
     const checkRecLink = root.querySelector("#bp-check-recommendations-link")
-    const strategyToggles = root.querySelector("#bp-strategy-toggles")
 
     // Book covers come from the inspira service's open /image/{isbn} route (same origin as
     // the recommend endpoint; VLB is 403-locked, Onleihe URLs need an underivable hash).
@@ -586,9 +596,8 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
 
         if (active) {
             renderStorageLabel()
-            mountAddTitleLauncher()
+            mountEnrichRow()
             profileEl.refresh()
-            renderStrategyToggles()
             // Entering the activated view (page load, login) computes the shelf; every
             // later state change re-renders the one on hand.
             if (active !== lastActivation) refreshShelf()
@@ -606,33 +615,56 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
-    // The launcher sits in the profile primitive's header, which the SDK owns; bib-pods
-    // adds this one app-specific action beside "Profil ausfüllen". refresh() replaces
-    // only .cori-profile-sections, so the button survives re-renders — the guard covers
-    // repeated applyState calls.
-    function mountAddTitleLauncher() {
+    // Every way to add to the profile, in one row under its heading: the SDK's own
+    // assistant launcher, then the two bib-pods adds, a title and (pod storage only)
+    // what the pod already holds. The header belongs to the profile primitive, and its
+    // refresh() replaces only .cori-profile-sections, so the row is built once and
+    // survives re-renders; each applyState only settles the pod launcher's visibility.
+    let scanLauncher = null
+    function mountEnrichRow() {
         const header = profileEl.querySelector(".cori-profile-header")
-        if (!header || header.querySelector(".bp-add-title-open")) return
-        const btn = document.createElement("button")
-        btn.type = "button"
-        btn.className = "bp-add-title-open"
-        btn.textContent = "Titel hinzufügen"
-        header.appendChild(btn)
-        btn.addEventListener("click", openAddTitle)
-        // show(), not schedule(): the label says what the button does but not what it
-        // accepts, and that list is the whole point — so it arrives on contact rather
-        // than after the hover delay the cards use.
-        const reveal = () => tip.show(ADD_TITLE_TIP, btn)
-        btn.addEventListener("mouseenter", reveal)
-        btn.addEventListener("focus", reveal)
-        btn.addEventListener("mouseleave", () => tip.hide())
-        btn.addEventListener("blur", () => tip.hide())
+        if (!header) return
+        if (!scanLauncher) {
+            const lead = document.createElement("p")
+            lead.className = "bp-profile-lead"
+            lead.textContent = "Daraus entstehen deine Empfehlungen."
+            const label = document.createElement("span")
+            label.className = "bp-enrich-label"
+            label.textContent = "Profil erweitern:"
+            header.querySelector(".cori-profile-heading").after(lead, label)
+            const launcher = (text, onClick) => {
+                const btn = document.createElement("button")
+                btn.type = "button"
+                btn.className = "bp-enrich-btn"
+                btn.textContent = text
+                btn.addEventListener("click", onClick)
+                header.appendChild(btn)
+                return btn
+            }
+            const addTitle = launcher("Titel hinzufügen", openAddTitle)
+            // show(), not schedule(): the label says what the button does but not what it
+            // accepts, and that list is the whole point — so it arrives on contact rather
+            // than after the hover delay the cards use.
+            const reveal = () => tip.show(ADD_TITLE_TIP, addTitle)
+            addTitle.addEventListener("mouseenter", reveal)
+            addTitle.addEventListener("focus", reveal)
+            addTitle.addEventListener("mouseleave", () => tip.hide())
+            addTitle.addEventListener("blur", () => tip.hide())
+            scanLauncher = launcher("Aus deinem Pod übernehmen", () => openScan())
+            scanLauncher.setAttribute("aria-haspopup", "dialog")
+        }
+        scanLauncher.hidden = !canPublish()
+    }
+    // The profile assistant is the SDK's; its launcher is the one handle on it.
+    function openAssistant() {
+        profileEl.querySelector(".cori-profile-fill").click()
     }
 
     function openAddTitle() {
         tip.hide()
         addTitleInput.value = ""
         showAddTitleMsg(null)
+        showAddTitleHits([])
         addTitleSubmit.disabled = false
         addTitleDialog.showModal()
         addTitleInput.focus()
@@ -641,6 +673,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     function closeAddTitle() {
         addTitleInput.value = ""
         showAddTitleMsg(null)
+        showAddTitleHits([])
         addTitleDialog.close()
     }
 
@@ -650,40 +683,74 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         addTitleMsg.classList.toggle("is-error", Boolean(text) && isError)
     }
 
-    // Paste-a-link counterpart to a card's "+", for catalogues the widget can't be
-    // mounted on. It only resolves the reference — the shared book prompt still owns
-    // what gets saved, so a pasted title and a clicked one land identically.
-    async function submitCatalogueRef() {
-        const ref = parseCatalogueRef(addTitleInput.value)
+    // What a text search found, one button per record: the same work often exists as
+    // print, e-book and audio, so medium and year sit beside title and author. While
+    // hits are on display they take the place of the list of accepted link kinds.
+    function showAddTitleHits(docs) {
+        addTitleHits.replaceChildren(...docs.map(doc => {
+            const btn = document.createElement("button")
+            btn.type = "button"
+            const title = document.createElement("strong")
+            title.textContent = doc.title?.[0]?.split(" | ")[0] ?? doc.id
+            const rest = [doc.author?.[0] && cleanAuthorName(doc.author[0]), doc.format?.[0], doc.publishDate?.[0]].filter(Boolean)
+            btn.append(title, ...rest.map(part => ` · ${part}`))
+            btn.addEventListener("click", () => { closeAddTitle(); openBookPrompt(doc.id, doc) })
+            const li = document.createElement("li")
+            li.appendChild(btn)
+            return li
+        }))
+        addTitleHits.hidden = docs.length === 0
+        addTitleKinds.hidden = docs.length > 0
+    }
+
+    // Counterpart to a card's "+" for every title that isn't on a card. A link, ISBN or
+    // Datensatznummer names one record and goes straight to the shared book prompt;
+    // anything else is searched as title or author and offers its hits to pick from.
+    // The book prompt owns what gets saved, so a typed, pasted and clicked title all
+    // land identically.
+    async function submitAddTitle() {
+        const text = addTitleInput.value.trim()
+        if (!text) {
+            showAddTitleMsg("Bitte einen Titel, eine*n Autor*in, einen Link oder eine ISBN eingeben.")
+            return
+        }
+        const ref = parseCatalogueRef(text)
         // Recognised but unresolvable: Goodreads keys titles by an id of its own, so name
         // the format and point at the way out rather than letting the lookup report the
         // title as missing.
         if (ref?.kind === "goodreads") {
-            showAddTitleMsg("Goodreads-Links enthalten keine ISBN, nur eine Goodreads-eigene Nummer. Bitte die ISBN des Titels einfügen.")
-            return
-        }
-        if (!ref) {
-            showAddTitleMsg("Damit kann ich nichts anfangen. Erwartet werden ein Katalog- oder Onleihe-Link, eine ISBN oder eine Datensatznummer.")
+            showAddTitleMsg("Goodreads-Links enthalten keine ISBN, nur eine Goodreads-eigene Nummer. Bitte den Titel eintippen oder die ISBN einfügen.")
             return
         }
         addTitleSubmit.disabled = true
+        showAddTitleHits([])
         showAddTitleMsg("Titel wird im Katalog gesucht …", false)
         try {
-            const { id, book } = await resolveCatalogueRef(solrEndpoint, ref)
-            if (!book) {
+            const found = ref ? await resolveCatalogueRef(solrEndpoint, ref) : null
+            if (found?.book) {
+                closeAddTitle()
+                openBookPrompt(found.id, found.book)
+                return
+            }
+            // A reference that names no record is a miss. Only a bare number goes on to
+            // the text search: it reads as a Datensatznummer, but may be a title ("1984").
+            const { docs, total } = ref && !/^\d+$/.test(text) ? { docs: [], total: 0 } : await searchBooks(solrEndpoint, text)
+            if (docs.length === 0) {
                 showAddTitleMsg("Dazu wurde im Katalog kein Titel gefunden.")
                 return
             }
-            closeAddTitle()
-            openBookPrompt(id, book)
+            showAddTitleHits(docs)
+            showAddTitleMsg(total > docs.length
+                ? `Die ersten ${docs.length} von ${total.toLocaleString("de-DE")} Treffern. Mit mehr Wörtern wird die Suche genauer.`
+                : null, false)
         } catch (err) {
             console.error("[bib-pods] catalogue lookup failed:", err)
             // The catalogue (or, for an Onleihe 3.0 link, Onleihe) is unreachable, not the
-            // title unknown — reporting "nicht gefunden" would misdescribe a link that
+            // title unknown — reporting "nicht gefunden" would misdescribe an input that
             // parsed fine. A SOPAC id stands on
             // its own, so offer the same degraded save a card click falls back to; an
             // unresolved Onleihe id has no AK id to save under.
-            if (ref.kind === "sopac") {
+            if (ref?.kind === "sopac") {
                 closeAddTitle()
                 openBookPrompt(ref.id, null)
             } else if (err instanceof OnleiheUnavailableError) {
@@ -696,15 +763,14 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
-    // The Konto block's one-line "where your data lives", plus the publish and import
-    // actions that only a pod can offer.
+    // The Konto block's one-line "where your data lives", plus the publish action that
+    // only a pod can offer.
     function renderStorageLabel() {
         const choice = getChoice()
         storageLabel.textContent = choice === "solid" && !isStorageReady()
             ? "Solid Pod – Sitzung unterbrochen"
             : STORAGE_LABELS[choice] ?? ""
         publishBlock.hidden = !canPublish()
-        importBlock.hidden = !canPublish()
         // Ask the pod which access-control mechanism it speaks: acl:agentGroup exists
         // only in WAC, so on an ACP pod the group option must not be offered at all.
         if (canPublish()) {
@@ -716,9 +782,10 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
 
     // The Schaufenster: one carousel per enabled strategy that found books. The shelf is
     // computed from profile + catalogue when the page opens, after every profile change
-    // and on "Empfehlungen prüfen", and is never stored: the same profile shows other
+    // and on "Jetzt aktualisieren", and is never stored: the same profile shows other
     // books once the catalogue changes. Other state changes re-render the shelf on hand.
-    // An empty or unreachable result shows as a quiet note in place of the lanes.
+    // An unreachable result shows as a quiet note in place of the lanes; an empty one
+    // offers the two ways to give the profile something to work with.
     const SHELF_NOTES = {
         empty: "Noch keine Vorschläge. Sobald dein Profil passende Angaben enthält, erscheinen sie hier.",
         unreachable: "Das Schaufenster kann gerade nicht geladen werden. Bitte versuche es später erneut.",
@@ -728,17 +795,19 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     let shelfRun = 0            // a run whose number is no longer current drops its result
     let shelfLoading = false
     const checkRecLabel = checkRecLink.textContent
+    const NO_POD = "Keine Verbindung zum Pod. Lade die Seite neu, sobald dein Pod wieder erreichbar ist."
     // While a run is under way the link turns into plain status text: there is nothing
-    // to click until it ends.
+    // to click until it ends. The status line beside the heading says so on the page.
     function showShelfLoading(loading) {
         shelfLoading = loading
         checkRecLink.textContent = loading ? "Lädt …" : checkRecLabel
         checkRecLink.classList.toggle("is-loading", loading)
         if (loading) checkRecLink.setAttribute("aria-disabled", "true")
         else checkRecLink.removeAttribute("aria-disabled")
+        renderLaneStatus()
     }
 
-    // `manual`: the click on "Empfehlungen prüfen", the only run that may interrupt
+    // `manual`: the click on "Jetzt aktualisieren", the only run that may interrupt
     // with an alert (a Solid session that wasn't restored).
     async function refreshShelf({ manual = false } = {}) {
         if (shelfLoading) return
@@ -747,7 +816,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         if (!isStorageReady()) {
             // Only Solid can be not-ready: the choice is persisted but the session wasn't
             // restored (pod offline or expired). The Konto block already says so.
-            if (manual) window.alert("Keine Verbindung zum Pod. Lade die Seite neu, sobald dein Pod wieder erreichbar ist.")
+            if (manual) window.alert(NO_POD)
             return
         }
         const run = ++shelfRun
@@ -822,14 +891,12 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     let laneRender = 0          // like shelfRun: only the latest render may touch the DOM
     async function renderLanes() {
         const render = ++laneRender
+        renderLaneStatus()
         const current = shelf
         if (!current?.length) {
             clearLanes()
             if (shelfNote) {
-                const note = document.createElement("p")
-                note.className = "bp-aside"
-                note.textContent = shelfNote
-                lanes.append(note)
+                lanes.append(shelfNote === SHELF_NOTES.empty ? buildShelfEmpty() : buildShelfNote(shelfNote))
                 lanes.hidden = false
             }
             return
@@ -860,7 +927,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
                         explanation: explainDocMatches(doc, profileStore, profileSubject, strategy.properties) ?? laneExplanation,
                     }
                 })
-                frag.appendChild(buildLane(strategy.label, items, { onDismiss: dismissCard, tip, more, moreHref }))
+                frag.appendChild(buildLane(strategy.label, items, { onSave: saveCard, onDismiss: dismissCard, tip, more, moreHref }))
             }
             if (render !== laneRender) return
             // Re-renders keep each lane's scroll position (a profile edit would otherwise
@@ -885,6 +952,105 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         }
     }
 
+    function buildShelfNote(text) {
+        const note = document.createElement("p")
+        note.className = "bp-aside"
+        note.textContent = text
+        return note
+    }
+    function actionButton(text, onClick) {
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = "button"
+        btn.textContent = text
+        btn.addEventListener("click", onClick)
+        return btn
+    }
+    // The empty shelf is where a new user looks first, so the two main ways to fill
+    // the profile are offered right here as well as in the profile's own row.
+    function buildShelfEmpty() {
+        const box = document.createElement("div")
+        box.className = "bp-shelf-empty"
+        const note = document.createElement("p")
+        note.textContent = SHELF_NOTES.empty
+        const actions = document.createElement("p")
+        actions.className = "bp-shelf-empty-actions"
+        actions.append(actionButton("Fragen beantworten", openAssistant), actionButton("Titel hinzufügen", openAddTitle))
+        box.append(note, actions)
+        return box
+    }
+    // Beside the heading: that a run is under way, or how many strategies have a lane on
+    // the shelf. Before the first run lands and while the shelf can't be loaded there
+    // is nothing to count, so the button only names what it opens. An open dialog
+    // follows every change.
+    function renderLaneStatus() {
+        laneStatus.textContent = shelfLoading ? "Lädt …"
+            : shelf === null || shelfNote === SHELF_NOTES.unreachable ? "Empfehlungsarten"
+            : `Vorschläge in ${shelf.length} von ${strategies.length} Reihen`
+        if (laneStatusDialog.open) renderLaneRows()
+    }
+    async function openLaneStatus() {
+        // Only Solid can be not-ready (see refreshShelf): no profile to read the rows from.
+        if (!isStorageReady()) { window.alert(NO_POD); return }
+        await renderLaneRows()
+        laneStatusDialog.showModal()
+    }
+    // Syncs the dialog's rows from the profile and the shelf on hand. A lane shows
+    // suggestions, is switched off, waits for profile fields (named, with the way to
+    // fill them), is being computed, can't be loaded, or has its input and found nothing.
+    let laneRowsRender = 0      // only the latest render may touch the rows
+    async function renderLaneRows() {
+        const render = ++laneRowsRender
+        try {
+            const profileStore = await loadStore()
+            if (render !== laneRowsRender) return
+            const profileSubject = getProfileSubject()
+            const choices = readStrategyChoices(profileStore)
+            const filled = prop => profileStore.getObjects(profileSubject, prop, null).length > 0
+            for (const { strategy, row, checkbox, state } of laneRows) {
+                // a choice still on its way to storage outranks what storage says
+                if (!savingToggles) checkbox.checked = resolveStrategyEnabled(strategy, choices)
+                const shown = shelf?.find(lane => lane.strategy.iri === strategy.iri)?.docs.length
+                row.className = !checkbox.checked ? "is-off" : shown ? "is-showing" : "is-waiting"
+                if (!checkbox.checked) {
+                    state.textContent = "Ausgeschaltet."
+                } else if (shown) {
+                    state.textContent = shown === 1 ? "Zeigt 1 Vorschlag." : `Zeigt ${shown} Vorschläge.`
+                } else if (!strategy.properties.some(filled)) {
+                    // any one of its fields gives a strategy something to search with
+                    const names = new Intl.ListFormat("de", { type: "disjunction" })
+                        .format(strategy.properties.map(prop => getLabel(prop) ?? contractTerm(prop)))
+                    const byTitle = strategy.properties.includes(BP + "savedBook")
+                    const link = document.createElement("a")
+                    link.href = "#"
+                    link.textContent = byTitle ? "Titel hinzufügen" : "Fragen beantworten"
+                    link.addEventListener("click", (e) => {
+                        e.preventDefault()
+                        laneStatusDialog.close()
+                        ;(byTitle ? openAddTitle : openAssistant)()
+                    })
+                    state.replaceChildren(`Im Profil fehlt noch: ${names}. `, link)
+                } else if (savingToggles || autoPending || shelfLoading) {
+                    state.textContent = "Wird geprüft …"
+                } else if (shelfNote === SHELF_NOTES.unreachable) {
+                    state.textContent = "Kann gerade nicht geladen werden."
+                } else {
+                    state.textContent = "Dazu wurde nichts Passendes gefunden."
+                }
+            }
+        } catch (err) {
+            console.error("[bib-pods] lane status render failed:", err)
+        }
+    }
+
+    // "+" on a card: ask what the user likes about it and save it (the shared book
+    // prompt, as on a catalogue card). The saved title leaves the shelf with the run
+    // its profile change triggers.
+    async function saveCard({ sopacId, doc }) {
+        tip.hide()
+        openBookPrompt(sopacId, await fetchDocCached(sopacId) ?? doc)
+    }
+
     // ✕ on a card: ask what the user doesn't want (see installDismissPrompt). Books are
     // read from the catalogue, both for the dialog and for clearing the shelf: an
     // inspira card's own data is too sparse to show what it carries. Saving takes every
@@ -907,78 +1073,48 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         if (shelf === current) shelf = kept.filter(({ docs }) => docs.length > 0)
     }
 
-    // Strategy multiselect: a summary trigger ("2 von 5 Empfehlungsarten") over a
-    // popover of checkboxes with select-all/none, persisted to the profile as
-    // deviations from the vocab's bp:enabledByDefault seeds. Options are built once
-    // from the vocab here; checked states then sync from the profile on each render,
-    // a change writes the deviation sets.
+    // The lane status dialog is also where the strategies are switched on and off. One
+    // row per strategy, built once from the vocab: its checkbox and name, the state of
+    // its lane (see renderLaneRows), and the strategy's rdfs:comment (e.g. the inspira
+    // note that this sends the Merkliste to another City of Munich server) right where
+    // the user enables it. The choices are persisted to the profile as deviations from
+    // the vocab's bp:enabledByDefault seeds.
     const strategies = getStrategies()
-    const strategyCheckboxes = new Map()
-    const strategySettings = root.querySelector("#bp-strategy-settings")
-    const strategySummary = root.querySelector("#bp-strategy-summary")
-    const bulkRow = document.createElement("div")
-    bulkRow.className = "bp-strategy-bulk"
-    for (const [text, on] of [["Alle auswählen", true], ["Alle abwählen", false]]) {
-        const btn = document.createElement("button")
-        btn.type = "button"
-        btn.className = "bp-strategy-bulk-btn"
-        btn.textContent = text
-        btn.addEventListener("click", () => {
-            for (const checkbox of strategyCheckboxes.values()) checkbox.checked = on
-            persistStrategyToggles()
-        })
-        bulkRow.append(btn)
-    }
-    strategyToggles.append(bulkRow)
-    for (const strategy of strategies) {
+    const laneRows = strategies.map(strategy => {
+        const row = document.createElement("li")
         const option = document.createElement("label")
         option.className = "bp-strategy-option"
         const checkbox = document.createElement("input")
         checkbox.type = "checkbox"
         checkbox.checked = strategy.defaultEnabled
         checkbox.addEventListener("change", persistStrategyToggles)
-        option.append(checkbox, document.createTextNode(" " + strategy.label))
-        strategyToggles.append(option)
-        // Surface the strategy's rdfs:comment (e.g. the inspira note that this sends the
-        // Merkliste to another City of Munich server) right where the user enables it.
+        const title = document.createElement("strong")
+        title.textContent = strategy.label
+        option.append(checkbox, " ", title)
+        const state = document.createElement("p")
+        state.className = "bp-lane-state"
+        row.append(option, state)
         if (strategy.comment) {
             const note = document.createElement("p")
             note.className = "bp-strategy-note"
             note.textContent = strategy.comment
-            strategyToggles.append(note)
+            row.append(note)
         }
-        strategyCheckboxes.set(strategy.iri, checkbox)
-    }
-    renderStrategySummary()
-    // The trigger label states the popover's current selection: how many lanes are on.
-    function renderStrategySummary() {
-        const on = [...strategyCheckboxes.values()].filter(c => c.checked).length
-        const count = on === strategies.length ? "Alle" : on === 0 ? "Keine" : `${on} von ${strategies.length}`
-        strategySummary.textContent = `${count} Empfehlungsarten`
-    }
-    function setStrategyPopover(open) {
-        strategyToggles.hidden = !open
-        strategySummary.setAttribute("aria-expanded", String(open))
-    }
-    strategySummary.addEventListener("click", () => setStrategyPopover(strategyToggles.hidden))
-    // click outside closes the popover; Escape too, returning focus to the trigger
-    document.addEventListener("mousedown", (e) => {
-        if (!strategyToggles.hidden && !strategySettings.contains(e.target)) setStrategyPopover(false)
+        laneStatusList.append(row)
+        return { strategy, row, checkbox, state }
     })
-    strategySettings.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && !strategyToggles.hidden) { setStrategyPopover(false); strategySummary.focus() }
-    })
+    let savingToggles = 0
     async function persistStrategyToggles() {
-        renderStrategySummary()
         // Only deviations from the seed are stored, so later vocab changes to the
         // seeds keep applying to users who never touched the affected toggle.
         const enabled = []
         const disabled = []
-        for (const strategy of strategies) {
-            const checked = strategyCheckboxes.get(strategy.iri).checked
-            if (checked === strategy.defaultEnabled) continue
-            ;(checked ? enabled : disabled).push(strategy.iri)
+        for (const { strategy, checkbox } of laneRows) {
+            if (checkbox.checked === strategy.defaultEnabled) continue
+            ;(checkbox.checked ? enabled : disabled).push(strategy.iri)
         }
+        savingToggles++
+        renderLaneRows()    // the row follows its checkbox at once, not after the write
         try {
             await replaceSubjectObjects(SETTINGS_SUBJECT, ENABLED_STRATEGY, enabled)
             await replaceSubjectObjects(SETTINGS_SUBJECT, DISABLED_STRATEGY, disabled)
@@ -987,19 +1123,9 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         } catch (err) {
             console.error("[bib-pods] saving strategy settings failed:", err)
             window.alert("Einstellung konnte nicht gespeichert werden:\n" + storageErrorMessage(err))
-        }
-    }
-    async function renderStrategyToggles() {
-        if (!isStorageReady()) return
-        try {
-            const store = await loadStore()
-            const choices = readStrategyChoices(store)
-            for (const strategy of strategies) {
-                strategyCheckboxes.get(strategy.iri).checked = resolveStrategyEnabled(strategy, choices)
-            }
-            renderStrategySummary()
-        } catch (err) {
-            console.error("[bib-pods] strategy toggles render failed:", err)
+        } finally {
+            savingToggles--
+            renderLaneRows()
         }
     }
 
@@ -1060,7 +1186,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     }
     grantLink.addEventListener("click", (e) => { e.preventDefault(); openAccessDialog("grant") })
     revokeLink.addEventListener("click", (e) => { e.preventDefault(); openAccessDialog("revoke") })
-    mountScanDialog(root, { onSaved: () => profileEl.refresh() })
+    const openScan = mountScanDialog(root, { onSaved: () => profileEl.refresh() })
     for (const radio of accessDialog.querySelectorAll('input[name="bp-access-scope"]')) {
         radio.addEventListener("change", () => {
             for (const [scope, input] of Object.entries(SCOPE_INPUTS)) input.hidden = radio.value !== scope
@@ -1096,26 +1222,31 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     // A profile mutation (add / clear) can wipe the whole store, so re-run the broad state.
     profileEl.addEventListener("cori-profile:change", () => applyState())
 
-    addTitleSubmit.addEventListener("click", submitCatalogueRef)
+    addTitleSubmit.addEventListener("click", submitAddTitle)
     addTitleCancel.addEventListener("click", closeAddTitle)
     addTitleDialog.addEventListener("click", (e) => { if (e.target === addTitleDialog) closeAddTitle() })
+    laneStatus.addEventListener("click", openLaneStatus)
+    laneStatusDialog.addEventListener("click", (e) => { if (e.target === laneStatusDialog) laneStatusDialog.close() })
+    root.querySelector("#bp-lane-status-close").addEventListener("click", () => laneStatusDialog.close())
     // Enter submits. The row is deliberately not a <form> — the host page (TYPO3) may
     // already have one open around our mount point, and nesting forms is invalid.
     addTitleInput.addEventListener("keydown", (e) => {
         if (e.key !== "Enter") return
         e.preventDefault()
-        submitCatalogueRef()
+        submitAddTitle()
     })
     // Editing after a rejection retracts the complaint about the previous input.
     addTitleInput.addEventListener("input", () => { if (!addTitleMsg.hidden) showAddTitleMsg(null) })
-    checkRecLink.addEventListener("click", (e) => { e.preventDefault(); tip.hide(); refreshShelf({ manual: true }) })
-    // show(), not schedule(): like the „Titel hinzufügen“ launcher, the explanation
-    // arrives on contact
-    const revealCheckTip = () => tip.show(CHECK_TIP, checkRecLink)
+    // A modal dialog sits in the top layer, above the page's tip, so the dialog gets a
+    // tip of its own. show(), not schedule(): like the „Titel hinzufügen“ launcher,
+    // the explanation arrives on contact.
+    const dialogTip = createTip(laneStatusDialog)
+    const revealCheckTip = () => dialogTip.show(CHECK_TIP, checkRecLink)
     checkRecLink.addEventListener("mouseenter", revealCheckTip)
     checkRecLink.addEventListener("focus", revealCheckTip)
-    checkRecLink.addEventListener("mouseleave", () => tip.hide())
-    checkRecLink.addEventListener("blur", () => tip.hide())
+    checkRecLink.addEventListener("mouseleave", () => dialogTip.hide())
+    checkRecLink.addEventListener("blur", () => dialogTip.hide())
+    checkRecLink.addEventListener("click", (e) => { e.preventDefault(); dialogTip.hide(); refreshShelf({ manual: true }) })
 
     applyState()
 
