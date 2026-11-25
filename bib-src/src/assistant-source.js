@@ -6,7 +6,7 @@
 // catalogue's own entry, with its authority IRI where the index has one. Nothing typed
 // goes into the profile unmatched.
 // Every request is a /select on the index, the one path its read proxy lets through.
-import { getVocab, getProfileSubject, getLabel, RDF_TYPE } from "cori-sdk/utils.js"
+import { getVocab, getProfileSubject, getLabel, getOne, RDF_TYPE, CORI } from "cori-sdk/utils.js"
 import { BP, NO_IRI } from "./vocab.js"
 import {
     getLinkedIndices, escapeSolr, getStrategies, readStrategyChoices, resolveStrategyEnabled,
@@ -14,6 +14,7 @@ import {
 } from "./recommendations.js"
 import { cleanAuthorName, valueFacts } from "./book-options.js"
 
+const SKOS = "http://www.w3.org/2004/02/skos/core#"
 const AUTHOR = BP + "favoriteAuthor"
 const TOPIC = BP + "interestedIn"
 const GENRE = BP + "favoriteGenre"
@@ -35,14 +36,10 @@ const TOPIC_SKIP = new Set([
     "Klassische Briefmarke",
 ])
 
-// Per open field: which records its suggestions are counted over, and the line that
-// says so on the card. Fiction carries no genre in the index, so recent novels and
-// crime are recognised by their subtitle ("Roman", "Kriminalroman", "Thriller").
+// Per field whose suggestions come from the live index: which records they are counted
+// over, and the line that says so on the card. A field with bp:suggestedValues offers
+// that snapshot instead (authors: their ranking is too slow to ask for live).
 const SUGGESTIONS = {
-    [AUTHOR]: {
-        caption: "Häufige Autor*innen neuerer Romane und Krimis im Bestand",
-        q: `language:ger AND ${RECENT} AND title_sub:(roman OR kriminalroman OR thriller OR krimi)`,
-    },
     [TOPIC]: {
         caption: "Häufige Themen in neueren Büchern des Bestands, ohne Lern- und Nachschlagewerke",
         q: `${BOOKS} AND ${RECENT} -genre:(Aufgabensammlung OR Lehrbuch OR Lehrmittel OR Schulbuch OR Übungssammlung`
@@ -181,9 +178,26 @@ export function createAssistantSource({ solrEndpoint }) {
         return valueFacts(field, { rawLabel: raw, cleanedLabel: label, iri })
     }
 
+    // A field's bp:suggestedValues snapshot as { caption, items }, or null.
+    function snapshotSuggestions(field) {
+        const v = getVocab()
+        const scheme = getOne(v, field, BP + "suggestedValues")
+        if (!scheme) return null
+        const concepts = v.getObjects(scheme, SKOS + "hasTopConcept", null).map(c => ({
+            raw: getOne(v, c.value, SKOS + "prefLabel"),
+            order: Number(getOne(v, c.value, CORI + "order") ?? Number.MAX_SAFE_INTEGER),
+        })).filter(c => c.raw).sort((a, b) => a.order - b.order)
+        return {
+            caption: getOne(v, scheme, SKOS + "definition") ?? "",
+            items: concepts.map(c => toItem(field, c.raw, null)),
+        }
+    }
+
     // The same for every profile, so each field's list is fetched once per page view.
     const suggestionCache = new Map()
     function suggest(field) {
+        const snapshot = snapshotSuggestions(field)
+        if (snapshot) return snapshot
         const spec = SUGGESTIONS[field]
         const labelField = labelFields(field)[0]
         if (!spec || !labelField) return null

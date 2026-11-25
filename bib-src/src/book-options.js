@@ -6,13 +6,20 @@ import { BP, LOCAL, NO_IRI } from "./vocab.js"
 import { profileFactsMatching } from "./recommendations.js"
 
 // MARC 100 author strings arrive as "Lastname, Firstname YYYY-YYYY?"
-// strip the trailing date range and swap the comma'd name to its natural order
+// strip the trailing date range and swap the comma'd name to its natural order.
+// Older records write the whole name in capitals ("FUNKE, ALFRED"); those read as
+// names again with only each word's first letter left large, name particles aside.
+const NAME_PARTICLES = new Set(["von", "van", "de", "der", "den", "zu", "zur", "vom", "del", "della", "di", "da", "du", "la", "le"])
 export function cleanAuthorName(s) {
     const withoutDates = s.replace(/\s+\d{4}-\d{0,4}\s*$/, "").trim()
-    const comma = withoutDates.indexOf(",")
-    if (comma === -1) return withoutDates
-    const last = withoutDates.slice(0, comma).trim()
-    const first = withoutDates.slice(comma + 1).trim()
+    const cased = /\p{Ll}/u.test(withoutDates)
+        ? withoutDates
+        : withoutDates.toLocaleLowerCase("de-DE").replace(/\p{L}+/gu, word =>
+            NAME_PARTICLES.has(word) ? word : word[0].toLocaleUpperCase("de-DE") + word.slice(1))
+    const comma = cased.indexOf(",")
+    if (comma === -1) return cased
+    const last = cased.slice(0, comma).trim()
+    const first = cased.slice(comma + 1).trim()
     return first ? `${first} ${last}` : last
 }
 

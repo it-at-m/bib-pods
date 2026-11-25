@@ -213,13 +213,20 @@ export async function searchBooks(endpoint, text, rows = 8, extra = {}) {
 // so that word is also asked for as it stands (a title that is exactly "Tschick" then
 // outranks the study guides about it), and the print and e-book records of a work are
 // lifted above its film and audio ones (the raw index tokens behind the media types
-// Buch and E-Book).
+// Buch and E-Book). Several editions of a title in the same medium (the catalogue
+// keeps a record per edition) show as one line, the best-ranked of them.
 export async function suggestBooks(endpoint, text, rows = 8) {
     const words = text.toLocaleLowerCase("de-DE").split(/[^\p{L}\p{N}]+/u).filter(Boolean)
     if (words.join("").length < 3) return { docs: [], total: 0 }
     const last = words.pop()
     words.push(`(${last} OR ${last}*)`)
-    return searchBooks(endpoint, words.join(" "), rows, { bq: 'format:(Druckschrift OR "E-Book")' })
+    const { docs, total } = await searchBooks(endpoint, words.join(" "), rows * 3, { bq: 'format:(Druckschrift OR "E-Book")' })
+    const seen = new Set()
+    const editions = docs.filter(doc => {
+        const key = [doc.title?.[0], doc.author?.[0], doc.format?.[0]].join("\n")
+        return !seen.has(key) && seen.add(key)
+    })
+    return { docs: editions.slice(0, rows), total }
 }
 
 export function fetchBook(endpoint, id) {

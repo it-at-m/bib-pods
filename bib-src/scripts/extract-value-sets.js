@@ -21,6 +21,10 @@
 //     relabeled for users ("Druckschrift" -> "Buch") and combo values are merged
 //     into their base medium, so a concept may carry several bp:indexValue tokens.
 //     Stored as concept IRIs.
+//   author-suggestions.ttl — not a closed set but what the assistant offers to tap on
+//     the authors card: the authors the library invests in most visibly, those whose
+//     recent German titles it holds as book, e-book and audiobook alike. The index has
+//     no lending figures; breadth of forms is the nearest sign of demand it carries.
 // Every concept carries a cori:order: the assistant shows the first few chips and folds
 // the rest away, so the order decides what a reader sees first.
 
@@ -67,6 +71,13 @@ async function facetValues(field) {
     const values = []
     for (let i = 0; i < flat.length; i += 2) values.push({ label: flat[i], count: flat[i + 1] })
     return values
+}
+
+// How many records a query matches.
+async function countRecords(q) {
+    const res = await fetch(`${SOLR}?q=${encodeURIComponent(q)}&rows=0&wt=json`)
+    if (!res.ok) throw new Error(`Solr ${res.status}: ${res.statusText}`)
+    return (await res.json()).response.numFound
 }
 
 // Concept IRIs are minted from the label (stable across re-extractions, so diffs
@@ -174,6 +185,17 @@ const languages = frequentLanguages
     .map(v => ({ label: LANGUAGE_LABELS.get(v.label), count: v.count, indexValues: [v.label] }))
     .sort((a, b) => b.count - a.count)
 
+// A language filter keeps only records that carry a language, and for a large part of
+// the books (the older stock) none is recorded. The card says so, with the share.
+const BOOKS = 'format:(Druckschrift OR "E-Book")'
+const NO_LANGUAGE = `language:(${[...LANGUAGE_EXCLUDE].join(" OR ")})`
+const RECENT_FROM = new Date().getFullYear() - 8
+const books = await countRecords(BOOKS)
+const booksWithoutLanguage = await countRecords(`${BOOKS} AND ${NO_LANGUAGE}`)
+const recentBooks = await countRecords(`${BOOKS} AND publishDateSort:[${RECENT_FROM} TO *]`)
+const recentBooksWithoutLanguage = await countRecords(`${BOOKS} AND publishDateSort:[${RECENT_FROM} TO *] AND ${NO_LANGUAGE}`)
+const shareWithoutLanguage = Math.round(100 * booksWithoutLanguage / books)
+
 const languagesPath = resolve(OUT_DIR, "language-values.ttl")
 writeFileSync(languagesPath, conceptScheme({
     schemeName: "LanguageValues",
@@ -186,8 +208,11 @@ writeFileSync(languagesPath, conceptScheme({
         + `(covering ${languagesBelow.reduce((n, v) => n + v.count, 0).toLocaleString("en")} records in total) `
         + `and the non-language codes ${nonLanguage.map(v => v.label).join("/")} `
         + `(covering ${nonLanguage.reduce((n, v) => n + v.count, 0).toLocaleString("en")} records). `
-        + `Offered by record count.`,
-    definition: `Die ${languages.length} häufigsten Sprachen im Katalog, die häufigste zuerst.`,
+        + `Offered by record count. Books without a language: ${booksWithoutLanguage.toLocaleString("en")} of ${books.toLocaleString("en")}; `
+        + `published since ${RECENT_FROM}: ${recentBooksWithoutLanguage.toLocaleString("en")} of ${recentBooks.toLocaleString("en")}.`,
+    definition: `Die ${languages.length} häufigsten Sprachen im Katalog, die häufigste zuerst. `
+        + `Bei ${shareWithoutLanguage} % der Bücher, vor allem älteren, ist keine Sprache erfasst: `
+        + `Sie fallen heraus, sobald du eine Sprache wählst.`,
 }))
 console.log(`wrote ${languagesPath} (${languages.length} concepts; dropped ${languagesBelow.length} below min-count, ${nonLanguage.length} non-language codes)`)
 
@@ -246,3 +271,39 @@ writeFileSync(mediaPath, conceptScheme({
         + `Manche Katalogbegriffe heißen hier anders: Aus „Druckschrift“ wird „Buch“.`,
 }))
 console.log(`wrote ${mediaPath} (${media.length} concepts; dropped ${mediaBelow.length} below min-count, ${mediaExcluded.length} excluded, ${merged} merged)`)
+
+// ----- Author suggestions (bp:favoriteAuthor) -----
+
+// The forms a title can be read or listened to in (raw format tokens): print, e-book,
+// and audiobook as download, MP3-CD or CD. Music on CD carries no language, so the
+// German-language restriction keeps it out.
+const READING_FORMS = ["Druckschrift", "E-Book", "E-Audio", "MP3-CD", "CD"]
+const AUTHOR_SUGGESTIONS = 36
+// How many authors (by record count) are looked at; those further down hold too few
+// recent titles to lead a list of suggestions anyway.
+const AUTHOR_POOL = 1000
+
+const authorQuery = `language:ger AND publishDateSort:[${RECENT_FROM} TO *] AND format:(${READING_FORMS.map(f => `"${f}"`).join(" OR ")}) AND author:[* TO *]`
+const authorFacet = { authors: { type: "terms", field: "author_str", limit: AUTHOR_POOL, facet: { forms: "unique(format_str)" } } }
+const authorRes = await fetch(`${SOLR}?q=${encodeURIComponent(authorQuery)}&rows=0&wt=json&json.facet=${encodeURIComponent(JSON.stringify(authorFacet))}`)
+if (!authorRes.ok) throw new Error(`Solr ${authorRes.status}: ${authorRes.statusText}`)
+const authorPool = (await authorRes.json()).facets.authors.buckets
+// most forms first, then most records
+const suggestedAuthors = authorPool
+    .map(b => ({ label: b.val, count: b.count, forms: b.forms }))
+    .sort((a, b) => b.forms - a.forms || b.count - a.count)
+    .slice(0, AUTHOR_SUGGESTIONS)
+const fewestForms = Math.min(...suggestedAuthors.map(a => a.forms))
+
+const authorsPath = resolve(OUT_DIR, "author-suggestions.ttl")
+writeFileSync(authorsPath, conceptScheme({
+    schemeName: "AuthorSuggestions",
+    schemeLabel: "Vorschläge für Autor*innen",
+    conceptPrefix: "author-suggestion",
+    values: suggestedAuthors,
+    comment: `Author suggestions: of the ${authorPool.length} authors with the most German-language records published since ${RECENT_FROM} `
+        + `in the forms ${READING_FORMS.join(", ")}, the ${suggestedAuthors.length} held in the most of these forms `
+        + `(${fewestForms} to ${READING_FORMS.length}), ties broken by record count. The label is the catalogue's own name form.`,
+    definition: `Im Bestand als Buch, E-Book und Hörbuch vertreten, mit vielen neueren Titeln.`,
+}))
+console.log(`wrote ${authorsPath} (${suggestedAuthors.length} authors, each in ${fewestForms}+ of ${READING_FORMS.length} forms)`)

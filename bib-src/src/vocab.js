@@ -8,6 +8,7 @@ import libraryVocabTtl from "../definitions/vocabulary.ttl.js"
 import libraryProfileShapesTtl from "../definitions/profile.shapes.ttl.js"
 import genreValuesTtl from "../resources/genre-values.ttl.js"
 import languageValuesTtl from "../resources/language-values.ttl.js"
+import authorSuggestionsTtl from "../resources/author-suggestions.ttl.js"
 import mediumValuesTtl from "../resources/medium-values.ttl.js"
 import { sparqlSelect } from "@foerderfunke/sem-ops-utils/sparql"
 
@@ -28,6 +29,7 @@ registerVocab(libraryVocabTtl)
 registerVocab(genreValuesTtl) // catalogue-extracted value sets, see scripts/extract-value-sets.js
 registerVocab(languageValuesTtl)
 registerVocab(mediumValuesTtl)
+registerVocab(authorSuggestionsTtl)
 registerProfileShapes(libraryProfileShapesTtl)
 
 // collects the follow-up questions declared on a cori:UserAction in the vocabulary.

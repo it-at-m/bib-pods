@@ -42,6 +42,7 @@ bp:favoriteAuthor a rdf:Property ;
     cori:assistantPrompt "Wen liest du gern?"@de ;
     cori:assistantHint "Drei Namen reichen für den Anfang."@de ;
     cori:assistantExample "Name suchen, z. B. Cornelia Funke"@de ;
+    bp:suggestedValues bp:AuthorSuggestions ;
     bp:linkedToIndex [
         bp:labelField "author" ;
         bp:iriField "author_uri_str_mv"
@@ -271,6 +272,14 @@ bp:blockedPlace a rdf:Property ;
     cori:order 50 ;
     cori:assistantQuestion false ;
     bp:negates bp:interestedInPlace .
+
+# On an open profile field: a snapshot of values its assistant card offers to tap, as a
+# skos:ConceptScheme in cori:order whose skos:prefLabel is the index's own form of the
+# value and whose skos:definition says where the selection comes from (see
+# scripts/extract-value-sets.js). Fields without one get their suggestions from the
+# live index (assistant-source.js).
+bp:suggestedValues a rdf:Property ;
+    rdfs:domain rdf:Property .
 
 # On a concept of a value set: the raw index token(s) it stands for, when they differ
 # from the display label ("Deutsch" queries language:"ger"). Several tokens OR into one
