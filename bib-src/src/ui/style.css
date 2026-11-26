@@ -139,9 +139,22 @@
    (no desc block, no dismiss), tighter gutters, smaller arrows and dots. */
 .bp-cf-mini { --bp-cf-gap: 12px; --bp-cf-pad: 36px; --bp-cf-nav: 26px; padding-top: 10px; padding-bottom: 10px; }
 .bp-cf-mini .bp-cf-slide { flex: 0 0 92px; }
-.bp-cf-mini .bp-cf-image { padding: 8px; min-height: 116px; border-radius: 10px; }
+/* as tall as a full-height cover with its padding, so the titles beneath line up */
+.bp-cf-mini .bp-cf-image { padding: 8px; min-height: 126px; border-radius: 10px; }
 .bp-cf-mini .bp-cf-image img { max-height: 110px; box-shadow: 3px 3px 2px rgba(0, 0, 0, 0.3); }
 .bp-cf-mini .bp-cf-noimage { min-height: 100px; }
+.bp-cf-mini-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    margin: 6px 2px 0;
+    font-size: 12px;
+    line-height: 1.25;
+    color: #555;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
 .bp-cf-mini .bp-cf-noimage svg { width: 36px; height: 36px; }
 .bp-cf-mini .bp-cf-dots { gap: 0.5rem; margin-top: 8px; }
 .bp-cf-mini .bp-cf-dot { width: 11px; height: 11px; border-width: 1px; }

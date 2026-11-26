@@ -251,13 +251,14 @@ function buildCard(item, { onSave, onDismiss, tip }) {
     return slide
 }
 
-// A compact slide for the profile's title lists (Merkliste, excluded titles): just the
-// cover (or the no-cover placeholder) linking to the catalogue entry. Title + author
-// live in the shared tooltip — shown instantly (no schedule() delay), since these tiles
-// carry no visible text at all. With onRemove the tile gets a ✕ that takes it off;
-// removeLabel says what that does ("wieder vorschlagen").
+// A compact slide for the profile's title lists (Merkliste, excluded titles): the cover
+// (or the no-cover placeholder) linking to the catalogue entry, and the title beneath
+// it, without its subtitle and cut off after three lines. The whole title and the
+// author are in the shared tooltip, shown instantly (no schedule() delay). With onRemove
+// the tile gets a ✕ that takes it off; removeLabel says what that does ("wieder
+// vorschlagen").
 // `details` resolves to { title, author, coverUrl }: the tile shows at once with the
-// catalogue id and the no-cover placeholder, and fills in when the record arrives.
+// no-cover placeholder, and fills in when the record arrives.
 function buildMiniCard({ sopacId, details }, { tip, onRemove, removeLabel }) {
     let title = sopacId
     let author = ""
@@ -272,7 +273,9 @@ function buildMiniCard({ sopacId, details }, { tip, onRemove, removeLabel }) {
     link.target = "_blank"
     link.rel = "noopener"
     link.appendChild(buildNoCoverPlaceholder())
-    slide.appendChild(link)
+    const name = document.createElement("p")
+    name.className = "bp-cf-mini-title"
+    slide.append(link, name)
     let remove = null
     if (onRemove) {
         // a sibling of the link, not inside it: a button can't nest in an <a>
@@ -292,6 +295,7 @@ function buildMiniCard({ sopacId, details }, { tip, onRemove, removeLabel }) {
     details.then(d => {
         ;({ title, author } = d)
         label()
+        name.textContent = title.split(" : ")[0]
         if (!d.coverUrl) return
         const img = document.createElement("img")
         img.src = d.coverUrl
