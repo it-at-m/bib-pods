@@ -142,7 +142,8 @@ export function profileFactsMatching(property, doc, profileStore, profileSubject
 }
 
 // Does the doc carry this profile fact in any of the property's index fields?
-// Authority IRIs check the iriField, literals the labelField; picker concepts carrying
+// Authority IRIs check the iriField, and the labelField for the index forms without an
+// IRI the profile keeps for them (bp:sourceLabel); literals the labelField; picker concepts carrying
 // bp:indexValue check the labelField via their raw catalogue token(s); locally minted
 // URNs (urn:bibpods:…) never appear in the index, so they check the labelField via
 // their preserved raw index form (bp:sourceLabel). Exact matches only — a near-miss
@@ -163,6 +164,8 @@ function docMatchesFact(doc, mappings, obj, profileStore) {
                 ?? germanText(profileStore, obj.value, RDFS_LABEL)
             if (raw && inField(m.labelField, raw)) return true
         } else if (inField(m.iriField, obj.value)) {
+            return true
+        } else if (profileStore.getObjects(obj.value, BP + "sourceLabel", null).some(t => inField(m.labelField, t.value))) {
             return true
         }
     }
@@ -383,7 +386,9 @@ function publicationYearSort() {
 // bp:indexValue expand to their raw catalogue token(s) on the labelField — "Deutsch"
 // becomes language:"ger", merged media concepts OR all their tokens. Locally minted
 // URNs (urn:bibpods:…) never appear in the index; their preserved raw index form
-// (bp:sourceLabel) hits the labelField, as in docMatchesFact. A concept the vocabulary
+// (bp:sourceLabel) hits the labelField, as in docMatchesFact; an authority IRI's own
+// bp:sourceLabel forms (index forms without the IRI) hit the labelField's exact copy
+// beside the IRI clause. A concept the vocabulary
 // defines by a query of its own (bp:indexQuery: "Hörbuch", an age group) contributes
 // that query as it stands, whatever the property's mappings.
 function factClauses(v, mappings, obj, profileStore) {
@@ -407,6 +412,11 @@ function factClauses(v, mappings, obj, profileStore) {
         } else {
             const field = obj.termType === "NamedNode" ? m.iriField : m.labelField
             if (field) clauses.push(`${field}:"${escapeSolr(obj.value)}"`)
+            if (obj.termType === "NamedNode" && m.labelField) {
+                for (const form of profileStore.getObjects(obj.value, BP + "sourceLabel", null)) {
+                    clauses.push(`${m.labelField}_str:"${escapeSolr(form.value)}"`)
+                }
+            }
         }
     }
     return clauses

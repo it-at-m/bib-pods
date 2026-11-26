@@ -46,9 +46,16 @@ export function collectOptions(spec, book) {
 }
 
 // The facts that store an option under `predicate`.
-export function valueFacts(predicate, { rawLabel, cleanedLabel, iri }) {
+// `alsoRaw`: further index forms of the same value that carry no IRI (an author's name
+// without life dates on the Onleihe's records), kept as bp:sourceLabel so the lanes find
+// those records too.
+export function valueFacts(predicate, { rawLabel, cleanedLabel, iri, alsoRaw = [] }) {
     // authority IRI is the source of truth, we store however the cleaned label locally
-    if (iri) return [{ predicate, object: iri }, { subject: iri, predicate: RDFS_LABEL, object: cleanedLabel }]
+    if (iri) return [
+        { predicate, object: iri },
+        { subject: iri, predicate: RDFS_LABEL, object: cleanedLabel },
+        ...alsoRaw.map(raw => ({ subject: iri, predicate: BP + "sourceLabel", object: raw })),
+    ]
     // no authority IRI, mint a local URN so the entity has a graph node to attach facts to
     if (rawLabel !== cleanedLabel) {
         const localUri = LOCAL + "author:" + encodeURIComponent(rawLabel)

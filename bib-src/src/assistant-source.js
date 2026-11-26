@@ -87,6 +87,29 @@ function lifeDates(raw) {
     return m ? `${m[1]}–${m[2]}` : null
 }
 
+// One person under two name forms: the library's own records name an author with life
+// dates and a GND link ("Kemmerer, Brigid 1978-"), the Onleihe's e-book records often
+// only as a co-author without either ("Kemmerer, Brigid"). [raw, count] pairs come back
+// with each undated form folded into the dated one of the same name, counts added up and
+// the undated forms kept as `alsoRaw`; where several dated forms share a name
+// (namesakes), the undated one could be any of them and stays apart.
+function foldUndated(counted) {
+    const name = raw => raw.replace(/\s\d{4}-\d{0,4}\s*$/, "")
+    const dated = new Map()
+    for (const [raw] of counted) {
+        if (lifeDates(raw)) dated.set(name(raw), dated.has(name(raw)) ? null : raw)
+    }
+    const folded = new Map(counted.map(([raw, count]) => [raw, { raw, count, alsoRaw: [] }]))
+    for (const [raw, count] of counted) {
+        const into = !lifeDates(raw) && dated.get(raw)
+        if (!into) continue
+        folded.get(into).count += count
+        folded.get(into).alsoRaw.push(raw)
+        folded.delete(raw)
+    }
+    return [...folded.values()]
+}
+
 export function createAssistantSource({ solrEndpoint }) {
     // Form-encoded POST, as the lanes' queries: no CORS preflight through the read
     // proxy. Array values repeat their parameter (facet.field).
@@ -154,16 +177,17 @@ export function createAssistantSource({ solrEndpoint }) {
                 if (matches(value, tokens)) counts.set(value, (counts.get(value) ?? 0) + count)
             }
         }
-        return [...counts]
-            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "de"))
+        const values = field === AUTHOR ? foldUndated([...counts]) : [...counts].map(([raw, count]) => ({ raw, count, alsoRaw: [] }))
+        return values
+            .sort((a, b) => b.count - a.count || a.raw.localeCompare(b.raw, "de"))
             .slice(0, 8)
-            .map(([raw, count]) => ({ ...toItem(field, raw, count), hint: count === 1 ? "1 Titel" : `${number(count)} Titel` }))
+            .map(({ raw, count, alsoRaw }) => ({ ...toItem(field, raw, count), alsoRaw, hint: count === 1 ? "1 Titel" : `${number(count)} Titel` }))
     }
 
     // What storing a picked value writes. The authority IRI is read off a record that
     // carries the value: label and IRI arrays are position-aligned. A value without one
     // (or an index that doesn't answer) is stored by its label, as the book dialog does.
-    async function facts({ field, raw, label }) {
+    async function facts({ field, raw, label, alsoRaw = [] }) {
         let iri
         try {
             for (const m of getLinkedIndices(getVocab(), field)) {
@@ -182,7 +206,7 @@ export function createAssistantSource({ solrEndpoint }) {
         } catch (err) {
             console.error("[bib-pods] authority lookup failed, storing the label:", err)
         }
-        return valueFacts(field, { rawLabel: raw, cleanedLabel: label, iri })
+        return valueFacts(field, { rawLabel: raw, cleanedLabel: label, iri, alsoRaw })
     }
 
     // The snapshot a field's card offers to this profile: its bp:suggestedValues, for
