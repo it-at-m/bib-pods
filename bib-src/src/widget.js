@@ -1138,7 +1138,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         box.append(note, actions)
         return box
     }
-    // The filters (Sprache, Medienart) leave nothing of what the profile would find:
+    // The filters (Sprache, Medienart, Altersgruppe) leave nothing of what the profile would find:
     // say so, with the number they hide and the way to the cards that hold them.
     function buildShelfFiltered() {
         const box = document.createElement("div")

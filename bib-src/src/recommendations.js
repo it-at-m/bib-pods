@@ -234,7 +234,7 @@ export function buildShelfQuery(profileStore, profileSubject, { preferences = tr
     return { q: pools.map(q => `(${q})`).join(" OR "), fq: constraints(profileStore, profileSubject, { preferences }) }
 }
 
-// Does the profile hold any preference filter (Sprache, Medienart)?
+// Does the profile hold any preference filter (Sprache, Medienart, Altersgruppe)?
 export function hasPreferenceFilters(profileStore, profileSubject) {
     return preferenceFilters(getVocab(), profileStore, profileSubject).length > 0
 }
@@ -413,7 +413,7 @@ function factClauses(v, mappings, obj, profileStore) {
 }
 
 // fq clauses from the profile's preference properties (bp:RecommendationFilter — e.g.
-// Sprache, Medienart): one fq per property OR-ing its values. Solr ANDs separate fq
+// Sprache, Medienart, Altersgruppe): one fq per property OR-ing its values. Solr ANDs separate fq
 // params, so "auf Deutsch oder Englisch, und als E-Book" comes out right. They apply
 // to every lane: the Solr lanes carry them in their queries, the inspira lane is
 // checked against them afterwards (see checkedAgainstIndex).
