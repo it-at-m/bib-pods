@@ -126,9 +126,10 @@
                     <li><strong>Ausgleichen:</strong> Danach kommen Einträge mit weniger
                         ausgewählten Vorschlägen zum Zug; Mehrfachtreffer zählen
                         für jeden passenden Eintrag. Bei Gleichstand entscheidet der Anzeigename.</li>
-                    <li><strong>Dopplungen vermeiden:</strong> Gleiche Katalog-IDs oder gleiche
-                        Kombinationen aus normalisiertem Titel und erstem Autor werden innerhalb
-                        der neuen Auswahl nur einmal berücksichtigt.</li>
+                    <li><strong>Dopplungen vermeiden:</strong> Gleiche Katalog-IDs und weitere
+                        Ausgaben desselben Werks werden innerhalb der neuen Auswahl nur einmal
+                        berücksichtigt. Ein Werk erkennt die Auswahl am Werkschlüssel des Index,
+                        sonst an normalisiertem Titel und erstem Autor.</li>
                 </ol>
                 <p>Der Solr-Score bewertet die Suchübereinstimmung, nicht die persönliche Eignung;
                     auch innerhalb eines Themas können die Scores unterschiedlich sein.
@@ -143,7 +144,8 @@
                 <h2 id="solr-and">Solr mit AND: alle Angaben zusammen</h2>
                 <p>Ein Titel muss alle vorhandenen, abfragbaren Angaben der Strategie zugleich
                     erfüllen. Treffer folgen dem Solr-Score, bei Gleichstand der Katalog-ID;
-                    Einzelangaben werden nicht ausgeglichen.</p>
+                    Einzelangaben werden nicht ausgeglichen. Weitere Ausgaben desselben Werks
+                    erscheinen wie oben nur einmal.</p>
 
                 <h2 id="shelf">Wie entsteht die Reihenfolge im Schaufenster?</h2>
                 <p>Jede Reihe zeigt die Vorschläge in der Reihenfolge, in der die Auswahl sie
@@ -159,9 +161,10 @@
                 <h2 id="inspira">inspira_BIB: Ähnlichkeit zur Merkliste</h2>
                 <p>Der gesonderte inspira_BIB-Dienst erhält die IDs deiner gemerkten Bücher und
                     liefert ähnliche Titel; gemerkte und ausgeblendete Bücher werden aus den
-                    Ergebnissen entfernt, ebenso Bücher mit einem ausgeschlossenen Wert (geprüft
-                    über den Katalogindex). Solr-Balancierung und Sprach-/Medienartfilter werden
-                    dort nicht berücksichtigt.</p>
+                    Ergebnissen entfernt. Der Katalogindex prüft die Ergebnisse nach: Bücher mit
+                    einem ausgeschlossenen Wert und Titel außerhalb deiner Einschränkungen (etwa
+                    Sprache oder Medienart) fallen heraus, und jedes Werk erscheint einmal, soweit
+                    der Index Ausgaben einander zuordnet. Die Solr-Balancierung gilt dort nicht.</p>
 
                 <h2 id="implementation">Definitionen und Implementierung</h2>
                 <p><a href="https://github.com/it-at-m/bib-pods/blob/main/bib-src/definitions/vocabulary.ttl">vocabulary.ttl</a>
@@ -273,7 +276,7 @@
                     queryCell.appendChild(em)
                 }
                 if (isInspira) {
-                    note("keine Solr-Query (Inspira-Engine)")
+                    note("Auswahl durch inspira_BIB; Einschränkungen und Ausschlüsse prüft der Katalogindex nach")
                 } else if (!profileStore) {
                     note(noProfileNote)
                 } else {

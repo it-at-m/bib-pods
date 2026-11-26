@@ -386,7 +386,9 @@ The TYPO3/docs plugin (bib-src) talks to the index read-only and relies on:
   children's genres), `boost=log(sum(field(copies,max),2))` in the title search, and
   one negative join per profile,
   `-_query_:"{!join from=work_key_str to=work_key_str method=topLevelDV}id:(AK… AK…)"`,
-  which drops every record sharing a work with a saved or dismissed title. The
+  which drops every record sharing a work with a saved or dismissed title. The lane
+  of the inspira recommender is checked against the same filters in one query for its
+  ids (`{!terms f=id}`, `fl=id,work_key`). The
   snapshot script also sums `copies` per author (JSON Facet API) over records without
   subject headings (`-topic:[* TO *] -geographic:[* TO *]`: the library indexes
   non-fiction by subject, so what carries none is fiction).

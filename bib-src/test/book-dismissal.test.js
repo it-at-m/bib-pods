@@ -151,7 +151,7 @@ test("only catalogue ids from the Merkliste are sent to inspira", async t => {
         return { ok: true, status: 200, json: async () => ({ basedOn: [], points: [] }) }
     })
     await runRecommendations(store, subject, { solrEndpoint: "https://index.example/select", qdrantEndpoint: "https://inspira.example/api/recommend" })
-    assert.deepEqual(bodies.map(b => JSON.parse(b)), [{ query: { recommend: { positive: ["4264358"] } }, limit: 5 }])
+    assert.deepEqual(bodies.map(b => JSON.parse(b)), [{ query: { recommend: { positive: ["4264358"] } }, limit: 10 }])
 
     const onlyText = parseTurtle(`
         <${subject}> <${BP}savedBook> "mein Lieblingsbuch" .

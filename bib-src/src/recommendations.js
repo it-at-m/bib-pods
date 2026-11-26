@@ -415,7 +415,8 @@ function factClauses(v, mappings, obj, profileStore) {
 // fq clauses from the profile's preference properties (bp:RecommendationFilter — e.g.
 // Sprache, Medienart): one fq per property OR-ing its values. Solr ANDs separate fq
 // params, so "auf Deutsch oder Englisch, und als E-Book" comes out right. They apply
-// to every Solr lane; the inspira engine has no query to attach them to.
+// to every lane: the Solr lanes carry them in their queries, the inspira lane is
+// checked against them afterwards (see checkedAgainstIndex).
 function preferenceFilters(v, profileStore, profileSubject) {
     const fqs = []
     for (const prop of v.getSubjects(RDF_TYPE, BP + "RecommendationFilter", null)) {
@@ -475,7 +476,9 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
                 // The inspira recommender is seeded by the Merkliste, returning points whose
                 // payload.metadata mirrors our catalogue. Reshape to the {id, title} docs the
                 // caller already knows, minting the SOPAC id back from the bare akkey.
-                const { savedIds, basedOn, results: points } = await recommendFromSavedBooks(profileStore, profileSubject, qdrantEndpoint, strategy.maxSuggestions ?? limit)
+                // twice the lane: the check against the index below takes some out
+                const wanted = strategy.maxSuggestions ?? limit
+                const { savedIds, basedOn, results: points } = await recommendFromSavedBooks(profileStore, profileSubject, qdrantEndpoint, wanted * 2)
                 reached++
                 // basedOn = the bare akkeys the recommender actually used; the rest of the
                 // Merkliste isn't in the collection. Logged so we can see what went in/out.
@@ -492,7 +495,7 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
                         isbn: meta.isbn ? [meta.isbn] : undefined,
                     }
                 }).filter(doc => !excluded.has(doc.id))
-                results.push({ strategy, docs: await withoutBlocked(docs, profileStore, profileSubject, solrEndpoint) })
+                results.push({ strategy, docs: (await checkedAgainstIndex(docs, profileStore, profileSubject, solrEndpoint)).slice(0, wanted) })
             } catch (err) {
                 console.error(`[bib-pods] ${strategy.label} failed:`, err)
             }
@@ -505,7 +508,8 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
         const separateInputs = strategy.combine?.iri !== BP + "And"
         const combinedQuery = buildCombinedQuery(strategy, profileStore, profileSubject)
         // Relevance leads every query; alternative pools use freshness to break
-        // ties. Implausible dates rank like missing dates.
+        // ties. Implausible dates rank like missing dates. Every pool is asked for
+        // twice the lane: a work shows once, whatever its editions.
         const requests = [
             ...(combinedQuery ? [{ ...combinedQuery, sort: `score desc,${publicationYearSort()},id asc` }] : []),
             ...queries.map(query => ({ ...query, sort: separateInputs
@@ -515,7 +519,7 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
             attempted++
             console.log(`[bib-pods] ${strategy.label}: POST ${solrEndpoint}`, query.q)
             try {
-                const result = await fetchSolr(solrEndpoint, query, separateInputs ? wanted * 2 : wanted)
+                const result = await fetchSolr(solrEndpoint, query, wanted * 2)
                 reached++
                 return result.response?.docs ?? []
             } catch (err) {
@@ -524,7 +528,7 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
             }
         }))
         if (!separateInputs) {
-            results.push({ strategy, docs: pools[0].slice(0, wanted) })
+            results.push({ strategy, docs: selectDiverseDocs([pools[0]], wanted) })
             continue
         }
         const entries = profileFactEntries(strategy, profileStore, profileSubject)
@@ -537,26 +541,30 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
     return { results, serverUnreachable }
 }
 
-// Blocked values and the other editions of excluded titles can't be read off inspira's
-// sparse metadata, so the index decides: one query for the lane's ids under those
-// filters keeps the books that pass. If the index can't answer, the lane stays as it
-// is rather than going empty.
-async function withoutBlocked(docs, profileStore, profileSubject, solrEndpoint) {
+// What inspira's sparse metadata can't tell is asked of the index: one query for the
+// lane's ids under the profile's blocked values, its preference filters and the other
+// editions of excluded titles keeps the books that pass, each work once where the
+// index carries the key. If the index can't answer, the lane stays as it is rather
+// than going empty.
+async function checkedAgainstIndex(docs, profileStore, profileSubject, solrEndpoint) {
     const v = getVocab()
-    const blocks = [
+    const byWork = indexOffers("work_key")
+    const filters = [
         ...excludedWorks(excludedIds(v, profileStore, profileSubject)),
         ...blockFilters(v, profileStore, profileSubject),
+        ...preferenceFilters(v, profileStore, profileSubject),
     ]
-    if (blocks.length === 0 || docs.length === 0) return docs
+    if ((filters.length === 0 && !byWork) || docs.length === 0) return docs
     const ids = docs.map(doc => doc.id)
     try {
         const result = await fetchSolr(solrEndpoint, {
-            q: "{!terms f=id v=$laneIds}", fq: blocks, params: { laneIds: ids.join(","), fl: "id" },
+            q: "{!terms f=id v=$laneIds}", fq: filters, params: { laneIds: ids.join(","), fl: byWork ? "id,work_key" : "id" },
         }, ids.length)
-        const passing = new Set((result.response?.docs ?? []).map(doc => doc.id))
-        return docs.filter(doc => passing.has(doc.id))
+        const workOf = new Map((result.response?.docs ?? []).map(doc => [doc.id, doc.work_key?.[0] ?? doc.id]))
+        const works = new Set()
+        return docs.filter(doc => workOf.has(doc.id) && !works.has(workOf.get(doc.id)) && works.add(workOf.get(doc.id)))
     } catch (err) {
-        console.error("[bib-pods] blocklist check for the inspira lane failed:", err)
+        console.error("[bib-pods] checking the inspira lane against the index failed:", err)
         return docs
     }
 }

@@ -199,11 +199,27 @@ test("AND lanes keep one full conjunction and relevance-ranked results", async t
     })
     const run = await runRecommendations(store, subject, { solrEndpoint: endpoint })
     assert.equal(requests.length, 1)
-    assert.ok(requests.every(p => p.get("sort") === "score desc,id asc" && p.get("rows") === "3"))
+    assert.ok(requests.every(p => p.get("sort") === "score desc,id asc" && p.get("rows") === "6"))
     assert.equal(requests[0].get("q"), buildQuery(and, store, subject).q)
     assert.deepEqual(shelfOf(run, and).map(d => d.id), ["relevant", "newer"])
     assert.equal(buildRecommendationQueries(and, store, subject).length, 1)
     assert.equal(buildCombinedQuery(and, store, subject), null)
+})
+
+test("AND lanes show a work once, the best-ranked of its editions", async t => {
+    const and = getStrategies().find(s => s.combine?.iri === BP + "And")
+    const disabled = getStrategies().filter(s => s.iri !== and.iri).map(s => `<${s.iri}>`).join(", ")
+    const store = parseTurtle(`
+        ${and.properties.map(prop => `<${subject}> <${prop}> "A" .`).join("\n")}
+        <${SETTINGS_SUBJECT}> <${BP}enabledStrategy> <${and.iri}> ;
+            <${DISABLED_STRATEGY}> ${disabled} .
+    `)
+    const edition = (id, title) => ({ id, title: [title], author: ["Herrndorf, Wolfgang"] })
+    t.mock.method(globalThis, "fetch", async () => ({ ok: true, json: async () => ({ response: { docs: [
+        edition("print", "Tschick"), edition("ebook", "Tschick"), edition("other", "Sand"),
+    ] } }) }))
+    const run = await runRecommendations(store, subject, { solrEndpoint: endpoint })
+    assert.deepEqual(shelfOf(run, and).map(d => d.id), ["print", "other"])
 })
 
 test("the Solr freshness tie-break counts only years from 1 to next year, others as missing", async t => {

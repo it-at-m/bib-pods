@@ -85,6 +85,44 @@ test("the inspira lane asks the index which of its books are other editions of e
     assert.deepEqual(asked[0].getAll("fq"), [JOIN("AK7")])
 })
 
+test("the inspira lane keeps to the profile's filters and shows a work once", async t => {
+    indexOffering("work_key")
+    const store = parseTurtle(`
+        <${subject}> <${BP}savedBook> "AK7" ; <${BP}preferredAudience> <${BP}test-audience-6-9> .
+        <${SETTINGS_SUBJECT}> <${DISABLED_STRATEGY}> <${BP}authorMatch>, <${BP}topicMatch> .`)
+    const asked = []
+    t.mock.method(globalThis, "fetch", async (url, init) => {
+        if (url.includes("inspira")) return {
+            ok: true, status: 200,
+            json: async () => ({ basedOn: ["7"], points: ["2", "3", "4", "5"].map(akkey => ({ id: akkey, payload: { metadata: { akkey } } })) }),
+        }
+        asked.push(new URLSearchParams(init.body))
+        // AK5 fails the filters; AK2 and AK3 are editions of one work
+        return { ok: true, json: async () => ({ response: { docs: [
+            { id: "AK2", work_key: ["momo|ende michael"] }, { id: "AK3", work_key: ["momo|ende michael"] }, { id: "AK4" },
+        ] } }) }
+    })
+    const run = await runRecommendations(store, subject, { solrEndpoint: "https://index.example/select", qdrantEndpoint: "https://inspira.example/api/recommend" })
+    assert.deepEqual(run.results.find(r => r.strategy.iri === BP + "savedBookSimilarity").docs.map(d => d.id), ["AK2", "AK4"])
+    assert.deepEqual(asked[0].getAll("fq"), [JOIN("AK7"), "audience_age:[6 TO 9]"])
+    assert.equal(asked[0].get("fl"), "id,work_key")
+})
+
+test("an inspira lane with nothing to check asks the index nothing", async t => {
+    indexOffering()
+    const store = parseTurtle(`
+        <${subject}> <${BP}savedBook> "AK7" .
+        <${SETTINGS_SUBJECT}> <${DISABLED_STRATEGY}> <${BP}authorMatch>, <${BP}topicMatch> .`)
+    const urls = []
+    t.mock.method(globalThis, "fetch", async (url) => {
+        urls.push(url)
+        return { ok: true, status: 200, json: async () => ({ basedOn: ["7"], points: [{ id: "2", payload: { metadata: { akkey: "2" } } }] }) }
+    })
+    const run = await runRecommendations(store, subject, { solrEndpoint: "https://index.example/select", qdrantEndpoint: "https://inspira.example/api/recommend" })
+    assert.deepEqual(run.results.find(r => r.strategy.iri === BP + "savedBookSimilarity").docs.map(d => d.id), ["AK2"])
+    assert.deepEqual(urls, ["https://inspira.example/api/recommend"])
+})
+
 test("a lane shows a work once where the index keys it, whatever the editions' subtitles", () => {
     const print = { id: "AK1", title: ["1999 Meter über dem Meer : Roman"], author: ["Wahl, Caroline"], work_key: ["1999 meter uber dem meer|wahl caroline"] }
     const audio = { id: "AK2", title: ["1999 Meter über dem Meer"], author: ["Wahl, Caroline"], work_key: ["1999 meter uber dem meer|wahl caroline"] }

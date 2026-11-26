@@ -359,7 +359,8 @@ bp:RecommendationStrategy a rdfs:Class ;
 # Profile properties typed bp:RecommendationFilter don't form lanes of their own —
 # their values narrow every Solr strategy's query as fq clauses: OR within a property,
 # AND across properties ("auf Deutsch oder Englisch, und als E-Book"). The inspira
-# engine can't be filtered this way, so its lanes ignore these preferences.
+# engine takes no filter, so what it returns is checked against the same clauses in
+# the index afterwards.
 bp:RecommendationFilter a rdfs:Class .
 
 # Profile properties typed bp:RecommendationExclusion hold catalogue ids that no lane
