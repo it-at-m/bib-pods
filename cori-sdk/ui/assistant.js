@@ -1,4 +1,4 @@
-import { loadStore, addInquiryFacts, removeProfileFact, isStorageReady } from "../storage/index.js"
+import { loadStore, addInquiryFacts, removeProfileFact, isStorageReady, getChoice } from "../storage/index.js"
 import { getProfileSubject, getVocab, getLabel, getPluralLabel, getText, getOne, contractTerm, sectionPlan, storageErrorMessage, RDFS_LABEL, CORI } from "../utils.js"
 import { getProfileShapesStore } from "../shacl.js"
 
@@ -178,6 +178,10 @@ export async function openAssistant({ host, onChange, only = null }) {
     let leaveCard = null    // cleanup of the card on display
     let refreshers = []     // what on the card on display follows the profile
     let saving = Promise.resolve()
+    // The answers belong to the storage the deck opened on: one still on its way when
+    // the user has moved to another storage is dropped, not written there.
+    const openedOn = getChoice()
+    const moved = () => getChoice() !== openedOn
 
     // Every change to the profile made from a card goes through here: stored, then
     // the card and the profile behind the dialog follow. Changes queue up, so quick
@@ -186,7 +190,9 @@ export async function openAssistant({ host, onChange, only = null }) {
     function change(write) {
         const done = saving.then(async () => {
             try {
+                if (moved()) return false
                 await write()
+                if (moved()) return false
                 store = await loadStore()
             } catch (err) {
                 console.error("[cori-assistant] saving an answer failed:", err)
@@ -203,6 +209,7 @@ export async function openAssistant({ host, onChange, only = null }) {
     const add = async (item) => {
         if (termFor(item)) return
         const facts = source.facts ? await source.facts(item) : [{ predicate: item.field, object: item.label }]
+        if (moved()) return
         await addInquiryFacts(facts)
     }
     const addItem = item => change(() => add(item))
@@ -307,8 +314,10 @@ export async function openAssistant({ host, onChange, only = null }) {
         let active = -1
         let searches = 0
         let timer = 0
+        let stale = false   // typed on since the hits arrived
         const showHits = (items) => {
             hits = items
+            stale = false
             active = -1
             results.hidden = items.length === 0
             results.replaceChildren(...items.map((item, i) => {
@@ -362,12 +371,13 @@ export async function openAssistant({ host, onChange, only = null }) {
             }
         }
         input.addEventListener("input", () => {
+            stale = true
             clearTimeout(timer)
             timer = setTimeout(runSearch, SEARCH_DELAY_MS)
         })
         input.addEventListener("keydown", (e) => {
             if (e.key === "ArrowDown" && hits.length) { e.preventDefault(); mark((active + 1) % hits.length) }
-            else if (e.key === "ArrowUp" && hits.length) { e.preventDefault(); mark((active - 1 + hits.length) % hits.length) }
+            else if (e.key === "ArrowUp" && hits.length) { e.preventDefault(); mark(active <= 0 ? hits.length - 1 : active - 1) }
             else if (e.key === "Escape" && (hits.length || input.value)) {
                 // first Escape gives up the search, the next one closes the dialog
                 e.preventDefault()
@@ -377,7 +387,9 @@ export async function openAssistant({ host, onChange, only = null }) {
                 say(null)
             } else if (e.key === "Enter") {
                 e.preventDefault()
-                if (hits.length) pick(active === -1 ? 0 : active)
+                // hits of an earlier input are not what Enter means: search first
+                if (stale && source.search) { clearTimeout(timer); runSearch() }
+                else if (hits.length) pick(active === -1 ? 0 : active)
                 else if (!source.search && input.value.trim()) {
                     addHere({ field, label: input.value.trim() }).then(ok => { if (ok) input.value = "" })
                 }
@@ -538,6 +550,10 @@ export async function openAssistant({ host, onChange, only = null }) {
         leaveCard = null
         refreshers = []
         shown++
+        // answers still on their way count too
+        doneBtn.disabled = true
+        await saving
+        doneBtn.disabled = false
         try {
             store = await loadStore()
         } catch {
