@@ -990,15 +990,15 @@ cori-profile .cori-profile-heading { margin-top: 0; }
 /* <cori-profile>'s Turtle inspector dialog — structure + Prism theme come from the
    SDK; the app frames it to match the bib-pods modal. */
 dialog.cori-turtle-view {
-    padding: 1.5rem 2rem;
+    padding: 24px 32px;
     border: none;
     border-radius: var(--border-radius, 12px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-    max-width: min(60rem, 92vw);
+    max-width: min(960px, 92vw);
     max-height: 92vh;
 }
 dialog.cori-turtle-view::backdrop { background: rgba(0, 0, 0, 0.4); }
-.cori-turtle-view-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
+.cori-turtle-view-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 16px; }
 .cori-turtle-view-header h3 { margin: 0; margin-right: auto; }
 /* The expert tools: quiet grey links (as .bp-aside), brand colour only on hover. Pinned
    so host anchor rules can't recolour them. */

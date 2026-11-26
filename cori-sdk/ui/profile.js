@@ -45,7 +45,9 @@ const PROFILE_TYPE = CORI + "Profile"
 //   cori-profile:change --> the profile was mutated (entry added or cleared)
 
 // Prism is loaded from a CDN the first time the Turtle inspector opens; the promise
-// is cached module-wide so concurrent <cori-profile> instances share one load.
+// is cached module-wide so concurrent <cori-profile> instances share one load. The
+// inspector doesn't wait for it: where the CDN can't be reached the Turtle stays plain
+// text, and the next opening tries again.
 let prismLoaded = null
 function ensurePrism() {
     if (prismLoaded) return prismLoaded
@@ -56,7 +58,12 @@ function ensurePrism() {
         document.head.appendChild(css)
         await loadScript("https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js")
         await loadScript("https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-turtle.min.js")
-    })()
+        return true
+    })().catch(err => {
+        console.warn("[cori-profile] syntax highlighting unavailable:", err)
+        prismLoaded = null
+        return false
+    })
     return prismLoaded
 }
 
@@ -421,7 +428,6 @@ export class CoriProfile extends HTMLElement {
     async _inspect() {
         if (!isStorageReady()) return window.alert("Keine Verbindung zum Speicherort.")
         try {
-            await ensurePrism()
             if (!this._turtleDialog) {
                 this._turtleDialog = buildTurtleDialog({ onAdd: () => this._add(), onValidate: () => this._validate() })
                 this.appendChild(this._turtleDialog)
@@ -459,7 +465,7 @@ export class CoriProfile extends HTMLElement {
     async _renderTurtle() {
         const code = this._turtleDialog.querySelector("code")
         code.textContent = await loadAsTurtle()
-        window.Prism.highlightElement(code)
+        ensurePrism().then(loaded => { if (loaded) window.Prism.highlightElement(code) })
     }
 
     async _validate() {
