@@ -1,8 +1,9 @@
-// Initial Solr seed. Imports every file in oai/data/. The cursor in
-// .import-cursor.json persists past successful completion, so re-running
-// this script with no new files is a no-op (same shape as import-incremental).
-// To actually wipe and reseed, uncomment the clearIndex() call at the bottom —
-// it removes both the Solr documents and this script's cursor entry.
+// Full Solr import: maps every file in oai/data/ and upserts every record, so a changed
+// mapping (shared.js) reaches the whole index while it stays online. The cursor in
+// .import-cursor.json is cleared first and ends at the last file, where
+// import-incremental carries on. To wipe the index before seeding it, uncomment the
+// clearIndex() call at the bottom: it removes the Solr documents and this script's
+// cursor entry.
 
 import { runImport, clearImportCursor } from "../shared.js"
 import path from "path"
