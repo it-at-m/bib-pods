@@ -10,6 +10,8 @@ import genreValuesTtl from "../resources/genre-values.ttl.js"
 import languageValuesTtl from "../resources/language-values.ttl.js"
 import authorSuggestionsTtl from "../resources/author-suggestions.ttl.js"
 import mediumValuesTtl from "../resources/medium-values.ttl.js"
+import audienceValuesTtl from "../resources/audience-values.ttl.js"
+import indexFieldsTtl from "../resources/index-fields.ttl.js"
 import { sparqlSelect } from "@foerderfunke/sem-ops-utils/sparql"
 
 export const BP = "https://www.muenchner-stadtbibliothek.de/bib-pods#"
@@ -29,8 +31,18 @@ registerVocab(libraryVocabTtl)
 registerVocab(genreValuesTtl) // catalogue-extracted value sets, see scripts/extract-value-sets.js
 registerVocab(languageValuesTtl)
 registerVocab(mediumValuesTtl)
+registerVocab(audienceValuesTtl)
 registerVocab(authorSuggestionsTtl)
+registerVocab(indexFieldsTtl)
 registerProfileShapes(libraryProfileShapesTtl)
+
+// Does the catalogue index carry this field? The index can be older than the mapping
+// that fills it, and asking it for a field it doesn't know is an error. So what builds
+// on a field not every index has reads the record of the last extraction first
+// (resources/index-fields.ttl).
+export function indexOffers(field) {
+    return getVocab().getObjects(BP + "CatalogueIndex", BP + "offersField", null).some(o => o.value === field)
+}
 
 // collects the follow-up questions declared on a cori:UserAction in the vocabulary.
 // A blocklist field (bp:negates) reads the book through its taste field's index

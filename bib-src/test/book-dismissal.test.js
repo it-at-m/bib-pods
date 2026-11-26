@@ -4,6 +4,10 @@ import { parseTurtle, getProfileSubject } from "cori-sdk/utils.js"
 import { BP, LOCAL, getFollowUpsFor } from "../src/vocab.js"
 import { buildQuery, getStrategies, runRecommendations, SETTINGS_SUBJECT, DISABLED_STRATEGY } from "../src/recommendations.js"
 import { collectOptions, dismissalChanges, bookHasOption } from "../src/book-options.js"
+import { indexOffering } from "./index-fields.js"
+
+// An index without the fields that not every index has (see index-fields.test.js).
+indexOffering()
 
 const subject = getProfileSubject()
 const topics = getStrategies().find(s => s.iri === BP + "topicMatch")

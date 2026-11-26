@@ -124,7 +124,9 @@ bp:preferredLanguage a rdf:Property, bp:RecommendationFilter ;
 
 # Media types are catalogue jargon ("Druckschrift"), so the concepts on offer carry
 # user labels plus the raw token(s) as bp:indexValue — combo values like "Buch + CD"
-# fold into their base medium. Also a filter, not a lane (see bp:preferredLanguage).
+# fold into their base medium. "Hörbuch" and "Musik" are what is on a medium rather
+# than a medium, defined by a query on the content type (bp:indexQuery). Also a filter,
+# not a lane (see bp:preferredLanguage).
 bp:preferredMedium a rdf:Property, bp:RecommendationFilter ;
     rdfs:label "preferred medium"@en, "Medienart"@de ;
     cori:pluralLabel "preferred media"@en, "Medienarten"@de ;
@@ -140,6 +142,23 @@ bp:preferredMedium a rdf:Property, bp:RecommendationFilter ;
     bp:linkedToIndex [
         bp:labelField "format"
     ] .
+
+# For whom: the age groups are bands over the catalogue's age recommendation ("ab 8"),
+# each concept a range query (bp:indexQuery), so the field needs no index mapping of
+# its own. The set comes from the index (resources/audience-values.ttl) and is empty
+# as long as the index carries no age: the assistant then has nothing to ask. Also a
+# filter, not a lane (see bp:preferredLanguage).
+bp:preferredAudience a rdf:Property, bp:RecommendationFilter ;
+    rdfs:label "age group"@en, "Altersgruppe"@de ;
+    cori:pluralLabel "age groups"@en, "Altersgruppen"@de ;
+    rdfs:domain cori:Profile ;
+    rdfs:range bf:IntendedAudience ;
+    cori:inSection bp:FilterSection ;
+    cori:order 30 ;
+    cori:allowedValues bp:AudienceValues ;
+    cori:storeAs cori:ConceptIri ;
+    cori:assistantPrompt "Für welches Alter suchst du?"@de ;
+    cori:assistantHint "Optional. Ohne Auswahl bekommst du Titel für jedes Alter; jede Auswahl hier verkleinert alle Reihen."@de .
 
 bp:savedBook a rdf:Property, bp:RecommendationExclusion ; # SOPAC identifier
     rdfs:label "saved book"@en, "Gemerktes Buch"@de ;
@@ -285,6 +304,19 @@ bp:suggestedValues a rdf:Property ;
 # from the display label ("Deutsch" queries language:"ger"). Several tokens OR into one
 # clause.
 bp:indexValue a rdf:Property .
+
+# On a concept of a value set: the index query it stands for, where no token of the
+# field's own index mapping says it: a range ("6 bis 9 Jahre"), another field
+# ("Hörbuch" is a content type, not a medium). Used as it stands, in place of the
+# mapping. Such a concept can't be checked against a single record on the page.
+bp:indexQuery a rdf:Property .
+
+# The catalogue index, and which of the fields that not every index has it carries
+# (resources/index-fields.ttl, written at extraction): what builds on one of them
+# checks here first.
+bp:Index a rdfs:Class .
+bp:offersField a rdf:Property ;
+    rdfs:domain bp:Index .
 
 # A blocklist field's positive counterpart. Every lane drops books carrying a blocked
 # value in that field's index fields.

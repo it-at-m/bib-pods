@@ -80,10 +80,13 @@ function maxCountOf(field) {
 }
 
 // The fields the assistant may ask about, given current value counts: fields not
-// opted out via cori:assistantQuestion false, whose sh:maxCount isn't reached yet.
+// opted out via cori:assistantQuestion false, whose sh:maxCount isn't reached yet. A
+// field whose closed value set (cori:allowedValues) offers nothing has no question
+// either: there is nothing to choose from.
 export function askableFields(fields, countOf) {
     return fields.filter(f => {
         if (getOne(getVocab(), f, CORI + "assistantQuestion") === "false") return false
+        if (getOne(getVocab(), f, CORI + "allowedValues") && !allowedValuesOf(f)) return false
         const max = maxCountOf(f)
         return max === null || countOf(f) < max
     })

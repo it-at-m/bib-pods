@@ -3,6 +3,10 @@ import assert from "node:assert/strict"
 import { parseTurtle, getProfileSubject } from "cori-sdk/utils.js"
 import { BP } from "../src/vocab.js"
 import { buildQuery, buildRecommendationQueries, buildCombinedQuery, countDocMatches, explainDocMatches, selectDiverseDocs, getStrategies, runRecommendations, SETTINGS_SUBJECT, DISABLED_STRATEGY } from "../src/recommendations.js"
+import { indexOffering } from "./index-fields.js"
+
+// An index without the fields that not every index has (see index-fields.test.js).
+indexOffering()
 
 const subject = getProfileSubject()
 const strategy = getStrategies().find(s => s.iri === BP + "topicMatch")

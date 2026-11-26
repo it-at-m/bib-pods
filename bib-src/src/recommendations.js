@@ -146,7 +146,8 @@ export function profileFactsMatching(property, doc, profileStore, profileSubject
 // bp:indexValue check the labelField via their raw catalogue token(s); locally minted
 // URNs (urn:bibpods:…) never appear in the index, so they check the labelField via
 // their preserved raw index form (bp:sourceLabel). Exact matches only — a near-miss
-// (e.g. a differing name-date variant) counts as "not traceable", not as a match.
+// (e.g. a differing name-date variant) counts as "not traceable", not as a match; so
+// does a concept defined by a query (bp:indexQuery), which only the index can answer.
 function docMatchesFact(doc, mappings, obj, profileStore) {
     const inField = (field, value) => field && [].concat(doc[field] ?? []).includes(value)
     const indexValues = obj.termType === "NamedNode"
@@ -363,8 +364,14 @@ function publicationYearSort() {
 // bp:indexValue expand to their raw catalogue token(s) on the labelField — "Deutsch"
 // becomes language:"ger", merged media concepts OR all their tokens. Locally minted
 // URNs (urn:bibpods:…) never appear in the index; their preserved raw index form
-// (bp:sourceLabel) hits the labelField, as in docMatchesFact.
+// (bp:sourceLabel) hits the labelField, as in docMatchesFact. A concept the vocabulary
+// defines by a query of its own (bp:indexQuery: "Hörbuch", an age group) contributes
+// that query as it stands, whatever the property's mappings.
 function factClauses(v, mappings, obj, profileStore) {
+    if (obj.termType === "NamedNode") {
+        const queries = v.getObjects(obj.value, BP + "indexQuery", null).map(t => t.value)
+        if (queries.length > 0) return queries
+    }
     const indexValues = obj.termType === "NamedNode"
         ? v.getObjects(obj.value, BP + "indexValue", null).map(t => t.value)
         : []
