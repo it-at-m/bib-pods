@@ -101,8 +101,8 @@ Rationale: consumers should never have to know that `(DE-588)4211695-8` means
 | `author2` (+uri) | 700 abcqd | 33.1% | |
 | `author_corporate` (+uri) | 110/111/710/711 | 4.4% | |
 | `topic` (+uri) | 600/610/611/630/650/653/656 | 24.9% | best GND linkage, see §4 |
-| `genre` (+uri) | 655, plus literary genres read off 245b | 25.3% from 655, +3.4 points derived | labels only in practice, see §4 |
-| `genre_derived` | 245b, by rule | 3.9% | the derived part of `genre` on its own, see §4 |
+| `genre` (+uri) | 655, plus literary genres read off 245b | 25.3% from 655, +3.0 points derived | labels only in practice, see §4 |
+| `genre_derived` | 245b, by rule | 3.5% | the derived part of `genre` on its own, see §4 |
 | `geographic` (+uri) | 651 | 7.5% | well GND-linked |
 | `era` (+uri) | 648 | 3.6% | messy, zero GND, see §4 |
 | `language` | 008/35-37, 041 adhj | 100% | but 49% `unb`, see §4 |
@@ -163,14 +163,16 @@ entry):
   into `genre` (and, kept apart, `genre_derived`): a genre word counts only as the
   head of the subtitle or of one of its ISBD segments, and only on texts and readings
   (336 content type text or spoken word), since sheet music has subtitles like "sechs
-  Gedichte für Altstimme" too. Measured over the full dump with the importer's own
-  mapping (November 2026, 1,285,382 records): **50,642 records gain a derived
-  genre**, 43,706 of which had no 655 at all — Roman 35,242, Krimi 5,809, Thriller
-  3,837, Erzählungen 2,787, Lyrik 2,007, Historischer Roman 752; Kinderbuch,
-  Graphic Novel, Liebesroman, Science-Fiction, Jugendbuch and Fantasy stay below 200
-  each. On precision: 6,977 of the derived "Roman" records also carry 655
-  "Fiktionale Darstellung", while pairings that suggest a miss are rare (Roman with
-  655 Erlebnisbericht 22, Biografie 9, Führer 6). It is a heuristic on publisher
+  Gedichte für Altstimme" too. Measured with the importer's own mapping over the dump
+  as harvested on 26 November 2026, every record in its latest state and deletions
+  applied (1,240,288 records): **43,938 records gain a derived genre**, 37,464 of
+  which had no 655 at all — Roman 30,938, Krimi 4,575, Thriller 3,051, Erzählungen
+  2,597, Lyrik 1,959, Historischer Roman 586; Kinderbuch, Graphic Novel, Liebesroman,
+  Science-Fiction, Jugendbuch and Fantasy stay below 200 each. Among books
+  (Druckschrift, E-Book) the share carrying any genre rises from 13.0% to 16.8%. On
+  precision: 5,092 of the derived "Roman" records also carry 655 "Fiktionale
+  Darstellung", while pairings that suggest a miss are rare (Roman with 655
+  Erlebnisbericht 21, Biografie 7, Führer 5). It is a heuristic on publisher
   wording: novels without such a subtitle stay unreached, and "Roman" lumps literary
   fiction with everything else a publisher calls a novel. Derived labels have no
   authority IRI (the sentinel keeps `genre_uri_str_mv` aligned).
