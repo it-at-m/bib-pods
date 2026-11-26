@@ -1198,7 +1198,8 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
                         laneStatusDialog.close()
                         ;(byTitle ? openAddTitle : openAssistant)()
                     })
-                    state.replaceChildren(`Im Profil fehlt noch: ${names}. `, link)
+                    const onlyTitles = strategy.properties.every(prop => prop === BP + "savedBook")
+                    state.replaceChildren(onlyTitles ? "Deine Merkliste ist noch leer. " : `Im Profil fehlt noch: ${names}. `, link)
                 } else if (savingToggles || autoPending || shelfLoading) {
                     state.textContent = "Wird geprüft …"
                 } else if (shelfNote === SHELF_NOTES.unreachable) {
