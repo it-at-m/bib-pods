@@ -254,10 +254,11 @@ function buildCard(item, { onSave, onDismiss, tip }) {
 // A compact slide for the profile's title lists (Merkliste, excluded titles): just the
 // cover (or the no-cover placeholder) linking to the catalogue entry. Title + author
 // live in the shared tooltip — shown instantly (no schedule() delay), since these tiles
-// carry no visible text at all. With onRemove the tile gets a ✕ that takes it off.
+// carry no visible text at all. With onRemove the tile gets a ✕ that takes it off;
+// removeLabel says what that does ("wieder vorschlagen").
 // `details` resolves to { title, author, coverUrl }: the tile shows at once with the
 // catalogue id and the no-cover placeholder, and fills in when the record arrives.
-function buildMiniCard({ sopacId, details }, { tip, onRemove }) {
+function buildMiniCard({ sopacId, details }, { tip, onRemove, removeLabel }) {
     let title = sopacId
     let author = ""
     const slide = document.createElement("li")
@@ -279,13 +280,13 @@ function buildMiniCard({ sopacId, details }, { tip, onRemove }) {
         remove.type = "button"
         remove.className = "bp-cf-dismiss bp-round-btn"
         remove.textContent = "✕"
-        remove.title = "Wieder vorschlagen"
+        remove.title = removeLabel[0].toUpperCase() + removeLabel.slice(1)
         remove.addEventListener("click", () => { tip.hide(); onRemove(sopacId) })
         slide.appendChild(remove)
     }
     const label = () => {
         link.setAttribute("aria-label", author ? `${title} – ${author}` : title)
-        remove?.setAttribute("aria-label", `„${title}" wieder vorschlagen`)
+        remove?.setAttribute("aria-label", `„${title}" ${removeLabel}`)
     }
     label()
     details.then(d => {
@@ -528,11 +529,11 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
     profileEl.addEventListener("mouseout", (e) => {
         if (e.target.closest(".cori-profile-field-notice")) tip.hide()
     })
-    // The profile's title lists render as cover tiles; excluded titles can be taken
-    // off again (the Merkliste has no remove control).
+    // The profile's title lists render as cover tiles, each with a ✕ that takes the
+    // title off its list.
     const TITLE_LISTS = {
-        [BP + "savedBook"]: {},
-        [BP + "excludedBook"]: { onRemove: id => unexcludeTitle(id) },
+        [BP + "savedBook"]: { onRemove: id => unsaveTitle(factory.literal(id)), removeLabel: "von der Merkliste nehmen" },
+        [BP + "excludedBook"]: { onRemove: id => unexcludeTitle(id), removeLabel: "wieder vorschlagen" },
     }
     const titleListCleanups = new Map()
     profileEl.renderFieldValues = async (predicate, objects) => {
@@ -558,6 +559,16 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         titleListCleanups.get(predicate)?.()
         titleListCleanups.set(predicate, initCarousel(lane))
         return lane
+    }
+    // `term` is the stored value; the profile and the title card follow the change
+    async function unsaveTitle(term) {
+        try {
+            await removeProfileFact(BP + "savedBook", term)
+            applyState()
+        } catch (err) {
+            console.error("[bib-pods] removing a saved title failed:", err)
+            window.alert("Eintrag konnte nicht entfernt werden:\n" + storageErrorMessage(err))
+        }
     }
     async function unexcludeTitle(id) {
         try {
@@ -887,16 +898,6 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
                 li.append(name, remove)
                 return li
             }))
-        }
-        // the list follows through PROFILE_SAVED
-        async function unsaveTitle(term) {
-            try {
-                await removeProfileFact(BP + "savedBook", term)
-                applyState()
-            } catch (err) {
-                console.error("[bib-pods] removing a saved title failed:", err)
-                window.alert("Eintrag konnte nicht entfernt werden:\n" + storageErrorMessage(err))
-            }
         }
         renderSaved()
         window.addEventListener(PROFILE_SAVED, renderSaved)
