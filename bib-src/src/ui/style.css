@@ -905,55 +905,77 @@ dialog.bp-lane-status-dialog {
 /* Top blocks (intro / how-to / privacy): stacked while inactive, with their
    <summary> acting as a plain, non-interactive heading. */
 .bp-top-blocks { display: flex; flex-direction: column; gap: 1.5rem; }
+/* Their headings follow the column headings of the library's website (its search page,
+   .resultheader h2): the condensed heading face and the icon at the right in the
+   contrast colour. The values are the site's, in px (its own are rem on
+   a 62.5% root); the face comes from the site, elsewhere the fallbacks stand in. */
 .bp-collapsible > summary {
+    display: flex;
+    align-items: flex-end;   /* beside a heading that wraps, the icon stays on its last line */
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
     cursor: pointer;
     list-style: none;
-    font-size: 1.17em;
-    font-weight: bold;
+    font-family: 'Fira Sans Condensed', Tahoma, Arial, Helvetica, sans-serif;
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1.264;
+    color: #000;
 }
 .bp-collapsible > summary::-webkit-details-marker { display: none; }
-/* inline-block keeps the link underline (once activated) off the emoji */
-.bp-collapsible > summary > .bp-icon { display: inline-block; margin-right: 0.4em; }
+.bp-collapsible > summary > .bp-icon {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    color: var(--contrastcolor, #d14900);
+}
+.bp-collapsible > summary > .bp-icon svg { height: 18px; width: auto; fill: currentColor; }
 .bp-landing:not(.is-activated) .bp-collapsible > summary { pointer-events: none; }
-
-/* h2, not h1: on TYPO3 the host page already carries the page's h1. Margins and size are
-   set explicitly so host heading rules don't leak in; px because of TYPO3's 62.5% root. */
-.bp-title { margin: 0; font-size: 36px; line-height: 1.2; font-weight: bold; }
 
 .bp-intro-links { font-weight: bold; }
 
 /* Folded sections inside the top blocks (how-to steps, privacy details, the full
    Datenschutzauskunft): only the summary shows until opened. Unlike the blocks'
-   own summaries these stay clickable in every state. The chevron is drawn here rather
-   than left to the native marker, which host stylesheets (TYPO3) switch off. */
-/* tight stacking: the host's body line-height (TYPO3) would otherwise space the rows widely */
-.bp-fold { margin: 2px 0; }
+   own summaries these stay clickable in every state. They follow the accordions of the
+   library's website (.accordeon-container, "Standort" on a branch's page), without its
+   rules between the sections: the heading at text size in regular weight (bold while
+   open, underlined on hover), and at the right an angle in the contrast colour that
+   turns over when open. Font and angle values are the site's, in px. The angle is
+   drawn here: the site's is a glyph of its icon font, and host stylesheets (TYPO3)
+   switch the native marker off. */
+.bp-fold { margin: 0; }
 .bp-fold > summary {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    position: relative;
+    display: block;
     list-style: none;
     cursor: pointer;
-    font-weight: bold;
-    line-height: 1.3;
-    padding: 2px 0;
-    color: #5f5f5f;
+    padding: 6px 50px 6px 0;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 1.36;
+    color: #000;
 }
 .bp-fold > summary::-webkit-details-marker { display: none; }
-.bp-fold > summary::before {
+.bp-fold > summary::after {
     content: "";
-    flex: none;
-    width: 6px;
-    height: 6px;
+    position: absolute;
+    right: 4px;
+    top: 11px;
+    width: 8px;
+    height: 8px;
     border-right: 2px solid var(--contrastcolor, #d14900);
     border-bottom: 2px solid var(--contrastcolor, #d14900);
-    transform: translateX(-2px) rotate(-45deg);
-    transition: transform 0.15s;
+    transform: rotate(45deg);
+    transition: transform 0.3s;
 }
-.bp-fold[open] > summary::before { transform: translateY(-2px) rotate(45deg); }
-.bp-fold > summary:hover { color: var(--contrastcolor, #d14900); }
-.bp-fold[open] { padding-bottom: 4px; }
-.bp-fold > :not(summary) { margin-left: 18px; }
+.bp-fold[open] > summary { margin-bottom: 8px; font-weight: 700; }
+.bp-fold[open] > summary::after { transform: translateY(5px) rotate(-135deg); }
+.bp-fold > summary:hover { text-decoration: underline; }
+.bp-fold[open] { padding-bottom: 8px; }
 .bp-fold li + li { margin-top: 4px; }
 /* The host's list reset (TYPO3 .maincontents ul/li) strips the markers, so the browser
    defaults are restated here for every list in the three top blocks. */
@@ -965,22 +987,25 @@ dialog.bp-lane-status-dialog {
 .bp-privacy-full h4 { margin: 16px 0 4px; }
 .bp-privacy-full hr { margin-top: 16px; border: none; border-top: 1px solid #e4e0d7; }
 
-/* Once activated the top blocks collapse to a row of links. A block the user
-   expands breaks onto its own full-width row and regains the box styling. */
-.bp-landing.is-activated .bp-top-blocks { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 1rem; }
+/* Once activated the top blocks collapse to a row of their headings at text size, each
+   with its icon right beside it; the intro goes by "Intro" instead of its claim. A block the
+   user expands breaks onto its own full-width row and regains the box styling. */
+.bp-intro-short { display: none; }
+.bp-landing.is-activated .bp-intro-claim { display: none; }
+.bp-landing.is-activated .bp-intro-short { display: inline; }
+.bp-landing.is-activated .bp-top-blocks { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 12px 28px; }
 .bp-landing.is-activated .bp-collapsible:not([open]) {
     min-height: 0;
     padding: 0;
     border: none;
     background: none;
 }
-.bp-landing.is-activated .bp-collapsible:not([open]) > summary {
-    font-size: 1em;
-    font-weight: normal;
-    color: var(--contrastcolor, #d14900);
-    text-decoration: underline;
-}
-.bp-landing.is-activated .bp-collapsible[open] { flex: 1 0 100%; }
+.bp-landing.is-activated .bp-collapsible:not([open]) > summary { justify-content: flex-start; align-items: center; gap: 4px; margin-bottom: 0; font-size: 16px; }
+.bp-landing.is-activated .bp-collapsible:not([open]) > summary > .bp-icon { width: 20px; height: 20px; }
+.bp-landing.is-activated .bp-collapsible:not([open]) > summary > .bp-icon svg { height: 13px; }
+.bp-landing.is-activated .bp-collapsible > summary:hover { color: var(--contrastcolor, #d14900); }
+/* border-box: the full row includes the box's own padding */
+.bp-landing.is-activated .bp-collapsible[open] { flex: 1 0 100%; box-sizing: border-box; }
 
 /* <cori-profile> is a cori-sdk light-DOM primitive — the app owns its layout/look.
    Custom elements are inline by default, so make it a block; a size container so its
