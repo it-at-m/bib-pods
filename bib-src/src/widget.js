@@ -812,18 +812,22 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             },
             busy: on => { submit.disabled = on },
             open: (id, book) => {
+                typed++
                 input.value = ""
                 ui.hits([])
                 ui.say(null)
                 openBookPrompt(id, book)
             },
         }
-        let typed = 0       // counts lookups: an answer to an earlier input is dropped
+        // counts what was typed, looked up and picked: an answer to an earlier state
+        // of the card is dropped (also once the card is left)
+        let typed = 0
         let timer = 0
         const run = () => {
             clearTimeout(timer)
-            typed++
-            return lookUpTitle(input.value.trim(), ui)
+            const lookup = ++typed
+            const current = act => (...args) => { if (lookup === typed) act(...args) }
+            return lookUpTitle(input.value.trim(), { say: current(ui.say), hits: current(ui.hits), open: current(ui.open), busy: ui.busy })
         }
         async function suggest() {
             const text = input.value.trim()
@@ -848,6 +852,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             run()
         })
         input.addEventListener("input", () => {
+            typed++
             if (!msg.hidden) ui.say(null)
             clearTimeout(timer)
             timer = setTimeout(suggest, TITLE_SUGGEST_DELAY_MS)

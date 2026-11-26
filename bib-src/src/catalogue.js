@@ -196,15 +196,17 @@ async function fetchFirst(endpoint, field, value) {
 }
 
 // A factor that grows with the copies held, gently: 1 copy counts 0.5, 30 copies 1.5.
-// Records without a count rank like a single copy.
+// Records without a count rank just below a single copy (0.3).
 const COPIES_BOOST = "log(sum(field(copies,max),2))"
 
 // Free-text search for the "Titel hinzufügen" dialog: every typed word must occur in
-// the title or among the authors, title matches rank first. Returns whole records, so a
-// picked hit needs no second lookup, plus the total for "the first n of m".
+// the title or among the authors, title matches rank first. What was typed is searched
+// as text, never as a query on a field of its own ("genre:Roman" looks for those words;
+// uf). Returns whole records, so a picked hit needs no second lookup, plus the total
+// for "the first n of m".
 export async function searchBooks(endpoint, text, rows = 8, extra = {}) {
     const params = new URLSearchParams({
-        q: text, defType: "edismax", qf: "title^3 author^2 author2", "q.op": "AND", rows: String(rows), wt: "json", ...extra,
+        q: text, defType: "edismax", qf: "title^3 author^2 author2", uf: "-*", "q.op": "AND", rows: String(rows), wt: "json", ...extra,
     })
     const res = await fetch(`${endpoint}?${params}`)
     if (!res.ok) throw new Error(`Solr ${res.status}: ${res.statusText}`)
