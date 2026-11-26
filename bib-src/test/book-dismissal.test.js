@@ -41,6 +41,21 @@ test("the dismissal dialog asks through the taste fields' index mappings", () =>
     assert.deepEqual(collectOptions(spec("blockedAuthor"), book).map(o => [o.cleanedLabel, o.iri]), [["Juli Zeh", GND_ZEH]])
 })
 
+test("a value the record repeats is offered once", () => {
+    const NO_IRI = "https://unknown.invalid/"
+    const repeated = {
+        id: "AK36350",
+        topic: ["Wandern", "Wandern", "Wandern"], topic_uri_str_mv: Array(3).fill("https://d-nb.info/gnd/4064532-0"),
+        genre: ["Führer", "Führer"], genre_uri_str_mv: [NO_IRI, NO_IRI],
+        geographic: ["Gasteiner Tal", "Großarltal", "Großarltal"],
+        geographic_uri_str_mv: ["https://d-nb.info/gnd/4019392-5", "https://d-nb.info/gnd/4229670-5", "https://d-nb.info/gnd/4229670-5"],
+    }
+    const offered = property => collectOptions(spec(property), repeated).map(o => o.cleanedLabel)
+    assert.deepEqual(offered("blockedTopic"), ["Wandern"])
+    assert.deepEqual(offered("blockedGenre"), ["Führer"])
+    assert.deepEqual(offered("blockedPlace"), ["Gasteiner Tal", "Großarltal"])
+})
+
 test("every ticked value is blocked, one already in the profile also removed, the title excluded", () => {
     const store = parseTurtle(`
         <${subject}> <${BP}favoriteAuthor> <${GND_ZEH}> ; <${BP}interestedIn> "Schlaf" .

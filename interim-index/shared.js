@@ -339,7 +339,16 @@ export function mapRecord(oaiRecord) {
         // The RSWK subject chains (689) are deliberately not mapped — MSB's
         // export already materializes them into these 6xx fields; see
         // field-notes.md for the measurements behind that decision.
-        topic:                 allAlphaSubfields(marc, ["600", "610", "611", "630", "650", "653", "656"]),
+        // TODO: drop repeated values here, label and IRI together so the arrays stay
+        // position-aligned. The export writes out every element of every chain as a 6xx
+        // field of its own, without removing repeats: AK36350 ("Gasteiner Tal mit
+        // Rauris-, Großarl- und Kleinarltal") has six chains of the form
+        // "<valley> / Wandern / Führer", one per valley in its title, so it carries 650
+        // "Wandern" and 655 "Führer" six times each and 651 "Großarltal" three times. The
+        // index copies that as it is; the plugin's book dialog removes the repeats
+        // (collectOptions in bib-src/src/book-options.js), other consumers don't. Takes
+        // effect with the next full import.
+        topic:                allAlphaSubfields(marc, ["600", "610", "611", "630", "650", "653", "656"]),
         genre:                 [...genre655, ...genreDerived],
         genre_derived:         genreDerived,
         geographic:            allAlphaSubfields(marc, ["651"]),

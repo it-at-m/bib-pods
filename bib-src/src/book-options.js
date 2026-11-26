@@ -23,17 +23,23 @@ export function cleanAuthorName(s) {
     return first ? `${first} ${last}` : last
 }
 
-// One option per value the book carries in the spec's index fields.
+// One option per value the book carries in the spec's index fields. A record repeats
+// a value once per subject chain it occurs in (six chains, six times "Wandern"), so
+// each value is offered once: by its authority IRI, or without one by its label.
 export function collectOptions(spec, book) {
     const clean = spec.source === BP + "favoriteAuthor" ? cleanAuthorName : (s) => s
     const options = []
+    const seen = new Set()
     for (const f of spec.fields) {
         const labels = book[f.labelField]
         if (!labels || labels.length === 0) continue
         const iris = f.iriField ? book[f.iriField] : null
         for (let i = 0; i < labels.length; i++) {
-            const iri = iris?.[i]
-            options.push({ rawLabel: labels[i], cleanedLabel: clean(labels[i]), iri: iri === NO_IRI ? undefined : iri })
+            const iri = iris?.[i] === NO_IRI ? undefined : iris?.[i]
+            const key = iri ?? `label:${labels[i]}`
+            if (seen.has(key)) continue
+            seen.add(key)
+            options.push({ rawLabel: labels[i], cleanedLabel: clean(labels[i]), iri })
         }
     }
     return options
