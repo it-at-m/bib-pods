@@ -518,6 +518,7 @@ dialog.cori-assistant [hidden] { display: none !important; }
     color: #888;
 }
 .cori-assistant-chip[aria-pressed="true"] .cori-assistant-kind { border-color: #777; color: #ccc; }
+.cori-assistant-chip[aria-pressed="true"] .cori-assistant-note { color: #ccc; }
 /* text actions: the fold at the end of a chip list, and the footer's quiet steps */
 .cori-assistant-more,
 .cori-assistant-nav button:not(.button) {

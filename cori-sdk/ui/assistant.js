@@ -45,6 +45,7 @@ const SKOS = "http://www.w3.org/2004/02/skos/core#"
 const CLOSED_IN_VIEW = 12
 const SUGGESTIONS_IN_VIEW = 9
 const SEARCH_DELAY_MS = 200
+let listboxes = 0   // numbers the search fields' hit lists: each needs an id of its own
 
 // The field's closed value set, or null for open fields: the concepts of the
 // cori:allowedValues skos:ConceptScheme in their cori:order (German prefLabel
@@ -220,13 +221,14 @@ export async function openAssistant({ host, onChange, only = null }) {
     })
 
     // A chip that is on or off. `key` finds it again after its list was rebuilt, so
-    // keyboard focus stays where it was.
-    function chip(text, { pressed = null, kind = null, key, onClick }) {
+    // keyboard focus stays where it was. `note` follows the text, as in a search hit.
+    function chip(text, { pressed = null, kind = null, note = null, key, onClick }) {
         const btn = el("button", "cori-assistant-chip")
         btn.type = "button"
         btn.dataset.key = key
         if (kind) btn.append(el("span", "cori-assistant-kind", kind), " ")
         btn.append(text)
+        if (note) btn.append(" ", el("span", "cori-assistant-note", note))
         if (pressed !== null) btn.setAttribute("aria-pressed", String(pressed))
         btn.addEventListener("click", onClick)
         const li = el("li")
@@ -296,8 +298,17 @@ export async function openAssistant({ host, onChange, only = null }) {
         input.spellcheck = false
         input.placeholder = getText(field, CORI + "assistantExample") ?? ""
         input.setAttribute("aria-label", nameOf(field))
+        // a combobox: the input keeps the focus, the hit marked with the arrow keys is
+        // announced through aria-activedescendant
         const results = el("ul", "cori-assistant-results")
         results.hidden = true
+        results.id = `cori-assistant-results-${++listboxes}`
+        results.setAttribute("role", "listbox")
+        results.setAttribute("aria-label", nameOf(field))
+        input.setAttribute("role", "combobox")
+        input.setAttribute("aria-autocomplete", "list")
+        input.setAttribute("aria-controls", results.id)
+        input.setAttribute("aria-expanded", "false")
         const status = el("p", "cori-assistant-status")
         status.setAttribute("role", "status")
         status.hidden = true
@@ -320,10 +331,15 @@ export async function openAssistant({ host, onChange, only = null }) {
             stale = false
             active = -1
             results.hidden = items.length === 0
+            input.setAttribute("aria-expanded", String(items.length > 0))
+            input.removeAttribute("aria-activedescendant")
             results.replaceChildren(...items.map((item, i) => {
                 const btn = el("button", "cori-assistant-result")
                 btn.type = "button"
                 btn.tabIndex = -1    // reached with the arrow keys from the input
+                btn.id = `${results.id}-${i}`
+                btn.setAttribute("role", "option")
+                btn.setAttribute("aria-selected", "false")
                 const name = el("span", "cori-assistant-result-label", item.label)
                 if (item.note) name.append(" ", el("span", "cori-assistant-note", item.note))
                 btn.appendChild(name)
@@ -331,13 +347,18 @@ export async function openAssistant({ host, onChange, only = null }) {
                 if (termFor(item)) btn.appendChild(el("span", "cori-assistant-result-hint", "schon gewählt"))
                 btn.addEventListener("click", () => pick(i))
                 const li = el("li")
+                li.setAttribute("role", "presentation")
                 li.appendChild(btn)
                 return li
             }))
         }
         const mark = (i) => {
             active = i
-            ;[...results.querySelectorAll("button")].forEach((b, n) => b.classList.toggle("is-active", n === i))
+            ;[...results.querySelectorAll("button")].forEach((b, n) => {
+                b.classList.toggle("is-active", n === i)
+                b.setAttribute("aria-selected", String(n === i))
+            })
+            input.setAttribute("aria-activedescendant", `${results.id}-${i}`)
         }
         // the value added last on this card: what the neighbours below go with
         let lastAdded = null
@@ -423,7 +444,7 @@ export async function openAssistant({ host, onChange, only = null }) {
             suggestCaption.textContent = suggestions?.caption ?? ""
             const visible = moreOpen ? open : open.slice(0, SUGGESTIONS_IN_VIEW)
             fill(suggestList, [
-                ...visible.map(item => chip(item.label, { key: item.label, onClick: () => addHere(item) })),
+                ...visible.map(item => chip(item.label, { note: item.note, key: `${item.label} ${item.note ?? ""}`, onClick: () => addHere(item) })),
                 ...foldToggle(open.length - visible.length, "mehr", () => { moreOpen = true; renderSuggestions() }),
             ])
         }
@@ -436,6 +457,7 @@ export async function openAssistant({ host, onChange, only = null }) {
             fill(relatedList, items.map(item => chip(item.label, {
                 // the badge names the field where it isn't this card's own
                 kind: item.field !== field ? item.kind : null,
+                note: item.note,
                 pressed: Boolean(termFor(item)),
                 key: `${item.field} ${item.label}`,
                 onClick: () => toggleItem(item),
