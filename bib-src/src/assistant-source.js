@@ -20,6 +20,13 @@ const TOPIC = BP + "interestedIn"
 const GENRE = BP + "favoriteGenre"
 const PLACE = BP + "interestedInPlace"
 
+// The authors card has a second snapshot for a profile narrowed to children's age
+// groups (bp:preferredAudience without the adults' group): the children's authors.
+// Both names are minted by scripts/extract-value-sets.js.
+const AUDIENCE = BP + "preferredAudience"
+const ADULTS = BP + "audience-Erwachsene"
+const CHILDRENS_AUTHORS = BP + "ChildrensAuthorSuggestions"
+
 // Suggestions describe the newer part of the stock: what was published in the last
 // eight years, as books (the raw tokens behind the media types Buch and E-Book).
 const RECENT = `publishDateSort:[${new Date().getFullYear() - 8} TO *]`
@@ -178,10 +185,21 @@ export function createAssistantSource({ solrEndpoint }) {
         return valueFacts(field, { rawLabel: raw, cleanedLabel: label, iri })
     }
 
-    // A field's bp:suggestedValues snapshot as { caption, items }, or null.
-    function snapshotSuggestions(field) {
+    // The snapshot a field's card offers to this profile: its bp:suggestedValues, for
+    // authors the children's list where the profile looks for children only.
+    function snapshotOf(field, store) {
         const v = getVocab()
-        const scheme = getOne(v, field, BP + "suggestedValues")
+        if (field === AUTHOR && v.getObjects(CHILDRENS_AUTHORS, SKOS + "hasTopConcept", null).length > 0) {
+            const audiences = store.getObjects(getProfileSubject(), AUDIENCE, null).map(o => o.value)
+            if (audiences.length > 0 && !audiences.includes(ADULTS)) return CHILDRENS_AUTHORS
+        }
+        return getOne(v, field, BP + "suggestedValues")
+    }
+
+    // A field's snapshot of suggestions as { caption, items }, or null.
+    function snapshotSuggestions(field, store) {
+        const v = getVocab()
+        const scheme = snapshotOf(field, store)
         if (!scheme) return null
         const concepts = v.getObjects(scheme, SKOS + "hasTopConcept", null).map(c => ({
             raw: getOne(v, c.value, SKOS + "prefLabel"),
@@ -195,8 +213,8 @@ export function createAssistantSource({ solrEndpoint }) {
 
     // The same for every profile, so each field's list is fetched once per page view.
     const suggestionCache = new Map()
-    function suggest(field) {
-        const snapshot = snapshotSuggestions(field)
+    function suggest(field, store) {
+        const snapshot = snapshotSuggestions(field, store)
         if (snapshot) return snapshot
         const spec = SUGGESTIONS[field]
         const labelField = labelFields(field)[0]

@@ -25,9 +25,9 @@
 //   audience-values.ttl — the age groups, from the age recommendation ("ab 8"). Fixed
 //     bands defined by range queries (bp:indexQuery). Stored as concept IRIs.
 //   author-suggestions.ttl — not a closed set but what the assistant offers to tap on
-//     the authors card: the authors the library invests in most visibly, those whose
-//     recent German titles it holds as book, e-book and audiobook alike. The index has
-//     no lending figures; breadth of forms is the nearest sign of demand it carries.
+//     the authors card: the authors of whose recent titles the library holds the most
+//     copies, one list for adults and one for children. The index has no lending
+//     figures; how many copies the library bought is the sign of demand it carries.
 //   index-fields.ttl — which of the fields that not every index has this one carries.
 //     The plugin reads it before it builds on one of them (vocab.js, indexOffers).
 // Every concept carries a cori:order: the assistant shows the first few chips and folds
@@ -35,7 +35,8 @@
 //
 // The index may be older than the mapping (interim-index/shared.js): what needs a field
 // the index doesn't have yet is left out (the content-type media, the age groups: an
-// empty set, which the assistant doesn't ask about), and the script says so.
+// empty set, which the assistant doesn't ask about) or left as it is (the author
+// suggestions), and the script says so.
 
 import { writeFileSync } from "fs"
 import { resolve, dirname } from "path"
@@ -387,34 +388,51 @@ console.log(`wrote ${audiencePath} (${audiences.length} concepts)`)
 // German-language restriction keeps it out.
 const READING_FORMS = ["Druckschrift", "E-Book", "E-Audio", "MP3-CD", "CD"]
 const AUTHOR_SUGGESTIONS = 36
-// How many authors (by record count) are looked at; those further down hold too few
-// recent titles to lead a list of suggestions anyway.
-const AUTHOR_POOL = 1000
 
-const authorQuery = `language:ger AND publishDateSort:[${RECENT_FROM} TO *] AND format:(${READING_FORMS.map(f => `"${f}"`).join(" OR ")}) AND author:[* TO *]`
-const authorFacet = { authors: { type: "terms", field: "author_str", limit: AUTHOR_POOL, facet: { forms: "unique(format_str)" } } }
-const authorRes = await fetch(`${SOLR}?q=${encodeURIComponent(authorQuery)}&rows=0&wt=json&json.facet=${encodeURIComponent(JSON.stringify(authorFacet))}`)
-if (!authorRes.ok) throw new Error(`Solr ${authorRes.status}: ${authorRes.statusText}`)
-const authorPool = (await authorRes.json()).facets.authors.buckets
-// most forms first, then most records
-const suggestedAuthors = authorPool
-    .map(b => ({ label: b.val, count: b.count, forms: b.forms }))
-    .sort((a, b) => b.forms - a.forms || b.count - a.count)
-    .slice(0, AUTHOR_SUGGESTIONS)
-const fewestForms = Math.min(...suggestedAuthors.map(a => a.forms))
+// The authors with the most copies in the stock, summed over their recent
+// German-language titles in the reading forms: what the library bought most of is what
+// its readers ask for most. Children's series are bought in far greater numbers than
+// anything for adults, so the two are counted apart (as the age groups tell them
+// apart) and offered as two lists. The adults' list counts fiction only, as far as the
+// index can tell it: the library indexes non-fiction by subject, so titles without a
+// subject heading are the novels and stories. Without that, travel-guide, cookbook and
+// software-manual authors stand between the novelists.
+const WITHOUT_SUBJECTS = "-topic:[* TO *] -geographic:[* TO *]"
+async function authorsByCopies(audience) {
+    const q = `language:ger AND publishDateSort:[${RECENT_FROM} TO *] AND format:(${READING_FORMS.map(f => `"${f}"`).join(" OR ")}) AND author:[* TO *] ${audience}`
+    const facet = { authors: { type: "terms", field: "author_str", limit: AUTHOR_SUGGESTIONS, sort: "copies desc", facet: { copies: `sum(${COPIES_FIELD})` } } }
+    const res = await fetch(`${SOLR}?q=${encodeURIComponent(q)}&rows=0&wt=json&json.facet=${encodeURIComponent(JSON.stringify(facet))}`)
+    if (!res.ok) throw new Error(`Solr ${res.status}: ${res.statusText}`)
+    return (await res.json()).facets.authors.buckets.map(b => ({ label: b.val, count: b.copies }))
+}
 
 const authorsPath = resolve(OUT_DIR, "author-suggestions.ttl")
-writeFileSync(authorsPath, conceptScheme({
-    schemeName: "AuthorSuggestions",
-    schemeLabel: "Vorschläge für Autor*innen",
-    conceptPrefix: "author-suggestion",
-    values: suggestedAuthors,
-    comment: `Author suggestions: of the ${authorPool.length} authors with the most German-language records published since ${RECENT_FROM} `
-        + `in the forms ${READING_FORMS.join(", ")}, the ${suggestedAuthors.length} held in the most of these forms `
-        + `(${fewestForms} to ${READING_FORMS.length}), ties broken by record count. The label is the catalogue's own name form.`,
-    definition: `Im Bestand als Buch, E-Book und Hörbuch vertreten, mit vielen neueren Titeln.`,
-}))
-console.log(`wrote ${authorsPath} (${suggestedAuthors.length} authors, each in ${fewestForms}+ of ${READING_FORMS.length} forms)`)
+if (offers(COPIES_FIELD) && offers(AGE_FIELD)) {
+    const forAdults = await authorsByCopies(`${NOT_FOR_CHILDREN} ${WITHOUT_SUBJECTS}`)
+    const forChildren = await authorsByCopies(`AND ${FOR_CHILDREN}`)
+    writeFileSync(authorsPath, fileHeader(`Author suggestions: per list the ${AUTHOR_SUGGESTIONS} authors with the most copies held (${COPIES_FIELD}), `
+            + `summed over their German-language records published since ${RECENT_FROM} in the forms ${READING_FORMS.join(", ")}: `
+            + `one list over the titles for adults that carry no subject heading (fiction), one over those with an age recommendation below ${ADULT_FROM}. `
+            + `The label is the catalogue's own name form.`)
+        + scheme({
+            schemeName: "AuthorSuggestions",
+            schemeLabel: "Vorschläge für Autor*innen",
+            conceptPrefix: "author-suggestion",
+            values: forAdults,
+            tally: "copies",
+            definition: `Von ihren neueren Romanen und Erzählungen hat die Bibliothek die meisten Exemplare.`,
+        }) + "\n" + scheme({
+            schemeName: "ChildrensAuthorSuggestions",
+            schemeLabel: "Vorschläge für Kinder- und Jugendbuchautor*innen",
+            conceptPrefix: "childrens-author-suggestion",
+            values: forChildren,
+            tally: "copies",
+            definition: `Von ihren neueren Büchern für Kinder und Jugendliche hat die Bibliothek die meisten Exemplare.`,
+        }))
+    console.log(`wrote ${authorsPath} (${forAdults.length} authors for adults, ${forChildren.length} for children)`)
+} else {
+    console.warn(`left ${authorsPath} as it is: ranking authors needs ${COPIES_FIELD} and ${AGE_FIELD}`)
+}
 
 // ----- Index fields -----
 
