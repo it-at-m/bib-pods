@@ -56,9 +56,29 @@ export function getWebId() {
 // storage interface (e.g. checking what another pod lets this WebID see).
 export const authFetch = (url, init) => session.authFetch(url, init)
 
-export async function login(oidcIssuer, { redirectUri, returnUrl } = {}) {
+// `provider` is what the user entered: the provider's address, or that of a pod or WebID
+// on it ("https://provider.example/alice/"), which issuerOf turns into the provider's.
+export async function login(provider, { redirectUri, returnUrl } = {}) {
     if (returnUrl) localStorage.setItem(returnUrlKey(), returnUrl)
-    await session.login(oidcIssuer, redirectUri)
+    await session.login(await issuerOf(provider), redirectUri)
+}
+
+// The login needs the provider's own address: the issuer its OpenID configuration
+// names. That configuration sits at the entered URL's origin (where the login looks it
+// up too), whatever path the URL carries. The issuer is taken over from the entered
+// host itself or from a parent domain of it (providers that give each pod a subdomain);
+// with any other answer, or none, the input stays as it is for the login to judge.
+async function issuerOf(input) {
+    try {
+        const entered = new URL(input)
+        const response = await fetch(`${entered.origin}/.well-known/openid-configuration`)
+        if (!response.ok) return input
+        const { issuer } = await response.json()
+        const host = new URL(issuer).hostname
+        return host === entered.hostname || entered.hostname.endsWith(`.${host}`) ? issuer : input
+    } catch {
+        return input
+    }
 }
 
 // Called from a static page used as OIDC redirectUri when the host
