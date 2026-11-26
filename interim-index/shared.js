@@ -146,15 +146,21 @@ function rdaCarrierCodes(marc) {
         .filter(code => /^[a-z]{2}$/.test(code))
 }
 
-// RDA content type codes from 336 (controlled by $2 = "rdacontent"), e.g. txt = text,
-// spw = spoken word, prm = performed music, ntm = notated music.
-function rdaContentCodes(marc) {
+// The content types of 336 as [{ code, label }] in document order: $b is the RDA code,
+// $a MSB's German label ("gesprochenes Wort"). What tells an audiobook from a music CD:
+// the medium (245$h, 338) is "CD" for both.
+function rdaContent(marc) {
     return (marc.datafield ?? [])
         .filter(f => f["@_tag"] === "336"
             && String((f.subfield ?? []).find(s => s["@_code"] === "2")?.["#text"] ?? "") === "rdacontent")
-        .map(f => String((f.subfield ?? []).find(s => s["@_code"] === "b")?.["#text"] ?? "").trim())
-        .filter(code => /^[a-z]{3}$/.test(code))
+        .map(f => ({
+            code: String((f.subfield ?? []).find(s => s["@_code"] === "b")?.["#text"] ?? "").trim(),
+            label: String((f.subfield ?? []).find(s => s["@_code"] === "a")?.["#text"] ?? "").trim(),
+        }))
+        .filter(c => /^[a-z]{3}$/.test(c.code))
 }
+
+const rdaContentCodes = marc => rdaContent(marc).map(c => c.code)
 
 // Is the record something to read or listen to being read: a text or a spoken-word
 // recording? Decides whether its subtitle may state a literary genre (see
@@ -170,6 +176,55 @@ function isReading(marc) {
 // cr → online resource). Mirrors authorityUris: mint IRIs at index time rather
 // than pushing bare codes onto consumers.
 const RDA_CARRIER_BASE = "https://id.loc.gov/vocabulary/carriers/"
+
+// The same for the RDA content type codes (spw → spoken word).
+const RDA_CONTENT_BASE = "https://id.loc.gov/vocabulary/contentTypes/"
+
+// 521$a reads "ab <N>" on every record that carries it. What the number means depends
+// on what the record is: on films (336 moving image, which MSB also gives console
+// games) it is the legal age rating (FSK/USK: 0, 6, 12, 16, 18), everywhere else the
+// publisher's or library's recommendation ("ab 8" on a children's book). The two are
+// kept apart: a film rated 12 is no film for twelve-year-olds.
+function minimumAge(marc) {
+    const m = first(subfields(marc, "521", "a"))?.match(/^\s*ab\s+(\d{1,2})\b/)
+    if (!m) return {}
+    const rated = rdaContentCodes(marc).some(c => c === "tdi" || c === "tdm")
+    return rated ? { age_rating: Number(m[1]) } : { audience_age: Number(m[1]) }
+}
+
+// 876$t: the number of copies MSB holds of the title. The export carries no lending
+// figures; how many copies the library bought is the demand signal it does carry.
+function copyCount(marc) {
+    const counts = subfields(marc, "876", "t").filter(t => /^\d+$/.test(t)).map(Number)
+    return counts.length ? Math.max(...counts) : null
+}
+
+// Lower-cased letters and digits, accents folded, everything else a single space.
+function normalizeForKey(s) {
+    return String(s ?? "").normalize("NFKD").replace(/\p{M}+/gu, "").toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, " ").trim()
+}
+
+// A key shared by the records of one work: the print edition, its e-book on the
+// Onleihe, the audiobook, a later edition. They have different ids and ISBNs, and no
+// field links them, so the key is what they have in common: main title (245$a) and
+// main author (100$a, the name without life dates). The volumes of a multi-volume work
+// stay apart by their part designation, which sits in $n/$p or opens the subtitle
+// ("Bd. 3", "2. Die Duloz-Marken"). Titles without a main author get none: "Italien"
+// or "Gesammelte Werke" alone would lump unrelated books together.
+// It is a heuristic with known misses, not an identifier: the Onleihe writes a series
+// volume into the title itself ("Die Schule der magischen Tiere 02: Voller Löcher!"),
+// which then shares no key with the print volume.
+const VOLUME_AT_START = /^(?:(?:bd|band|teil|tl|vol|volume|folge|heft|nr)\.?\s*)?\d+[a-z]?\b/i
+
+function workKey(marc) {
+    const author = normalizeForKey(first(subfields(marc, "100", "a")))
+    // " | <marketing subtitle>" appendices are not part of the title
+    const main = first(subfields(marc, "245", "a"))?.split(" | ")[0]
+    const volume = first(subfields(marc, "245", "b"))?.trim().match(VOLUME_AT_START)?.[0]
+    const title = normalizeForKey([main, ...subfields(marc, "245", "n"), ...subfields(marc, "245", "p"), volume].filter(Boolean).join(" "))
+    return author && title ? `${title}|${author}` : null
+}
 
 // Münchner Stadtbibliothek's own human-readable medium designator from 245$h,
 // e.g. "E-Paper", "Druckschrift", "CD", "Buch + CD". The square brackets are the
@@ -196,7 +251,7 @@ function onleiheIds(marc) {
 }
 
 // https://www.loc.gov/marc/bibliographic
-function mapRecord(oaiRecord) {
+export function mapRecord(oaiRecord) {
     const marc = oaiRecord.metadata.record[0]
 
     const title_short = trimEndPunct(first(subfields(marc, "245", "a")))
@@ -205,6 +260,7 @@ function mapRecord(oaiRecord) {
 
     const dates = getDates(marc)
     const carriers = rdaCarrierCodes(marc)
+    const content = rdaContent(marc)
 
     // Genre: the 655 terms, plus the literary genres a text's or reading's subtitle
     // states (derived-genre.js) — the only genre information fiction carries, since
@@ -255,6 +311,18 @@ function mapRecord(oaiRecord) {
         format:            mediumLabel(marc),
         format_uri_str_mv: carriers.map(c => RDA_CARRIER_BASE + c),
         electronic:        carriers.includes("cr"),
+
+        // Content type (336): what is on the medium. Label and IRI are position-aligned.
+        content:             content.map(c => c.label),
+        content_uri_str_mv:  content.map(c => RDA_CONTENT_BASE + c.code),
+
+        // Age (521): audience_age where "ab N" recommends, age_rating where it is a
+        // film or game rating; a record carries at most one of the two.
+        ...minimumAge(marc),
+
+        // Copies held (876$t), and the key that ties the records of one work together.
+        copies:            copyCount(marc),
+        work_key:          workKey(marc),
 
         // Identifiers (VuFind: isbn=020a:773z, issn=022a)
         isbn:             [...subfields(marc, "020", "a"), ...subfields(marc, "773", "z")],

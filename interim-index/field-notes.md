@@ -86,6 +86,49 @@ Rationale: consumers should never have to know that `(DE-588)4211695-8` means
 - **Titles**: trailing ISBD punctuation (`" /"`, `" :"`) is stripped from 245a/b.
   Some titles carry `" | <marketing subtitle>"` appendices; the interim index keeps
   them (consumers split on `" | "` for display).
+- The four that follow were measured on 26 November 2026 over the whole catalogue as
+  the importer maps it (1,240,288 records, every record in its latest state).
+- **Content type**: 336 (`$2=rdacontent`) says what is on the medium: `$b` the RDA
+  code, `$a` MSB's German label (Text, gesprochenes Wort, aufgeführte Musik, Noten,
+  unbewegtes Bild, zweidimensionales bewegtes Bild, …) → `content`, with the code minted
+  as LoC IRI (`https://id.loc.gov/vocabulary/contentTypes/<code>`) →
+  `content_uri_str_mv`, position-aligned. This is the only thing that tells an
+  audiobook from a music album: `format` is "CD" for both. Spoken word (`spw`): 19,290
+  records (E-Audio 7.9k, CD 6.9k, MP3-CD 3.1k); performed music (`prm`): 46,703 (CD
+  39k, LP 6.6k). **34,893 CDs carry no content type** and stay just "CD", among them
+  children's audio plays. The plugin offers "Hörbuch" and "Musik" next to the media
+  types on this field.
+- **Age**: 521$a reads `ab <N>` on every record that carries it (one field per record,
+  first indicator 4), but the number means two different things. On films (336
+  `tdi`/`tdm`, which MSB also gives console games) it is the legal rating, FSK/USK 0, 6,
+  12, 16, 18 → `age_rating` (23,562 records). Everywhere else it is a recommendation
+  ("ab 8" on a children's book, an audio play, a board game) → `audience_age` (72,898
+  records, 62,596 of them books: up to 5 years 23,918 records, 6 to 9 25,637, 10 to 12
+  13,600, 13 to 15 9,255, 16 and over 488). A record carries at most one of the two.
+  The recommendation reaches about three times as many books as the children's and
+  youth genres of 655 do (20,822 records); only 1,306 records with such a genre lack
+  it. **E-books and e-audio carry no 521 at all**, so a children's e-book has no age.
+- **Copies**: 876 occurs once per record with nothing but a numeric `$t` → `copies`.
+  We read it as the number of copies held; MSB has not confirmed that, but the values
+  behave like it: 87% of the records say 1, and the books since 2020 with the highest
+  values are the bestsellers of those years (Daniel Glattauer, Caroline Wahl, Martin
+  Suter, each around 30). The export has no lending figures, so this is the one demand
+  signal in it. Summed per author it needs the age next to it: children's series are
+  bought in far greater numbers than anything for adults (Ulf Blanck 2,614 copies of
+  recent titles, Sebastian Fitzek 501).
+- **Work key**: the same work exists as several records with different ids and ISBNs
+  (print, Onleihe e-book, audiobook, later edition) and no field links them.
+  `work_key` is what they share: normalised main title (245$a, plus the
+  part designation from `$n`/`$p` or the start of `$b`, so volumes stay apart) and main
+  author (100$a without life dates); records without a main author get none. 716,652
+  records carry one (615,846 distinct keys); 63,710 keys tie 164,516 records together,
+  13,219 of them across media. A heuristic, not an identifier. Known misses: the
+  Onleihe writes a series volume into the title itself ("Die Schule der magischen
+  Tiere 02: Voller Löcher!"), which shares no key with the print volume. Known lumps:
+  bilingual picture books (one key for all language pairs) and children's adaptations
+  of classics that keep title and author (one key for Defoe's Robinson Crusoe and its
+  retellings "ab 10" and "ab 12"), which is why the plugin does not carry an age from one record to
+  the others of its key.
 - **Series**: 800/830 carry `$w` (control number of the linked series authority,
   e.g. `(DE-M36)AK1120883`) which is *alphabetic* and would leak into display strings
   if mapped naively with an all-alpha-subfields rule — 800 uses `abcdfpqt`, 830 `ap`.
@@ -107,6 +150,11 @@ Rationale: consumers should never have to know that `(DE-588)4211695-8` means
 | `era` (+uri) | 648 | 3.6% | messy, zero GND, see §4 |
 | `language` | 008/35-37, 041 adhj | 100% | but 49% `unb`, see §4 |
 | `format`, `format_uri_str_mv`, `electronic` | 245$h, 338 | 98% | see §2 |
+| `content` (+uri) | 336 `$a`, `$b` | 93.8% | content type, see §2 |
+| `audience_age` | 521$a, not on films and games | 5.9% | recommended minimum age, integer, see §2 |
+| `age_rating` | 521$a on films and games | 1.9% | FSK/USK rating, integer, see §2 |
+| `copies` | 876$t | 94.2% | integer, see §2 |
+| `work_key` | 245 `$a$n$p` (+ volume from `$b`), 100$a | 57.8% | ties editions together, see §2 |
 | `publisher`, `publishDate`, `publishDateSort` | 264/260 | ~89% | |
 | `edition` | 250a | 22% | |
 | `physical` | 300 | 90% | |
@@ -225,26 +273,12 @@ is used. The routing that was implemented and verified: `$D g` → geographic,
 `$A z` → era, `$A f` → genre, everything else → topic; dedup pairwise against the
 6xx-derived label+IRI arrays.
 
-### Content and media type (336/337) — recommended for production
+### Media type (337)
 
-The index knows the *carrier* (338 → `format`) but not *what kind of content* is on
-it. The case that matters: `format:"CD"` (80k records) mixes music CDs and
-audiobooks with no way to tell them apart. 336 (`$2=rdacontent`) is the discriminator:
-Text, gesprochenes Wort (= audiobook), aufgeführte Musik, Noten, unbewegtes Bild,
-zweidimensionales bewegtes Bild, …. 337 (`$2=rdamedia`) is the third RDA axis
-(ohne Hilfsmittel zu benutzen / audio / Computermedien / video / Mikroform).
-Recipe: mirror the 338 handling — label from `$a`, LoC IRI from `$b`
-(`https://id.loc.gov/vocabulary/contentTypes/<code>`, e.g. `spw` for spoken word).
-This is what makes a "Hörbuch" preference expressible. The mapping already reads the
-336 codes, but only to decide which records may get a derived genre (§4); they are
-not indexed.
-
-### Audience / age recommendation (521) — recommended for production
-
-8.5% of records (concentrated in children's media, where it counts) carry 521$a, and
-in a 2,220-field sample **every single value** matched the exact pattern `ab <N>`
-("ab 4", "ab 12", …). A clean, directly filterable age-band facet for kids/family
-features. One-line mapping.
+337 (`$2=rdamedia`) is the third RDA axis next to content (336) and carrier (338):
+ohne Hilfsmittel zu benutzen / audio / Computermedien / video / Mikroform. Nothing
+has needed it so far; the recipe is the one of 336 and 338 (label from `$a`, LoC IRI
+from `$b`).
 
 ### Blurbs (520) — inline half is a one-liner, the rest is a crawl decision
 
@@ -263,8 +297,9 @@ field would be the substrate for any in-house semantic similarity.
 - **035**: system control numbers, including sub-institution variants of the same AK
   id (`(DE-M36:DE-M36b)AK…`) — the raw material for understanding the DE-M36b/c/d/e
   sub-collections.
-- **876**: present on 90% of records but carries only a numeric `$t` in our data
-  (likely copy count). Unexplored; item-level data would normally live here.
+- **876**: only its `$t` exists in our data and is mapped (`copies`, §2). Item-level
+  data (branch, call number, availability) would normally live here and is not in
+  the export.
 - **024**: EAN/ISBN-13-like identifiers without `$2` (14%). Redundant with 020 for
   books; possibly useful for non-book media matching.
 - **500/546/518/505 etc.**: notes fields; 505 (contents) is mapped, the rest are
@@ -291,6 +326,19 @@ Observed consequences — all verified against the live core:
   any GND author" is not expressible.
 - **Faceting on the base fields returns empty**; it works only on the auto-generated
   `*_str` copyFields (docValues strings) — which are **truncated at 256 chars**.
+- **Numbers are guessed as multiValued longs** (`plongs`: `audience_age`,
+  `age_rating`, `copies`). Range queries (`audience_age:[6 TO 9]`) and the JSON Facet
+  `sum(copies)` work on them; function queries need the multi-value form
+  (`field(copies,max)`).
+- **A join on a `*_str` twin needs `method=topLevelDV`.** The twins are docValues-only
+  (not indexed), and the default join method reads indexed terms: it returns nothing,
+  without an error. `{!join from=work_key_str to=work_key_str method=topLevelDV}`
+  works, at about 100 ms per distinct filter on the full index (then cached).
+- **Solr's default 512 MB heap is easy to exhaust from /select.** A terms facet over a
+  high-cardinality field sorted by a nested `unique()` (tried on `work_key_str`) ran
+  the JVM out of memory, and Solr is started to crash on that. The container has no
+  restart policy, so it stays down. Whatever is reachable through the proxy can do
+  this; see §7.
 - Case-sensitive exact matching and no German analysis (no stemming, no decompounding)
   — irrelevant for the plugin's exact-value matching, inadequate for user-facing search.
 
@@ -324,6 +372,20 @@ The TYPO3/docs plugin (bib-src) talks to the index read-only and relies on:
   on `language` and uses the JSON Facet API (`unique(format_str)` per author).
   A production schema must keep facetable string twins of every label field and
   prefix-searchable label and title fields, or replace both with a suggester.
+- **Fields not every index has** (`content_uri_str_mv`, `audience_age`, `copies`,
+  `work_key`): Solr answers a query on a field it has never seen with a 400, so the
+  plugin does not ask for them blindly. `bib-src/scripts/extract-value-sets.js` probes
+  the index and records what it found (`resources/index-fields.ttl`); the plugin
+  builds on a field only when that snapshot lists it. With them it sends: phrase
+  queries on `content_uri_str_mv` ("Hörbuch", "Musik" as media choices), range queries
+  on `audience_age` (the age groups; adults are `-audience_age:[0 TO 15]` minus the
+  children's genres), `boost=log(sum(field(copies,max),2))` in the title search, and
+  one negative join per profile,
+  `-_query_:"{!join from=work_key_str to=work_key_str method=topLevelDV}id:(AK… AK…)"`,
+  which drops every record sharing a work with a saved or dismissed title. The
+  snapshot script also sums `copies` per author (JSON Facet API) over records without
+  subject headings (`-topic:[* TO *] -geographic:[* TO *]`: the library indexes
+  non-fiction by subject, so what carries none is fiction).
 - **Explanations**: the "why recommended" tooltips re-check profile facts against the
   *stored* field values of a returned doc — string-exact. Stored values must remain
   verbatim (analysis may normalize indexed terms, but not stored ones).
@@ -335,11 +397,17 @@ The TYPO3/docs plugin (bib-src) talks to the index read-only and relies on:
 - **Covers** key on ISBN (via the inspira `/image/{isbn}` route) — the `isbn` field
   matters beyond bibliographic display.
 
-One known content-level issue for recommendation consumers: the same work often
-exists twice (print + Onleihe e-book) with **different ids and different ISBNs** —
-per-id exclusion of saved books lets the twin back into recommendations. A
-production index could add a work-level key (uniform title 240/130, or the 800/830
-`$w` links) to enable work-level dedup; currently parked.
+The same work often exists several times (print, Onleihe e-book, audiobook, later
+edition) with **different ids and different ISBNs**, so excluding a saved book by its
+id lets its other editions back into the recommendations. `work_key` (§2) is the
+interim answer: the plugin excludes by work where the index carries the key, and
+shows a work once per lane. A production index with real work-level data (uniform
+titles, a work authority, the 800/830 `$w` links) should replace the heuristic.
+
+The proxy lets every `/select` parameter through, including expensive facets (§6).
+For an internet-facing index that is an availability risk: give the container a
+restart policy and more heap, and consider limiting the parameters the proxy
+forwards to the ones listed here.
 
 ## 8. Import pipeline notes (if reused)
 
@@ -352,3 +420,10 @@ retry; the cursor only advances after a batch's POST acks, so a crash resumes
 without loss; OAI deletion markers are honored via `oai_identifier` delete queries.
 `import-all.js` clears the cursor first (full reseed), `import-incremental.js`
 doesn't.
+
+**After a reindex**, run `npm run extract-value-sets` in `bib-src`: it regenerates the
+value sets the plugin bundles (genres, languages, media, age groups, author
+suggestions) and the record of which fields the index carries, which is what switches
+on the plugin features built on fields the index did not have before (§7). A change to `mapRecord`
+reaches the index only through a full import (`npm run solr:import-all`, an upsert of
+every record); the incremental import maps only what the harvest brought since.
