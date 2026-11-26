@@ -103,10 +103,12 @@
             <div class="rules">
                 <h2 id="matching">Gemeinsam für alle Solr-Strategien</h2>
                 <p>Die Profileinträge werden über die Indexzuordnungen im Vokabular gesucht.
-                    Vorschläge schließen gemerkte und ausgeblendete Bücher aus, ebenso Bücher mit
-                    einem Wert, den du unter „Nicht mehr vorschlagen“ ausgeschlossen hast (etwa
-                    eine Autor*in oder ein Thema). Sprach- und Medienartpräferenzen gelten
-                    zusätzlich, etwa „Deutsch oder Englisch, und als E-Book“.</p>
+                    Vorschläge schließen gemerkte und ausgeblendete Bücher aus, samt ihren anderen
+                    Ausgaben (E-Book, Hörbuch, Neuauflage), soweit der Index sie einander zuordnet;
+                    ebenso Bücher mit einem Wert, den du unter „Nicht mehr vorschlagen“
+                    ausgeschlossen hast (etwa eine Autor*in oder ein Thema). Die Einschränkungen
+                    aus deinem Profil gelten zusätzlich, etwa „Deutsch oder Englisch, und als
+                    E-Book“.</p>
 
                 <h2 id="solr-or">Solr mit OR: Kombination zuerst, dann ausgleichen</h2>
                 <p>Für Themen, Autor*innen, Genres sowie Orte und Regionen genügt ein passender
@@ -287,14 +289,15 @@
                         a.appendChild(code)
                         queryCell.appendChild(a)
                         if (query.fq.length > 0) {
-                            // -id: fq's exclude saved and dismissed titles, other negative
-                            // fq's blocked values; the rest are preference filters
-                            // (bp:RecommendationFilter: Sprache, Medienart)
+                            // -id: fq's exclude saved and dismissed titles, the join fq
+                            // their other editions, other negative fq's blocked values;
+                            // the rest are preference filters (bp:RecommendationFilter)
                             const titles = query.fq.filter(f => f.startsWith("-id:")).length
-                            const values = query.fq.filter(f => f.startsWith("-") && !f.startsWith("-id:")).length
-                            const preferences = query.fq.length - titles - values
+                            const editions = query.fq.filter(f => f.startsWith("-_query_:")).length
+                            const values = query.fq.filter(f => f.startsWith("-")).length - titles - editions
+                            const preferences = query.fq.length - titles - editions - values
                             const parts = []
-                            if (titles > 0) parts.push(`${titles} ausgeschlossene Titel`)
+                            if (titles > 0) parts.push(`${titles} ausgeschlossene Titel${editions > 0 ? " samt anderen Ausgaben" : ""}`)
                             if (values > 0) parts.push(`${values} ausgeschlossene Werte`)
                             if (preferences > 0) parts.push(`${preferences} fq-Präferenzfilter`)
                             const fqNote = document.createElement("span")

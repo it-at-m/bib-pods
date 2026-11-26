@@ -1,6 +1,6 @@
 import { getVocab, contractTerm, RDF_TYPE, RDFS_LABEL, RDFS } from "cori-sdk/utils.js"
 import { sparqlSelect } from "@foerderfunke/sem-ops-utils/sparql"
-import { BP, LOCAL } from "./vocab.js"
+import { BP, LOCAL, indexOffers } from "./vocab.js"
 import { recommendFromSavedBooks, sendableSavedIds } from "./qdrant.js"
 
 const INSPIRA_ENGINE = BP + "InspiraEngine"
@@ -197,13 +197,16 @@ export function buildQuery(strategy, profileStore, profileSubject) {
     return { q, fq: constraints(profileStore, profileSubject) }
 }
 
-// What every Solr query of this profile runs under: -id: exclusions (see excludedIds),
-// one negative clause per blocked value (see blockFilters) and, unless left out, the
-// profile's preference filters (see preferenceFilters).
+// What every Solr query of this profile runs under: -id: exclusions (see excludedIds)
+// and their works (see excludedWorks), one negative clause per blocked value (see
+// blockFilters) and, unless left out, the profile's preference filters (see
+// preferenceFilters).
 function constraints(profileStore, profileSubject, { preferences = true } = {}) {
     const v = getVocab()
+    const excluded = excludedIds(v, profileStore, profileSubject)
     return [
-        ...excludedIds(v, profileStore, profileSubject).map(id => `-id:"${escapeSolr(id)}"`),
+        ...excluded.map(id => `-id:"${escapeSolr(id)}"`),
+        ...excludedWorks(excluded),
         ...blockFilters(v, profileStore, profileSubject),
         ...(preferences ? preferenceFilters(v, profileStore, profileSubject) : []),
     ]
@@ -241,6 +244,19 @@ export function hasPreferenceFilters(profileStore, profileSubject) {
 function excludedIds(v, profileStore, profileSubject) {
     return v.getSubjects(RDF_TYPE, BP + "RecommendationExclusion", null)
         .flatMap(prop => profileStore.getObjects(profileSubject, prop, null).map(o => o.value))
+}
+
+// A saved or dismissed title exists in the catalogue more than once: as print and as
+// e-book, in a later edition, as audiobook, each a record with an id of its own. Where
+// the index ties them together (work_key), one filter drops every record that shares a
+// work with an excluded id: a join of the index with itself, from the excluded records'
+// keys to all records carrying one of them. Only ids of the catalogue's own shape take
+// part, so nothing from the profile reaches the nested query as syntax.
+function excludedWorks(ids) {
+    if (!indexOffers("work_key")) return []
+    const catalogueIds = ids.filter(id => /^AK\d+$/.test(id))
+    if (catalogueIds.length === 0) return []
+    return [`-_query_:"{!join from=work_key_str to=work_key_str method=topLevelDV}id:(${catalogueIds.join(" ")})"`]
 }
 
 // A blocklist field's value, queried through the index mapping of the taste field it
@@ -321,7 +337,10 @@ export function selectDiverseDocs(pools, limit, { matches = () => [], lead = nul
     const positions = pools.map(() => 0)
     const coverage = pools.map(() => 0)
     const normalize = value => String(value ?? "").normalize("NFKC").toLocaleLowerCase("de-DE").replace(/\s+/g, " ").trim()
+    // the index's own key for a work where it has one (print and audiobook differ in
+    // their subtitles), else title and author as they stand
     const workOf = doc => {
+        if (doc.work_key?.[0]) return doc.work_key[0]
         const title = normalize(doc.title?.[0])
         return title ? `${title}\n${normalize(doc.author?.[0])}` : null
     }
@@ -518,11 +537,16 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
     return { results, serverUnreachable }
 }
 
-// Blocked values can't be read off inspira's sparse metadata, so the index decides: one
-// query for the lane's ids under the blocklist filters keeps the books that pass. If the
-// index can't answer, the lane stays as it is rather than going empty.
+// Blocked values and the other editions of excluded titles can't be read off inspira's
+// sparse metadata, so the index decides: one query for the lane's ids under those
+// filters keeps the books that pass. If the index can't answer, the lane stays as it
+// is rather than going empty.
 async function withoutBlocked(docs, profileStore, profileSubject, solrEndpoint) {
-    const blocks = blockFilters(getVocab(), profileStore, profileSubject)
+    const v = getVocab()
+    const blocks = [
+        ...excludedWorks(excludedIds(v, profileStore, profileSubject)),
+        ...blockFilters(v, profileStore, profileSubject),
+    ]
     if (blocks.length === 0 || docs.length === 0) return docs
     const ids = docs.map(doc => doc.id)
     try {
