@@ -121,7 +121,7 @@ function slug(label) {
 }
 
 function ttlString(s) {
-    return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+    return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`
 }
 
 // What every generated file starts with.
