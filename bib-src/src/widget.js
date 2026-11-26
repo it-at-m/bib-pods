@@ -861,20 +861,42 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
         let renders = 0
         async function renderSaved() {
             const render = ++renders
-            let ids = []
+            let terms = []
             try {
-                ids = (await loadStore()).getObjects(getProfileSubject(), BP + "savedBook", null).map(o => o.value)
+                terms = (await loadStore()).getObjects(getProfileSubject(), BP + "savedBook", null)
             } catch (err) {
                 console.error("[bib-pods] reading the Merkliste failed:", err)
             }
             if (render !== renders) return
-            savedLabel.hidden = saved.hidden = ids.length === 0
-            saved.replaceChildren(...ids.map(id => {
+            savedLabel.hidden = saved.hidden = terms.length === 0
+            saved.replaceChildren(...terms.map(term => {
                 const li = document.createElement("li")
-                li.textContent = id
-                fetchDocCached(id).then(doc => { if (doc?.title?.[0]) li.textContent = doc.title[0].split(" | ")[0] })
+                const name = document.createElement("span")
+                name.textContent = term.value
+                const remove = document.createElement("button")
+                remove.type = "button"
+                remove.className = "cori-profile-chip-remove"
+                remove.textContent = "×"
+                remove.title = "Entfernen"
+                const describe = () => remove.setAttribute("aria-label", `„${name.textContent}" entfernen`)
+                describe()
+                fetchDocCached(term.value).then(doc => {
+                    if (doc?.title?.[0]) { name.textContent = doc.title[0].split(" | ")[0]; describe() }
+                })
+                remove.addEventListener("click", () => unsaveTitle(term))
+                li.append(name, remove)
                 return li
             }))
+        }
+        // the list follows through PROFILE_SAVED
+        async function unsaveTitle(term) {
+            try {
+                await removeProfileFact(BP + "savedBook", term)
+                applyState()
+            } catch (err) {
+                console.error("[bib-pods] removing a saved title failed:", err)
+                window.alert("Eintrag konnte nicht entfernt werden:\n" + storageErrorMessage(err))
+            }
         }
         renderSaved()
         window.addEventListener(PROFILE_SAVED, renderSaved)
