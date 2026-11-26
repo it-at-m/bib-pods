@@ -209,19 +209,23 @@ function normalizeForKey(s) {
 // Onleihe, the audiobook, a later edition. They have different ids and ISBNs, and no
 // field links them, so the key is what they have in common: main title (245$a) and
 // main author (100$a, the name without life dates). The volumes of a multi-volume work
-// stay apart by their part designation, which sits in $n/$p or opens the subtitle
-// ("Bd. 3", "2. Die Duloz-Marken"). Titles without a main author get none: "Italien"
-// or "Gesammelte Werke" alone would lump unrelated books together.
+// stay apart by their part designation, which sits in $n/$p or opens the subtitle: a
+// number after a volume word ("Bd. 3", "Band 3"), an ordinal ("3. Die Duloz-Marken") or
+// a number that is the whole subtitle, each keyed as the bare number. A subtitle that
+// merely starts with a figure ("50 süße Rezepte", "1844-1910") names no part. Titles
+// without a main author get none: "Italien" or "Gesammelte Werke" alone would lump
+// unrelated books together.
 // It is a heuristic with known misses, not an identifier: the Onleihe writes a series
 // volume into the title itself ("Die Schule der magischen Tiere 02: Voller Löcher!"),
 // which then shares no key with the print volume.
-const VOLUME_AT_START = /^(?:(?:bd|band|teil|tl|vol|volume|folge|heft|nr)\.?\s*)?\d+[a-z]?\b/i
+const VOLUME_AT_START = /^(?:(?:bd|band|teil|tl|vol|volume|folge|heft|nr)\.?\s*(\d+[a-z]?)\b|(\d+[a-z]?)(?:\.(?=\s|$)|$))/i
 
 function workKey(marc) {
     const author = normalizeForKey(first(subfields(marc, "100", "a")))
     // " | <marketing subtitle>" appendices are not part of the title
     const main = first(subfields(marc, "245", "a"))?.split(" | ")[0]
-    const volume = first(subfields(marc, "245", "b"))?.trim().match(VOLUME_AT_START)?.[0]
+    const part = trimEndPunct(first(subfields(marc, "245", "b")))?.match(VOLUME_AT_START)
+    const volume = part?.[1] ?? part?.[2]
     const title = normalizeForKey([main, ...subfields(marc, "245", "n"), ...subfields(marc, "245", "p"), volume].filter(Boolean).join(" "))
     return author && title ? `${title}|${author}` : null
 }

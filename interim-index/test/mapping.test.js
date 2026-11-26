@@ -101,12 +101,24 @@ test("work key: the volumes of one work stay apart", () => {
 
 test("work key: a volume named at the start of the subtitle keeps volumes apart", () => {
     const volume = b => mapRecord(record([["100", { a: "Koike, Kazuo" }], ["245", { a: "Lone wolf & cub :", b }]])).work_key
-    assert.equal(volume("Bd. 1"), "lone wolf cub bd 1|koike kazuo")
+    assert.equal(volume("Bd. 1"), "lone wolf cub 1|koike kazuo")
     assert.notEqual(volume("Bd. 1"), volume("Bd. 10"))
     assert.equal(volume("2a. Die Duloz-Plattenfehler"), "lone wolf cub 2a|koike kazuo")
-    // a subtitle that merely starts with a word is none
-    assert.equal(volume("Roman"), "lone wolf cub|koike kazuo")
-    assert.equal(volume("Bandsalat und andere Geschichten"), "lone wolf cub|koike kazuo")
+    // one part, however it is written
+    assert.equal(volume("Band 2"), volume("Bd. 2"))
+    assert.equal(volume("2. Der Aufbruch"), volume("Bd. 2"))
+    assert.equal(volume("2 /"), volume("Bd. 2"))
+})
+
+test("work key: a subtitle that starts with a word or a figure names no part", () => {
+    const key = b => mapRecord(record([["100", { a: "Koike, Kazuo" }], ["245", { a: "Lone wolf & cub :", b }]])).work_key
+    const plain = "lone wolf cub|koike kazuo"
+    assert.equal(key("Roman"), plain)
+    assert.equal(key("Bandsalat und andere Geschichten"), plain)
+    assert.equal(key("50 süße Rezepte für kleine Formen"), plain)
+    assert.equal(key("1844-1910"), plain)
+    assert.equal(key("46.000 Kilometer Roadtrip durch Afrika"), plain)
+    assert.equal(key("7.-10. Klasse"), plain)
 })
 
 test("work key: none without a main author or a title", () => {

@@ -121,8 +121,12 @@ Rationale: consumers should never have to know that `(DE-588)4211695-8` means
   `work_key` is what they share: normalised main title (245$a, plus the
   part designation from `$n`/`$p` or the start of `$b`, so volumes stay apart) and main
   author (100$a without life dates); records without a main author get none. 716,652
-  records carry one (615,846 distinct keys); 63,710 keys tie 164,516 records together,
-  13,219 of them across media. A heuristic, not an identifier. Known misses: the
+  records carry one (615,313 distinct keys); 64,000 keys tie 165,339 records together,
+  13,273 of them across media. In `$b` a part is a number after a volume word
+  ("Bd. 3"), an ordinal ("3. Die Duloz-Marken") or a number alone, keyed as the bare
+  number; of the 9,198 subtitles of keyed records that start with a figure, 8,334 are
+  no part at all ("20 ausgewählte Routen", "1844-1910") and stay out of the key.
+  A heuristic, not an identifier. Known misses: the
   Onleihe writes a series volume into the title itself ("Die Schule der magischen
   Tiere 02: Voller Löcher!"), which shares no key with the print volume. Known lumps:
   bilingual picture books (one key for all language pairs) and children's adaptations
