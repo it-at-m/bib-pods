@@ -451,7 +451,7 @@ export async function countMatches(query, solrEndpoint) {
 
 // runs every enabled strategy against its engine (Solr index or the inspira recommender)
 // and returns:
-//   { results: [{ strategy, docs: [...] }], serverUnreachable: bool }
+//   { results: [{ strategy, docs: [...], unfiltered? }], serverUnreachable: bool }
 // `limit` caps each strategy's results; a strategy's bp:maxSuggestions overrides it.
 // Strategies resolved off (seed defaults + the profile's explicit choices, see
 // resolveStrategyEnabled) are skipped, as are Solr strategies that yield no clauses
@@ -495,7 +495,15 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
                         isbn: meta.isbn ? [meta.isbn] : undefined,
                     }
                 }).filter(doc => !excluded.has(doc.id))
-                results.push({ strategy, docs: (await checkedAgainstIndex(docs, profileStore, profileSubject, solrEndpoint)).slice(0, wanted) })
+                const lane = (await checkedAgainstIndex(docs, profileStore, profileSubject, solrEndpoint)).slice(0, wanted)
+                const result = { strategy, docs: lane }
+                // a lane the preference filters emptied says how many titles they keep
+                // out of it: the page then names the filters, not the profile, as the reason
+                if (lane.length === 0 && docs.length > 0 && hasPreferenceFilters(profileStore, profileSubject)) {
+                    const without = await checkedAgainstIndex(docs, profileStore, profileSubject, solrEndpoint, { preferences: false })
+                    result.unfiltered = Math.min(without.length, wanted)
+                }
+                results.push(result)
             } catch (err) {
                 console.error(`[bib-pods] ${strategy.label} failed:`, err)
             }
@@ -545,14 +553,14 @@ export async function runRecommendations(profileStore, profileSubject, { solrEnd
 // lane's ids under the profile's blocked values, its preference filters and the other
 // editions of excluded titles keeps the books that pass, each work once where the
 // index carries the key. If the index can't answer, the lane stays as it is rather
-// than going empty.
-async function checkedAgainstIndex(docs, profileStore, profileSubject, solrEndpoint) {
+// than going empty. `preferences: false` leaves the preference filters out.
+async function checkedAgainstIndex(docs, profileStore, profileSubject, solrEndpoint, { preferences = true } = {}) {
     const v = getVocab()
     const byWork = indexOffers("work_key")
     const filters = [
         ...excludedWorks(excludedIds(v, profileStore, profileSubject)),
         ...blockFilters(v, profileStore, profileSubject),
-        ...preferenceFilters(v, profileStore, profileSubject),
+        ...(preferences ? preferenceFilters(v, profileStore, profileSubject) : []),
     ]
     if ((filters.length === 0 && !byWork) || docs.length === 0) return docs
     const ids = docs.map(doc => doc.id)

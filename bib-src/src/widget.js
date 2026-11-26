@@ -973,9 +973,11 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             if (run !== shelfRun) return
             shelf = results.filter(({ docs }) => docs.length > 0)
             shelfNote = shelf.length > 0 ? null : serverUnreachable ? SHELF_NOTES.unreachable : SHELF_NOTES.empty
-            // An empty shelf with filters set: is it the filters that leave nothing?
+            // An empty shelf with filters set: is it the filters that leave nothing? The
+            // Solr lanes are counted without them, the inspira lane reports its own number.
             if (shelfNote === SHELF_NOTES.empty && hasPreferenceFilters(profileStore, getProfileSubject())) {
-                const unfiltered = await countMatches(buildShelfQuery(profileStore, getProfileSubject(), { preferences: false }), solrEndpoint)
+                const inIndex = await countMatches(buildShelfQuery(profileStore, getProfileSubject(), { preferences: false }), solrEndpoint)
+                const unfiltered = (inIndex ?? 0) + results.reduce((n, result) => n + (result.unfiltered ?? 0), 0)
                 if (run !== shelfRun) return
                 if (unfiltered) {
                     shelfNote = SHELF_NOTES.filtered

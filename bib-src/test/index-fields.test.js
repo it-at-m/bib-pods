@@ -108,6 +108,20 @@ test("the inspira lane keeps to the profile's filters and shows a work once", as
     assert.equal(asked[0].get("fl"), "id,work_key")
 })
 
+test("an inspira lane emptied by the preference filters says how many titles they keep out", async t => {
+    indexOffering()
+    const store = parseTurtle(`
+        <${subject}> <${BP}savedBook> "AK7" ; <${BP}preferredAudience> <${BP}test-audience-6-9> .
+        <${SETTINGS_SUBJECT}> <${DISABLED_STRATEGY}> <${BP}authorMatch>, <${BP}topicMatch> .`)
+    t.mock.method(globalThis, "fetch", async (url) => url.includes("inspira")
+        ? { ok: true, status: 200, json: async () => ({ basedOn: ["7"], points: ["2", "3"].map(akkey => ({ id: akkey, payload: { metadata: { akkey } } })) }) }
+        : { ok: true, json: async () => ({ response: { docs: [] } }) })
+    const run = await runRecommendations(store, subject, { solrEndpoint: "https://index.example/select", qdrantEndpoint: "https://inspira.example/api/recommend" })
+    const lane = run.results.find(r => r.strategy.iri === BP + "savedBookSimilarity")
+    assert.deepEqual(lane.docs, [])
+    assert.equal(lane.unfiltered, 2)
+})
+
 test("an inspira lane with nothing to check asks the index nothing", async t => {
     indexOffering()
     const store = parseTurtle(`
