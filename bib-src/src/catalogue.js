@@ -199,7 +199,7 @@ async function fetchFirst(endpoint, field, value) {
 // Records without a count rank just below a single copy (0.3).
 const COPIES_BOOST = "log(sum(field(copies,max),2))"
 
-// Free-text search for the "Titel hinzufügen" dialog: every typed word must occur in
+// Free-text search over the catalogue's records: every typed word must occur in
 // the title or among the authors, title matches rank first. What was typed is searched
 // as text, never as a query on a field of its own ("genre:Roman" looks for those words;
 // uf). Returns whole records, so a picked hit needs no second lookup, plus the total
@@ -214,33 +214,80 @@ export async function searchBooks(endpoint, text, rows = 8, extra = {}) {
     return { docs, total: numFound }
 }
 
-// Titles while typing: searchBooks with the word being typed matched as a prefix
-// ("unterleu" finds "Unterleuten"). The text is reduced to its words (letters and
-// digits), so nothing typed reaches the query parser as syntax; under three characters
-// there is nothing worth asking for. A prefix match carries no relevance of its own,
-// so that word is also asked for as it stands (a title that is exactly "Tschick" then
-// outranks the study guides about it), and the print and e-book records of a work are
-// lifted above its film and audio ones (the raw index tokens behind the media types
-// Buch and E-Book). Where the index knows how many copies the library holds, titles it
-// holds many of rise: among everything starting with "harry", the reader most likely
-// means what the library bought thirty times. Several editions of a title in the same
-// medium (the catalogue keeps a record per edition) show as one line, the best-ranked
-// of them.
+// The title search of the "Titel hinzufügen" card: searchBooks, one line per work. The
+// print and e-book records of a work are lifted above its film and audio ones (the raw
+// index tokens behind the media types Buch and E-Book), so they stand for it. Where the
+// index knows how many copies the library holds, titles it holds many of rise: among
+// everything called "harry", the reader most likely means what the library bought
+// thirty times. `total` is the number of records found while lines were cut off, else
+// the number of lines.
+async function searchWorks(endpoint, query, rows) {
+    const { docs, total } = await searchBooks(endpoint, query, rows * 3, {
+        bq: 'format:(Druckschrift OR "E-Book")',
+        ...(indexOffers("copies") ? { boost: COPIES_BOOST } : {}),
+    })
+    const seen = new Set()
+    const lines = docs.filter(doc => {
+        const key = doc.work_key?.[0] ?? [doc.title?.[0], doc.author?.[0], doc.format?.[0]].join("\n")
+        return !seen.has(key) && seen.add(key)
+    })
+    const cut = total > docs.length || lines.length > rows
+    return { docs: await withMedia(endpoint, lines.slice(0, rows)), total: cut ? total : lines.length }
+}
+
+// One line per work: the catalogue keeps a record per edition and medium, and of the
+// records that share a work key (or, without one, title, author and medium) the
+// best-ranked stands for all. Each line of a keyed work gets `media`: every medium the
+// catalogue holds the work in, its own first. One query asks for the records of the
+// lines' keys; the key field is tokenised, so the phrase may also find longer keys,
+// which the exact comparison drops. Without an answer the lines stay as they are.
+async function withMedia(endpoint, lines) {
+    const keys = [...new Set(lines.map(doc => doc.work_key?.[0]).filter(Boolean))]
+    if (keys.length === 0) return lines
+    const media = new Map(keys.map(key => [key, new Set()]))
+    try {
+        const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                q: keys.map(key => `work_key:"${key.replace(/(["\\])/g, "\\$1")}"`).join(" OR "),
+                fl: "work_key,format", rows: "500", wt: "json",
+            }),
+        })
+        if (!res.ok) throw new Error(`Solr ${res.status}`)
+        for (const record of (await res.json()).response.docs) {
+            const formats = media.get(record.work_key?.[0])
+            for (const format of formats ? record.format ?? [] : []) formats.add(format)
+        }
+    } catch (err) {
+        console.error("[bib-pods] media of the works found failed:", err)
+        return lines
+    }
+    return lines.map(doc => {
+        const own = doc.format?.[0]
+        const all = media.get(doc.work_key?.[0])
+        if (!all) return doc
+        return { ...doc, media: [own, ...[...all].filter(format => format !== own).sort()].filter(Boolean) }
+    })
+}
+
+// What was submitted, searched as it stands.
+export function searchTitles(endpoint, text, rows = 8) {
+    return searchWorks(endpoint, text, rows)
+}
+
+// Titles while typing: the word being typed is matched as a prefix ("unterleu" finds
+// "Unterleuten"). The text is reduced to its words (letters and digits), so nothing
+// typed reaches the query parser as syntax; under three characters there is nothing
+// worth asking for. A prefix match carries no relevance of its own, so that word is
+// also asked for as it stands (a title that is exactly "Tschick" then outranks the
+// study guides about it).
 export async function suggestBooks(endpoint, text, rows = 8) {
     const words = text.toLocaleLowerCase("de-DE").split(/[^\p{L}\p{N}]+/u).filter(Boolean)
     if (words.join("").length < 3) return { docs: [], total: 0 }
     const last = words.pop()
     words.push(`(${last} OR ${last}*)`)
-    const { docs, total } = await searchBooks(endpoint, words.join(" "), rows * 3, {
-        bq: 'format:(Druckschrift OR "E-Book")',
-        ...(indexOffers("copies") ? { boost: COPIES_BOOST } : {}),
-    })
-    const seen = new Set()
-    const editions = docs.filter(doc => {
-        const key = [doc.title?.[0], doc.author?.[0], doc.format?.[0]].join("\n")
-        return !seen.has(key) && seen.add(key)
-    })
-    return { docs: editions.slice(0, rows), total }
+    return searchWorks(endpoint, words.join(" "), rows)
 }
 
 export function fetchBook(endpoint, id) {

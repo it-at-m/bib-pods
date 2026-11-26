@@ -413,10 +413,10 @@ function factClauses(v, mappings, obj, profileStore) {
 }
 
 // fq clauses from the profile's preference properties (bp:RecommendationFilter — e.g.
-// Sprache, Medienart, Altersgruppe): one fq per property OR-ing its values. Solr ANDs separate fq
-// params, so "auf Deutsch oder Englisch, und als E-Book" comes out right. They apply
-// to every lane: the Solr lanes carry them in their queries, the inspira lane is
-// checked against them afterwards (see checkedAgainstIndex).
+// Sprache, Medienart, Altersgruppe): one fq per property OR-ing its values. Solr ANDs
+// separate fq params, so "auf Deutsch oder Englisch, und als E-Book" comes out right.
+// They apply to every lane: the Solr lanes carry them in their queries, the inspira
+// lane is checked against them afterwards (see checkedAgainstIndex).
 function preferenceFilters(v, profileStore, profileSubject) {
     const fqs = []
     for (const prop of v.getSubjects(RDF_TYPE, BP + "RecommendationFilter", null)) {

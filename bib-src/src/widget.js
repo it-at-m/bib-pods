@@ -4,7 +4,7 @@ import { getProfileSubject, getVocab, getLabel, contractTerm, storageErrorMessag
 import "cori-sdk/ui/profile.js" // registers the <cori-profile> primitive
 import { decorateCards, undecorateCards } from "./decorate-cards.js"
 import { runRecommendations, getStrategies, readStrategyChoices, resolveStrategyEnabled, explainStrategy, explainDocMatches, countStrategyMatches, countMatches, buildQuery, buildShelfQuery, hasPreferenceFilters, escapeHtml, ENABLED_STRATEGY, DISABLED_STRATEGY, SETTINGS_SUBJECT } from "./recommendations.js"
-import { sopacCatalogueUrl, fetchBook, searchBooks, suggestBooks, parseCatalogueRef, resolveCatalogueRef, OnleiheUnavailableError } from "./catalogue.js"
+import { sopacCatalogueUrl, fetchBook, searchTitles, suggestBooks, parseCatalogueRef, resolveCatalogueRef, OnleiheUnavailableError } from "./catalogue.js"
 import { installDismissPrompt } from "./book-prompt.js"
 import { createAssistantSource } from "./assistant-source.js"
 import { cleanAuthorName, bookHasOption } from "./book-options.js"
@@ -693,13 +693,22 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
 
     // What a text search found, one button per record: the same work often exists as
     // print, e-book and audio, so medium and year sit beside title and author.
+    // A raw medium token of the index under the name its media type goes by
+    // ("Druckschrift" is "Buch"); tokens outside the value set stay as they are.
+    function mediumLabel(token) {
+        const v = getVocab()
+        const concept = v.getSubjects(BP + "indexValue", factory.literal(token), null)[0]
+        return (concept && v.getObjects(concept, "http://www.w3.org/2004/02/skos/core#prefLabel", null)[0]?.value) ?? token
+    }
     function titleHits(docs, onPick) {
         return docs.map(doc => {
             const btn = document.createElement("button")
             btn.type = "button"
             const title = document.createElement("strong")
             title.textContent = doc.title?.[0]?.split(" | ")[0] ?? doc.id
-            const rest = [doc.author?.[0] && cleanAuthorName(doc.author[0]), doc.format?.[0], doc.publishDate?.[0]].filter(Boolean)
+            // the media a work comes in (or the record's own), by the names the media filter uses
+            const media = [...new Set((doc.media ?? doc.format?.slice(0, 1) ?? []).map(mediumLabel))].join(", ")
+            const rest = [doc.author?.[0] && cleanAuthorName(doc.author[0]), media, doc.publishDate?.[0]].filter(Boolean)
             btn.append(title, ...rest.map(part => ` · ${part}`))
             btn.addEventListener("click", () => onPick(doc))
             const li = document.createElement("li")
@@ -739,7 +748,7 @@ function mountLanding({ root, solrEndpoint, qdrantEndpoint, solidCallbackUrl, op
             }
             // A reference that names no record is a miss. Only a bare number goes on to
             // the text search: it reads as a Datensatznummer, but may be a title ("1984").
-            const { docs, total } = ref && !/^\d+$/.test(text) ? { docs: [], total: 0 } : await searchBooks(solrEndpoint, text)
+            const { docs, total } = ref && !/^\d+$/.test(text) ? { docs: [], total: 0 } : await searchTitles(solrEndpoint, text)
             if (docs.length === 0) {
                 ui.say("Dazu wurde im Katalog kein Titel gefunden.")
                 return
